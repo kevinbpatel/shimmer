@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026.8.14 - 2026-08-26
+
+Switching audio devices no longer teaches the stream bad habits, a connection
+that never shows a picture fixes itself, and Glimmer finally tells you about
+updates.
+
+Popping AirPods in or out mid-stream (or unplugging HDMI audio) used to be
+silently counted as evidence of a bad connection: each switch nudged the audio
+buffer a step deeper, and the app remembered that per PC - so audio delay crept
+up across sessions for anyone who changes audio devices. Device switches are now
+recognized for what they are and teach nothing.
+
+A stream that connected but never showed a first frame used to sit on a black
+screen until you cancelled it - the ten-second recovery everyone else gets
+simply didn't apply before the first picture. It does now.
+
+Internal health checks also now run on a clock that can't be moved by network
+time syncs or daylight-saving changes, so a clock adjustment mid-stream can no
+longer masquerade as (or hide) a real stall.
+
+And updates: Glimmer used to only look for a new version when you opened the
+app - which, if you leave it running for days, meant never. It now checks at
+startup and once a day while running, and tells you when a release is waiting.
+You can turn the automatic check off in the update window if you prefer quiet.
+
 ## 2026.8.13 - 2026-08-26
 
 Hosts added by hostname stream now.
