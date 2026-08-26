@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026.8.13 - 2026-08-26
+
+Hosts added by hostname stream now.
+
+Adding a PC by hostname or fully-qualified domain name - a Tailscale MagicDNS
+name, a local DNS record, anything that resolves - used to fail in the most
+confusing way possible: pairing worked, the connection reported as established,
+and then the stream died instantly, every time. Only the video and audio
+channels ever saw the raw hostname; everything before them resolved it on their
+own. Glimmer now resolves the name once, up front, and hands the same resolved
+address to every part of the session - so names work everywhere an IP does, and
+a name that doesn't resolve fails immediately with an error that says exactly
+that.
+
+Thanks to the excellent diagnosis in issue #70, which identified the root cause
+down to the line.
+
 ## 2026.8.12 - 2026-08-21
 
 A rare crash in long-running sessions is gone.
