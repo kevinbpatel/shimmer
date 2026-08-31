@@ -6,6 +6,18 @@
     <description>Glimmer auto-update feed</description>
     <language>en</language>
     <item>
+      <title>2026.8.16</title>
+      <description><![CDATA[
+<p>Fixes a crash at the end of a stream when diagnostics are turned on.</p>
+<p>With the optional diagnostics enabled, ending a stream could take the whole app down. The system interface Glimmer reads processor and power statistics from does not tolerate having its objects cleaned up the way its naming suggests it should, and the cleanup at session end could land on memory that was no longer valid. Glimmer now keeps that reader alive for the life of the app, the way Apple's own power tools use the same interface, and simply resets its counters between sessions. Diagnostics stay off by default and this changes nothing else.</p>
+]]></description>
+      <pubDate>Mon, 31 Aug 2026 00:45:15 GMT</pubDate>
+      <sparkle:version>20260831</sparkle:version>
+      <sparkle:shortVersionString>2026.8.16</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/Se7enbrc/glimmer/releases/download/2026.8.16/Glimmer-2026.8.16.zip" type="application/octet-stream" sparkle:edSignature="BooYV6B8A6k+xV7t9kb9+zvXrI37v8txse1nWMciRNsh0xVG+fge78pF8Y5nSQN9WFyDA8mnG6z8NcNNN8I1Ag==" length="8262111" />
+    </item>
+    <item>
       <title>2026.8.15</title>
       <description><![CDATA[
 <p>The DualSense quit chord works, pairing a second PC works, Glimmer stops taking things away from Moonlight, and Homebrew can install it.</p>
