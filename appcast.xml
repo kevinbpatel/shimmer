@@ -6,6 +6,18 @@
     <description>Glimmer auto-update feed</description>
     <language>en</language>
     <item>
+      <title>2026.8.18</title>
+      <description><![CDATA[
+<p>Glimmer no longer polls your PC while the Mac is going to sleep.</p>
+<p>The launcher checks the selected PC every ten seconds to keep the readiness chip honest. If the Mac fell asleep in the middle of one of those checks, the PC was left holding a half-finished secure connection, and Sunshine's secure listener would wait on it forever: every later connection was refused until Sunshine was restarted, and until 2026.8.17 Glimmer described that as a pairing problem. Any client can trigger that on Sunshine's side; Glimmer now simply stops being the one that does. The moment macOS announces sleep the poller stops, and it starts again on wake with a fresh check.</p>
+]]></description>
+      <pubDate>Wed, 02 Sep 2026 14:41:03 GMT</pubDate>
+      <sparkle:version>20260903</sparkle:version>
+      <sparkle:shortVersionString>2026.8.18</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/Se7enbrc/glimmer/releases/download/2026.8.18/Glimmer-2026.8.18.zip" type="application/octet-stream" sparkle:edSignature="cUrRpMaX1JDFf8ln7HYNdR+3lKBAc0/BloSJ2XLKMBQVbzlX2Rca7dBWL0ZVQXgNDnIbG+j5eVMoixuwwLMqCQ==" length="8263880" />
+    </item>
+    <item>
       <title>2026.8.17</title>
       <description><![CDATA[
 <p>Glimmer stops telling you to re-pair when the real problem is on the PC.</p>
