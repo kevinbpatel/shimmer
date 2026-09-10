@@ -85,7 +85,7 @@ extension NetworkClient {
         // refuse us as an unknown client.
         let resp = try await ControlTransport.get(
             host: server.address, port: port, target: target,
-            userAgent: "Mozilla/5.0 (compatible; Moonlight/Glimmer)",
+            userAgent: "Mozilla/5.0 (compatible; Moonlight/Shimmer)",
             tls: usePaired,
             credential: ControlTransport.TLSCredential(
                 clientCertPEM: usePaired ? clientCertPEM : nil,

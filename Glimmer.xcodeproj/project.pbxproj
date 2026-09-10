@@ -22,6 +22,7 @@
 		A10000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* SettingsView.swift */; };
 		A1000009A /* PairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000009B /* PairSheet.swift */; };
 		A100030A /* ContainerMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100030B /* ContainerMigration.swift */; };
+		A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE001120000000000000 /* BundleIDMigration.swift */; };
 		A100010A /* TroubleshootingPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100010B /* TroubleshootingPane.swift */; };
 		A100011A /* DualSenseHID.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100011B /* DualSenseHID.swift */; };
 		D20000A3 /* DualSenseHID+Decode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000A2 /* DualSenseHID+Decode.swift */; };
@@ -302,7 +303,7 @@
 		68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Glimmer Login Helper.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		71A5B2E11628E68BFAF05421 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9158C8506080330EC17875A9 /* Host.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Host.swift; sourceTree = "<group>"; };
-		A10000010 /* Glimmer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glimmer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000010 /* Shimmer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shimmer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000011 /* GlimmerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlimmerApp.swift; sourceTree = "<group>"; };
 		A10000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A10000013 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -312,6 +313,7 @@
 		A10000017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000009B /* PairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairSheet.swift; sourceTree = "<group>"; };
 		A100030B /* ContainerMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerMigration.swift; sourceTree = "<group>"; };
+		A1C0DE001120000000000000 /* BundleIDMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BundleIDMigration.swift"; sourceTree = "<group>"; };
 		A100010B /* TroubleshootingPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TroubleshootingPane.swift; sourceTree = "<group>"; };
 		A100011B /* DualSenseHID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DualSenseHID.swift; path = Stream/DualSenseHID.swift; sourceTree = "<group>"; };
 		D20000A2 /* DualSenseHID+Decode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DualSenseHID+Decode.swift"; path = "Stream/DualSenseHID+Decode.swift"; sourceTree = "<group>"; };
@@ -630,6 +632,7 @@
 				A10000017 /* SettingsView.swift */,
 				A1000009B /* PairSheet.swift */,
 				A100030B /* ContainerMigration.swift */,
+				A1C0DE001120000000000000 /* BundleIDMigration.swift */,
 				A100010B /* TroubleshootingPane.swift */,
 				A100020B /* DiagnosticsPane.swift */,
 				A100012B /* LogStore.swift */,
@@ -851,7 +854,7 @@
 		A10000032 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000010 /* Glimmer.app */,
+				A10000010 /* Shimmer.app */,
 				68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */,
 				D2000019 /* GlimmerTests.xctest */,
 			);
@@ -914,7 +917,7 @@
 				A1009011 /* Sparkle */,
 			);
 			productName = Glimmer;
-			productReference = A10000010 /* Glimmer.app */;
+			productReference = A10000010 /* Shimmer.app */;
 			productType = "com.apple.product-type.application";
 		};
 		AD84EE95363FBCE53F028062 /* Glimmer Login Helper */ = {
@@ -1027,6 +1030,7 @@
 				A10000005 /* SettingsView.swift in Sources */,
 				A1000009A /* PairSheet.swift in Sources */,
 				A100030A /* ContainerMigration.swift in Sources */,
+				A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */,
 				A100010A /* TroubleshootingPane.swift in Sources */,
 				A100020A /* DiagnosticsPane.swift in Sources */,
 				A100012A /* LogStore.swift in Sources */,
@@ -1305,8 +1309,8 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoginHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer.LoginHelper;
-				PRODUCT_NAME = "Glimmer Login Helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer.LoginHelper;
+				PRODUCT_NAME = "Shimmer Login Helper";
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
@@ -1456,8 +1460,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer;
+				PRODUCT_NAME = Shimmer;
+				PRODUCT_MODULE_NAME = Glimmer;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_INFERSENDABLEFROMCAPTURES = YES;
@@ -1488,8 +1493,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer;
+				PRODUCT_NAME = Shimmer;
+				PRODUCT_MODULE_NAME = Glimmer;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_INFERSENDABLEFROMCAPTURES = YES;
@@ -1509,7 +1515,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glimmer.app/Contents/MacOS/Glimmer";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shimmer.app/Contents/MacOS/Shimmer";
 			};
 			name = Debug;
 		};
@@ -1523,7 +1529,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glimmer.app/Contents/MacOS/Glimmer";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shimmer.app/Contents/MacOS/Shimmer";
 			};
 			name = Release;
 		};
@@ -1540,8 +1546,8 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoginHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer.LoginHelper;
-				PRODUCT_NAME = "Glimmer Login Helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer.LoginHelper;
+				PRODUCT_NAME = "Shimmer Login Helper";
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;

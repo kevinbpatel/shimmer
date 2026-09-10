@@ -129,7 +129,7 @@ enum Diag {
 /// Buffered background file sink that mirrors the Diag/os_log stream to a
 /// per-session text file when telemetry/debug is enabled. This is the THIRD sink
 /// on `LogStore.log` (after the in-memory ring buffer and os_log): it persists the
-/// rich runtime log to `~/Library/Logs/Glimmer/glimmer-<ISO8601>.log` - the SAME
+/// rich runtime log to `~/Library/Logs/Shimmer/shimmer-<ISO8601>.log` - the SAME
 /// directory the telemetry NDJSON writer uses, so a log shipper can mount one
 /// folder and tail both `*.log` and `*.ndjson`.
 ///
@@ -244,7 +244,7 @@ final class SessionLogFileSink: @unchecked Sendable {
         flushQueue.async { [weak self] in
             guard let self else { return }
             let dir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Logs/Glimmer", isDirectory: true)
+                .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
             do {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             } catch {

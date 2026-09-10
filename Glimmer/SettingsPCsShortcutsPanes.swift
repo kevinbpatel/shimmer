@@ -202,7 +202,7 @@ struct ShortcutsPane: View {
         Form {
             Section("In-stream shortcuts") {
                 HotkeyRow(label: "Leave the stream", hotkey: $model.quitHotkey)
-                Text("Press this combo at any time during a stream to return to Glimmer.")
+                Text("Press this combo at any time during a stream to return to Shimmer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 HotkeyRow(label: "Show or hide stream stats", hotkey: $model.statsHotkey)

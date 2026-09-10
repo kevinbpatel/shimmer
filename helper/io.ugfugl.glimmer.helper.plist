@@ -14,10 +14,13 @@
         <key>io.ugfugl.glimmer.helper</key>
         <true/>
     </dict>
-    <!-- Groups the daemon under the app in System Settings > Login Items & Extensions. -->
+    <!-- Groups the daemon under the app in System Settings > Login Items & Extensions.
+         The launchd label / binary name keep glimmer's internal identifier (renaming
+         a registered daemon forces every user to re-approve it); only the owning
+         app changes. -->
     <key>AssociatedBundleIdentifiers</key>
     <array>
-        <string>io.ugfugl.Glimmer</string>
+        <string>com.kevinbpatel.shimmer</string>
     </array>
 </dict>
 </plist>

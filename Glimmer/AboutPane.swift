@@ -2,8 +2,8 @@
 //  AboutPane.swift
 //
 //  Settings → About. App identity, the credo, version (with the option-click
-//  Diagnostics reveal), credits, license, and the donate link. Split out of
-//  SettingsPCsShortcutsPanes.swift to keep that file under the 600-line bar.
+//  Diagnostics reveal), credits, license, and the upstream support link. Split
+//  out of SettingsPCsShortcutsPanes.swift to keep that file under the 600-line bar.
 //
 
 import AppKit
@@ -13,12 +13,14 @@ import SwiftUI
 /// force-unwrapped URLs) so the pane renders link rows with a lint-clean
 /// `if let`; a malformed constant degrades to "row missing", never a crash.
 private enum AboutLink {
-    static let credits = "https://github.com/Se7enbrc/glimmer/blob/main/CREDITS.md"
+    static let repo = "https://github.com/kevinbpatel/shimmer"
+    static let credits = "https://github.com/kevinbpatel/shimmer/blob/main/CREDITS.md"
+    static let upstream = "https://github.com/Se7enbrc/glimmer"
     static let license = "https://www.gnu.org/licenses/gpl-3.0.html"
     static let sunshine = "https://github.com/LizardByte/Sunshine"
     static let moonlight = "https://github.com/moonlight-stream"
-    /// The support link - the donate row reads this one constant and nothing
-    /// else. Mirrors the repo's FUNDING.yml (GitHub Sponsors).
+    /// glimmer's author's GitHub Sponsors - shimmer's engine is theirs, so the
+    /// one ask in this pane goes upstream.
     static let donate = "https://github.com/sponsors/Se7enbrc"
 }
 
@@ -47,14 +49,14 @@ struct AboutPane: View {
                             .frame(width: 96, height: 96)
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Glimmer")
+                        Text("Shimmer")
                             .font(.system(size: 28, weight: .bold))
                             .tracking(-0.4)
-                        Text("Stream your gaming PC to this Mac.")
+                        Text("Stream your gaming PC to this Mac - and pop it out.")
                             .font(.title3)
                             .foregroundStyle(.secondary)
-                        // The credo. One line, no elaboration - it is the
-                        // project's bar, not a slogan to be decorated.
+                        // The credo, inherited from glimmer. One line, no
+                        // elaboration - it is the project's bar, not a slogan.
                         Text("Highest fidelity. Lowest resources. Rock stable.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -63,22 +65,16 @@ struct AboutPane: View {
                             .font(.footnote)
                             .foregroundStyle(.tertiary)
                             // Hidden reveal for the telemetry/tuning sections
-                            // inside Settings → Diagnostics (the pane itself is
-                            // always visible for the input test + logs; only the
-                            // debug wires hide). Option-clicking the version line
-                            // toggles the `showDiagnostics` UserDefault - a
+                            // inside Settings → Diagnostics. Option-clicking the
+                            // version line toggles `showDiagnostics` - a
                             // deliberate, undiscoverable gesture so normal users
                             // never trip it, but a power user (or a bug report)
-                            // can surface them. The Telemetry toggle lives inside
-                            // those sections, so it can't gate its own reveal -
-                            // hence this separate gesture-driven flag.
+                            // can surface them.
                             .gesture(
                                 TapGesture()
                                     .modifiers(.option)
                                     .onEnded { model.showDiagnostics.toggle() }
                             )
-                            // Option-cursor hint that something lives here,
-                            // without spelling it out.
                             .help(model.showDiagnostics
                                   ? "Option-click to hide the developer tools"
                                   : "")
@@ -87,18 +83,29 @@ struct AboutPane: View {
                 }
                 .padding(.vertical, 6)
             }
-            // Order: Support up top (the one ask), License in the middle (the
-            // legal fact), and the third-party credits at the bottom as a
-            // closing note of appreciation.
-            Section("Support") {
+            Section("A fork of glimmer") {
+                Text("Shimmer is a fork of glimmer by Se7enbrc that adds macOS Picture in "
+                    + "Picture. The streaming engine - decoder, pacing, audio, input - is "
+                    + "glimmer's work; the pop-out and its macOS workarounds are Shimmer's.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if let url = URL(string: AboutLink.repo) {
+                    Link("github.com/kevinbpatel/shimmer", destination: url)
+                        .font(.footnote)
+                }
+                if let url = URL(string: AboutLink.upstream) {
+                    Link("github.com/Se7enbrc/glimmer (upstream)", destination: url)
+                        .font(.footnote)
+                }
                 if let url = URL(string: AboutLink.donate) {
-                    Link("Support Glimmer's development", destination: url)
+                    Link("Support glimmer's author", destination: url)
                         .font(.footnote)
                 }
             }
             Section("License") {
-                Text("Glimmer is free software under the GNU General Public License v3. "
-                    + "You may run, study, share, and modify it; there is no warranty.")
+                Text("Shimmer is free software under the GNU General Public License v3, the "
+                    + "same license as glimmer. You may run, study, share, and modify it; "
+                    + "there is no warranty.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if let url = URL(string: AboutLink.license) {
@@ -107,7 +114,7 @@ struct AboutPane: View {
                 }
             }
             Section("Projects we like") {
-                Text("Built for Sunshine, the open-source game-streaming host. Glimmer "
+                Text("Built for Sunshine, the open-source game-streaming host. Shimmer "
                     + "speaks the Moonlight protocol - itself carrying NVIDIA GameStream "
                     + "forward - and the transport is ported from moonlight-common-c, "
                     + "with respect. Full credits in CREDITS.md.")

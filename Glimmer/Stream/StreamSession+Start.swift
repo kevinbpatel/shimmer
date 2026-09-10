@@ -238,7 +238,7 @@ extension StreamSession {
                 .userInitiated, .latencyCritical,
                 .idleDisplaySleepDisabled, .idleSystemSleepDisabled
             ],
-            reason: "Glimmer is streaming")
+            reason: "Shimmer is streaming")
     }
 
     /// Step 1 of start(): fetch /serverinfo, stamp its launch sub-leg, log the

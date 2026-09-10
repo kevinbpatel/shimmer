@@ -66,7 +66,7 @@ enum IdentityKey {
 
 // MARK: - FileIdentityStore
 //
-// Three mode-0600 files under ~/Library/Application Support/Glimmer/Identity/.
+// Three mode-0600 files under ~/Library/Application Support/Shimmer/Identity/.
 // Atomic writes, owner-only permissions, verified by stat(2) after setattr
 // because some filesystems (network mounts, FUSE) silently ignore the chmod.
 
@@ -93,7 +93,7 @@ enum FileIdentityStore {
         }
     }
 
-    /// `~/Library/Application Support/Glimmer/Identity/`. Created on first
+    /// `~/Library/Application Support/Shimmer/Identity/`. Created on first
     /// write with mode 0700.
     static func directoryURL() throws -> URL {
         let fm = FileManager.default
@@ -101,7 +101,7 @@ enum FileIdentityStore {
                               in: .userDomainMask,
                               appropriateFor: nil,
                               create: true)
-        return base.appendingPathComponent("Glimmer/Identity", isDirectory: true)
+        return base.appendingPathComponent("Shimmer/Identity", isDirectory: true)
     }
 
     static func fileURL(account: String) throws -> URL? {

@@ -195,7 +195,7 @@ extension StreamWindow {
         // invisible (defensive - close() is currently the last call).
         window.alphaValue = 1.0
         NSApp.activate()
-        if let main = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Glimmer" }) {
+        if let main = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Shimmer" }) {
             main.makeKeyAndOrderFront(nil)
         }
     }

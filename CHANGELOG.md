@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+The app is now Shimmer. It installs as `Shimmer.app`, identifies itself as
+`com.kevinbpatel.shimmer` (login helper `com.kevinbpatel.shimmer.LoginHelper`),
+and keeps its data under `Application Support/Shimmer` and `Logs/Shimmer`. An
+existing glimmer install upgrades in place: on first launch Shimmer copies the
+paired PCs, preferences, and client identity forward - no re-pairing - and
+leaves glimmer's own files alone. The Swift module and source tree keep the
+`Glimmer` name so upstream changes still merge cleanly, and the Wi-Fi helper
+daemon keeps its launchd label (renaming a registered daemon would force a
+re-approval); only its owning app changed.
+
 Fix: the Picture in Picture window showed only the bottom-left corner of the
 stream. macOS's sample-buffer PiP mirrors the source layer at 1:1 pixels with
 no scaling (an Apple bug, FB22411168), so a fullscreen source only ever filled

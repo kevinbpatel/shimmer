@@ -393,7 +393,7 @@ final class TelemetryExporter: @unchecked Sendable {
             }
         }
         if pruned > 0 {
-            log.notice("Telemetry: swept \(pruned, privacy: .public) old log file(s) from Logs/Glimmer")
+            log.notice("Telemetry: swept \(pruned, privacy: .public) old log file(s) from Logs/Shimmer")
         }
     }
 

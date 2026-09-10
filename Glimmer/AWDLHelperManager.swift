@@ -162,7 +162,7 @@ final class AWDLHelperManager: ObservableObject {
     /// the UI points them at Apple's own Login Items guide (`recoveryDocURL`).
     private static let wedgedRegistrationMessage =
         "macOS left a stuck background-item record (a known glitch after an app "
-        + "update), so it won't register the helper. You can manage Glimmer's "
+        + "update), so it won't register the helper. You can manage Shimmer's "
         + "background items in System Settings - Login Items & Extensions."
 
     /// Apple's official Login Items & Extensions guide - a credible reference for
@@ -390,7 +390,7 @@ struct AWDLEnablePrompt: View {
                 }
             }
             Text("AirDrop and Continuity share your Mac's Wi-Fi radio. While you stream they "
-                + "can grab the channel and cause multi-second freezes. Glimmer can park that "
+                + "can grab the channel and cause multi-second freezes. Shimmer can park that "
                 + "radio for the length of each stream and restore it the instant you stop.")
                 .fixedSize(horizontal: false, vertical: true)
             Text("Installs a small helper that needs a one-time approval in System Settings.")

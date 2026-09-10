@@ -25,14 +25,14 @@ struct MenuBarContent: View {
             // constraints (system NSMenu: Labels show their SF Symbol,
             // Sections render titled groups, custom materials are NOT
             // honoured - lean on iconography + structure, not glass). Item
-            // order: navigational ("Open Glimmer") FIRST, then stream actions,
+            // order: navigational ("Open Shimmer") FIRST, then stream actions,
             // then app-wide (Settings / Quit) - Apple's first-party agent
             // pattern (Time Machine, Bluetooth).
             Button {
                 openWindow(id: "main")
                 activate()
             } label: {
-                Label("Open Glimmer", systemImage: "macwindow")
+                Label("Open Shimmer", systemImage: "macwindow")
             }
 
             if let host = model.selectedHost {
@@ -128,7 +128,7 @@ struct MenuBarContent: View {
             Button {
                 NSApp.terminate(nil)
             } label: {
-                Label("Quit Glimmer", systemImage: "power")
+                Label("Quit Shimmer", systemImage: "power")
             }
             .keyboardShortcut("q")
         }
@@ -222,7 +222,7 @@ private struct HostContextMenu: ViewModifier {
                 Button("Unpair", role: .destructive) { model.unpair(host) }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Glimmer will forget this PC and leave a clean state. You can pair again at any time.")
+                Text("Shimmer will forget this PC and leave a clean state. You can pair again at any time.")
             }
     }
 }

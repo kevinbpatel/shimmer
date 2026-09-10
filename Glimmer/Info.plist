@@ -31,7 +31,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 ugfugl.io. GNU GPL v3.</string>
 	<key>CFBundleDisplayName</key>
-	<string>Glimmer</string>
+	<string>Shimmer</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<!-- Tell AppKit not to wrap notched MacBook panels in safe-area

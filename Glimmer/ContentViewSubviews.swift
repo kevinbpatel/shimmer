@@ -215,7 +215,7 @@ struct EmptyPairingState: View {
                 Text("Let's find your gaming PC")
                     .font(.system(size: 26, weight: .bold))
                     .tracking(-0.4)
-                Text("Glimmer plays games from your gaming PC, on this Mac.")
+                Text("Shimmer plays games from your gaming PC, on this Mac.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

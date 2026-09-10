@@ -34,7 +34,7 @@ extension AppModel {
         // SMAppService registration. Re-assert it so the post-update stream uses
         // the new daemon without the user re-toggling anything.
         AWDLHelperManager.shared.reconcileAfterUpdate()
-        log.info("Glimmer stream engine: Swift-native")
+        log.info("Shimmer stream engine: Swift-native")
         // Install step: build the client SecIdentity once, into Glimmer's own
         // keychain, so streams don't prompt the user for keychain access.
         await IdentityManager.shared.preflight()

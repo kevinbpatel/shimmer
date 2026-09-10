@@ -304,7 +304,7 @@ extension AppModel {
         self.restartHostStatusPolling(afterStream: true)
         NSApp.activate()
         if let main = NSApp.windows.first(where: {
-            $0.identifier?.rawValue == "main" || $0.title == "Glimmer"
+            $0.identifier?.rawValue == "main" || $0.title == "Shimmer"
         }) {
             main.makeKeyAndOrderFront(nil)
         }

@@ -33,6 +33,10 @@ struct GlimmerApp: App {
     @State private var model: AppModel
 
     init() {
+        // FIRST: carry a glimmer install's pairings + preferences forward into
+        // shimmer's bundle id / support directory (one-shot; see the file).
+        // Precedes ContainerMigration so its copied sentinel is honoured.
+        BundleIDMigration.runIfNeeded()
         // MUST precede AppModel(): its init reads ~20 UserDefaults keys,
         // which the unsandbox-flip orphaned in the old container until this runs.
         ContainerMigration.runIfNeeded()
@@ -102,7 +106,7 @@ struct GlimmerApp: App {
     var body: some Scene {
         // `Window` (single-instance) over `WindowGroup` - `openWindow(id:)`
         // brings the existing one to front instead of spawning a duplicate.
-        Window("Glimmer", id: "main") {
+        Window("Shimmer", id: "main") {
             MainWindow()
                 .environment(model)
                 // 520pt card + 80pt margins per side = 680. This MUST equal the
@@ -206,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bundle = Bundle.main
         let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-        Diag.notice("app launching - Glimmer \(version) (\(build)) commit \(BuildInfo.commit) "
+        Diag.notice("app launching - Shimmer \(version) (\(build)) commit \(BuildInfo.commit) "
             + "built \(BuildInfo.date) (launchedAtLogin=\(launchedAtLogin))", "Launch")
 
         // Defaults registration deliberately does NOT happen here: it has to run

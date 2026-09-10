@@ -59,7 +59,7 @@ is a nod to the moonlight → sunshine → glimmer lineage it sits in.
   hotkeys.
 
 Nothing leaves your Mac. Diagnostics are off by default and write local files
-under `~/Library/Logs/Glimmer`.
+under `~/Library/Logs/Shimmer`.
 
 ## Install
 
@@ -90,11 +90,13 @@ brew install openssl@3 opus
 make
 ```
 
-`make` builds and installs to /Applications the same way a release ships.
-`make app` compile-checks, `make test` runs the unit tests, `make uninstall`
-removes it. The engine is under `Glimmer/Stream/`, no submodules. The app
-bundle, log directory, and internal identifiers still carry glimmer's name for
-now - a full in-app rebrand is a follow-up.
+`make` builds and installs `/Applications/Shimmer.app` the same way a release
+ships. `make app` compile-checks, `make test` runs the unit tests,
+`make uninstall` removes it. The engine is under `Glimmer/Stream/` (the source
+tree and Swift module keep glimmer's name; the app, bundle id
+`com.kevinbpatel.shimmer`, and data folders are Shimmer's). Upgrading from a
+glimmer install is automatic: on first launch Shimmer copies your pairings,
+preferences, and client identity forward, and leaves glimmer's untouched.
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 

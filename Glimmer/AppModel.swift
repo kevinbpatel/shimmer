@@ -369,11 +369,11 @@ final class AppModel {
     /// Shared up-front explanation shown before macOS's Input Monitoring prompt
     /// (both the auto-offer on DualSense connect and the Settings toggle).
     static let rawHIDExplanation =
-        "Glimmer will read your DualSense's raw input to access the Options, "
+        "Shimmer will read your DualSense's raw input to access the Options, "
         + "Create/Share, and Mute buttons.\n\nmacOS will then ask for "
         + "\u{201C}Input Monitoring\u{201D} permission. Its dialog says "
         + "\u{201C}keystrokes\u{201D} because that's the same system permission "
-        + "- but Glimmer only reads the controller, never your keyboard."
+        + "- but Shimmer only reads the controller, never your keyboard."
 
     /// Reveals the Settings ▸ Diagnostics pane (the single hideable home for the
     /// debug/tuning wires: the Telemetry toggle, the bookmark chord, and the
