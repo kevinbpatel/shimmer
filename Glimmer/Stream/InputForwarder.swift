@@ -243,6 +243,16 @@ public final class InputForwarder {
     /// module.
     public internal(set) var isReady: Bool = false
 
+    /// True while the stream is popped out to Picture in Picture. The window is
+    /// then an alpha-0 mirror source, not a focused game surface, so keyboard
+    /// and mouse must NOT be forwarded to the host - otherwise the global
+    /// relative-aim cursor freeze (associate-false) stays engaged and every Mac
+    /// mouse move drives the game pointer, wherever the pointer is. Controller
+    /// input is unaffected (it goes through the GameController path, not the
+    /// StreamInputView handlers this gates) - keep-playing-with-the-pad is the
+    /// whole point of PiP. Set via `setPiPSuspended(_:)`.
+    public internal(set) var pipSuspended: Bool = false
+
     /// The streaming engine input is forwarded to. Injected by StreamSession at
     /// attach time so the forwarder talks to the protocol (`backend.send*`)
     /// instead of calling Li* directly. Optional + nil-guarded: until it's set

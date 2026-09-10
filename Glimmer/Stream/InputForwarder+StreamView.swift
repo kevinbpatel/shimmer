@@ -120,7 +120,7 @@ extension InputForwarder: StreamInputViewDelegate {
         }
 
         // Ignore auto-repeated keys; the host generates its own repeats.
-        guard !event.isARepeat, isReady else { return true }
+        guard !event.isARepeat, isReady, !pipSuspended else { return true }
         guard let vk = vkScanCode(forCarbonKeyCode: Int(event.keyCode)) else { return true }
         let wireCode = Int16(bitPattern: 0x8000 | UInt16(bitPattern: vk))
         let rc = backend?.sendKeyboard(
@@ -135,7 +135,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleKeyUp event: NSEvent) {
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         // Mirror the sys-key gate from handleKeyDown: if Cmd is held and
@@ -163,7 +163,7 @@ extension InputForwarder: StreamInputViewDelegate {
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let changed = mods.symmetricDifference(lastModFlags)
         lastModFlags = mods
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
 
         // Use the OS keyCode to figure out which side (L vs R) of the modifier
         // changed - Win VK has separate codes for LSHIFT (0xA0) and RSHIFT
@@ -227,7 +227,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseMoved event: NSEvent) {
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
 
         // Coalesce queued mouseMoved events the way moonlight-qt does it
         // (SDL_PeepEvents drains all pending SDL_MOUSEMOTION events and
@@ -375,7 +375,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseDown event: NSEvent) {
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
         let hostButton = button(for: event)
         let rc = backend?.sendMouseButton(
             action: Int8(StreamProtocol.BUTTON_ACTION_PRESS), button: hostButton) ?? -2
@@ -384,7 +384,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseUp event: NSEvent) {
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
         let hostButton = button(for: event)
         let rc = backend?.sendMouseButton(
             action: Int8(StreamProtocol.BUTTON_ACTION_RELEASE), button: hostButton) ?? -2
@@ -393,7 +393,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleScroll event: NSEvent) {
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
         // DEADZONE REMOVED. This handler
         // used to clamp each event's delta to ±1.0 line before the WHEEL_DELTA
         // scale - a per-event magnitude cap added

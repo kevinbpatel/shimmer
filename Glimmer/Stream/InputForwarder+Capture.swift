@@ -211,6 +211,25 @@ extension InputForwarder {
             """)
     }
 
+    /// Suspend/resume keyboard + mouse forwarding for Picture in Picture. On
+    /// suspend, release the global relative-aim cursor freeze and raise any
+    /// held keys/buttons so nothing is stuck on the host; on resume, re-engage
+    /// capture if the window is key again. Controller forwarding is untouched.
+    func setPiPSuspended(_ suspended: Bool) {
+        guard suspended != pipSuspended else { return }
+        pipSuspended = suspended
+        if suspended {
+            raiseAllHeldInputs(reason: "picture in picture")
+            exitCapturedMode()
+            log.info("Input: keyboard/mouse forwarding suspended for Picture in Picture (controller stays live)")
+        } else {
+            log.info("Input: keyboard/mouse forwarding resumed after Picture in Picture")
+            if window?.isKeyWindow == true {
+                enterCapturedMode()
+            }
+        }
+    }
+
     func installGestureSuppressionMonitor() {
         guard gestureSuppressionMonitor == nil else { return }
         // Zoom-inducing gestures only. A broader mask (`.gesture`,

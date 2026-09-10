@@ -108,12 +108,19 @@ extension StreamSession {
         // firing off screen - rebind the pacer to a screen link for the
         // duration. The caller gets the edge for its UI.
         let onPictureInPictureChanged = options.onPictureInPictureChanged
-        win.onPictureInPictureChanged = { [weak dec] active in
-            dec?.setPacingDetachedFromView(active)
-            onPictureInPictureChanged?(active)
-        }
         win.autoPictureInPictureProvider = options.autoPictureInPictureProvider
         let inp = InputForwarder()
+        // Picture in Picture up/down: rebind the pacer to a screen link, and
+        // SUSPEND keyboard/mouse forwarding (the window is an alpha-0 mirror
+        // source, not a focused game surface - otherwise the global relative-
+        // aim cursor freeze stays on and every Mac mouse move drives the game
+        // pointer). Controller forwarding is unaffected. The caller gets the
+        // edge for its UI. Wired after `inp` exists so it can be captured.
+        win.onPictureInPictureChanged = { [weak dec, weak inp] active in
+            dec?.setPacingDetachedFromView(active)
+            inp?.setPiPSuspended(active)
+            onPictureInPictureChanged?(active)
+        }
         // Hotkey chords need to be readable LIVE on every keyDown so
         // changes in Settings take effect without restarting the
         // stream. Capture-at-attach silently strands edits. The

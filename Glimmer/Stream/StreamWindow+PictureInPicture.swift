@@ -254,6 +254,13 @@ extension StreamWindow {
                     self.window.setFrame(
                         NSRect(x: origin.x, y: origin.y, width: size.width, height: size.height),
                         display: true)
+                    // Part B of the workaround: AVKit draws an empty black
+                    // overlay (AVPictureInPictureCALayerHostView) on top of the
+                    // correctly-scaled content layer - the big black box. Hide
+                    // it (never its parent CALayerHost, which carries the real
+                    // content). Re-applied on every resize because AVKit can
+                    // re-show it.
+                    self.hidePiPBlackOverlay(in: content)
                 }
                 apply()
                 content.postsFrameChangedNotifications = true
@@ -263,6 +270,21 @@ extension StreamWindow {
                 self.log.info("PiP: source window matched to PiP panel content \(Int(content.bounds.width))x\(Int(content.bounds.height))")
             }
         }
+    }
+
+    /// Walk the PiP panel's view tree and hide AVKit's empty black overlay
+    /// (`AVPictureInPictureCALayerHostView`) - the fixed black box drawn on top
+    /// of the correctly-scaled content. NEVER hide its parent `CALayerHost`,
+    /// which carries the real mirrored content. Safe/no-op if the class isn't
+    /// present (future macOS rename): the black box simply remains.
+    func hidePiPBlackOverlay(in root: NSView) {
+        func walk(_ v: NSView) {
+            if String(describing: type(of: v)) == "AVPictureInPictureCALayerHostView" {
+                if !v.isHidden { v.isHidden = true }
+            }
+            for sub in v.subviews { walk(sub) }
+        }
+        walk(root)
     }
 
     /// Leave mirror-source mode: stop tracking, restore the fullscreen frame,
