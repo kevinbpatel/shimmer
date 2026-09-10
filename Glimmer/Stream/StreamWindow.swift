@@ -249,6 +249,11 @@ public final class StreamWindow {
     /// The fullscreen frame to restore when PiP ends (saved on entering source
     /// mode). nil when not in source mode.
     var savedFrameBeforePiP: NSRect?
+    /// Window-mode chrome suspended while acting as the mirror source: the
+    /// aspect lock and minimum size (both would refuse the PiP-panel-sized
+    /// content) and the frame autosave name (so the tiny source frame is never
+    /// persisted as "the user's window"). Restored by exitPiPSourceMode().
+    var savedChromeBeforePiP: (aspect: NSSize, minSize: NSSize, autosaveName: String)?
     /// Observer on the PiP panel's content view frame, so the mirror source
     /// window tracks PiP window resizes and keeps filling it 1:1.
     var pipPanelFrameObserver: NSObjectProtocol?
@@ -259,6 +264,10 @@ public final class StreamWindow {
     /// PiP window came up / went away. The session owner rebinds the frame
     /// pacer (screen link vs view link) and tells the launcher UI.
     public var onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
+    /// The system PiP panel was located (non-nil, on didStart) or PiP ended
+    /// (nil). The session owner points the input forwarder's pointer mirror
+    /// at it so the Mac pointer over the PiP window drives the host pointer.
+    public var onPictureInPicturePanelChanged: (@MainActor (NSWindow?) -> Void)?
     /// The decoder's "nobody is looking at the layer" signal:
     /// backgrounded AND not (in / entering) PiP, OR paused from the PiP
     /// controls. Replaces the decoder's former use of `onBackgroundedChanged`,

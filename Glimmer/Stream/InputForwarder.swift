@@ -297,6 +297,31 @@ public final class InputForwarder {
     /// whole point of PiP. Set via `setPiPSuspended(_:)`.
     public internal(set) var pipSuspended: Bool = false
 
+    /// The system Picture in Picture panel while PiP is up and the user wants
+    /// the Mac pointer mirrored onto the host from it (see
+    /// InputForwarder+PiPPointer.swift). nil otherwise. Weak: AVKit owns it.
+    weak var pipPointerPanel: NSWindow?
+    /// Polls the pointer over the PiP panel (there is no view of ours in that
+    /// window to hand us mouseMoved).
+    var pipPointerTimer: Timer?
+    /// Local event monitor for clicks and scrolls landing on the PiP panel.
+    var pipPointerMonitor: Any?
+    /// Last absolute position sent from the PiP panel, so a resting pointer
+    /// costs nothing per tick.
+    var pipLastPointer: PointerMapping.StreamPoint?
+    /// A mouse-down on the PiP panel, held until the up decides whether it was
+    /// a click (forwarded) or the start of a panel drag (not).
+    var pipPendingClick: PiPPendingClick?
+    /// Whether the PiP pointer mirror is wanted at all. Read at the PiP
+    /// panel's arrival so the Settings toggle applies to the next pop-out.
+    public var pipPointerEnabledProvider: (@MainActor () -> Bool) = { true }
+
+    struct PiPPendingClick {
+        let button: Int32
+        let screenLocation: NSPoint
+        let panelFrame: NSRect
+    }
+
     /// The streaming engine input is forwarded to. Injected by StreamSession at
     /// attach time so the forwarder talks to the protocol (`backend.send*`)
     /// instead of calling Li* directly. Optional + nil-guarded: until it's set

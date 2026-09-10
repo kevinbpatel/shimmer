@@ -51,7 +51,8 @@ extension StreamSession {
         onBackgroundedChanged: (@MainActor (Bool) -> Void)? = nil,
         pipHotkeyProvider: @escaping @MainActor () -> HotkeyChord = { .defaultPiP },
         autoPictureInPictureProvider: @escaping @MainActor () -> Bool = { false },
-        onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil
+        onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil,
+        pipPointerProvider: @escaping @MainActor () -> Bool = { true }
     ) async throws -> AsyncStream<StreamEvent> {
         guard !isStreaming else {
             throw StreamError.sessionFailed(-1)
@@ -156,7 +157,8 @@ extension StreamSession {
             onBackgroundedChanged: onBackgroundedChanged,
             pipHotkeyProvider: pipHotkeyProvider,
             autoPictureInPictureProvider: autoPictureInPictureProvider,
-            onPictureInPictureChanged: onPictureInPictureChanged))
+            onPictureInPictureChanged: onPictureInPictureChanged,
+            pipPointerProvider: pipPointerProvider))
 
         // --- 4a) Build + publish the session bridge (see publishBridge): weak
         // refs to every subsystem + self so a torn-down subsystem just makes its

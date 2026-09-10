@@ -222,6 +222,7 @@
 		DEC0DE840000000000000003 /* StreamWindowGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000004 /* StreamWindowGeometry.swift */; };
 		DEC0DE840000000000000005 /* StreamWindow+Windowed.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000006 /* StreamWindow+Windowed.swift */; };
 		DEC0DE840000000000000007 /* InputForwarder+WindowPointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000008 /* InputForwarder+WindowPointer.swift */; };
+		A1C0DE771000000000000000 /* InputForwarder+PiPPointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE772000000000000000 /* InputForwarder+PiPPointer.swift */; };
 		DEC0DE840000000000000015 /* PointerMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000016 /* PointerMapping.swift */; };
 		DEC0DE840000000000000017 /* InputForwarder+EscapeHold.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000018 /* InputForwarder+EscapeHold.swift */; };
 		DEC0DE84000000000000001D /* InputForwarder+HoverCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE84000000000000001E /* InputForwarder+HoverCapture.swift */; };
@@ -524,6 +525,7 @@
 		DEC0DE840000000000000004 /* StreamWindowGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stream/StreamWindowGeometry.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000006 /* StreamWindow+Windowed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamWindow+Windowed.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000008 /* InputForwarder+WindowPointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/InputForwarder+WindowPointer.swift"; sourceTree = "<group>"; };
+		A1C0DE772000000000000000 /* InputForwarder+PiPPointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/InputForwarder+PiPPointer.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000016 /* PointerMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stream/PointerMapping.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000018 /* InputForwarder+EscapeHold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/InputForwarder+EscapeHold.swift"; sourceTree = "<group>"; };
 		DEC0DE84000000000000001E /* InputForwarder+HoverCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/InputForwarder+HoverCapture.swift"; sourceTree = "<group>"; };
@@ -728,6 +730,7 @@
 				DEC0DE840000000000000004 /* StreamWindowGeometry.swift */,
 				DEC0DE840000000000000006 /* StreamWindow+Windowed.swift */,
 				DEC0DE840000000000000008 /* InputForwarder+WindowPointer.swift */,
+				A1C0DE772000000000000000 /* InputForwarder+PiPPointer.swift */,
 				DEC0DE840000000000000016 /* PointerMapping.swift */,
 				DEC0DE840000000000000018 /* InputForwarder+EscapeHold.swift */,
 				DEC0DE84000000000000001E /* InputForwarder+HoverCapture.swift */,
@@ -1140,6 +1143,7 @@
 				DEC0DE840000000000000003 /* StreamWindowGeometry.swift in Sources */,
 				DEC0DE840000000000000005 /* StreamWindow+Windowed.swift in Sources */,
 				DEC0DE840000000000000007 /* InputForwarder+WindowPointer.swift in Sources */,
+				A1C0DE771000000000000000 /* InputForwarder+PiPPointer.swift in Sources */,
 				DEC0DE840000000000000015 /* PointerMapping.swift in Sources */,
 				DEC0DE840000000000000017 /* InputForwarder+EscapeHold.swift in Sources */,
 				DEC0DE84000000000000001D /* InputForwarder+HoverCapture.swift in Sources */,

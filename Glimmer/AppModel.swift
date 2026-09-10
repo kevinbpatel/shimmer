@@ -290,6 +290,12 @@ final class AppModel {
     var autoPictureInPicture: Bool = true {
         didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
     }
+    /// While the stream is in Picture in Picture, the Mac pointer over the PiP
+    /// window is mirrored onto the host as an absolute position (and a plain
+    /// click on the picture goes through). Read when the PiP panel appears.
+    var pipPointerMirror: Bool = true {
+        didSet { UserDefaults.standard.set(pipPointerMirror, forKey: "pipPointerMirror") }
+    }
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
@@ -577,6 +583,7 @@ final class AppModel {
         statsHotkey = Self.persistedDecoded("statsHotkey", HotkeyChord.self) ?? statsHotkey
         pipHotkey = Self.persistedDecoded("pipHotkey", HotkeyChord.self) ?? pipHotkey
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
+        pipPointerMirror = Self.persistedBool("pipPointerMirror") ?? pipPointerMirror
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 

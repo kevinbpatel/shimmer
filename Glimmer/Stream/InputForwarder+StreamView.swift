@@ -461,6 +461,12 @@ extension InputForwarder: StreamInputViewDelegate {
 
     func streamView(_ view: StreamInputView, handleScroll event: NSEvent) {
         guard isReady, forwardsMouseEvents, !pipSuspended else { return }
+        forwardScroll(event)
+    }
+
+    /// Scroll deltas → host wheel events. Shared by the stream view and the
+    /// Picture in Picture panel path (InputForwarder+PiPPointer.swift).
+    func forwardScroll(_ event: NSEvent) {
         // DEADZONE REMOVED. This handler
         // used to clamp each event's delta to ±1.0 line before the WHEEL_DELTA
         // scale - a per-event magnitude cap added
