@@ -241,6 +241,14 @@ struct QualityPane: View {
                     + "hides behind the notch. Off keeps it clear. Applies next stream.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                Toggle("Pop out to Picture in Picture when you switch away", isOn: $model.autoPictureInPicture)
+                    .toggleStyle(.switch)
+                    .help("Cmd-Tab away and the stream keeps playing in macOS's floating Picture in Picture window.")
+                Text("When you switch to another app, the stream keeps playing in a small floating window "
+                    + "you can drag to any corner - controllers keep working. Off just hides the stream "
+                    + "until you come back. \(model.pipHotkey.displayString) pops it out on demand either way.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if model.qualityPreset == .custom {

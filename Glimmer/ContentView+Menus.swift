@@ -47,6 +47,27 @@ struct MenuBarContent: View {
                     }
                     .disabled(model.isStreaming)
 
+                    if model.isStreaming {
+                        // Stream-window control while a session is live. "Back to
+                        // stream" whenever the fullscreen window is hidden (plain
+                        // Cmd-Tab-away OR showing in PiP); "Picture in Picture"
+                        // whenever it isn't already popped out.
+                        if model.nativeStreamBackgrounded {
+                            Button {
+                                model.resumeStreamWindow()
+                            } label: {
+                                Label("Back to stream", systemImage: "arrow.up.left.and.arrow.down.right")
+                            }
+                        }
+                        if !model.nativeStreamPictureInPicture {
+                            Button {
+                                model.enterPictureInPicture()
+                            } label: {
+                                Label("Picture in Picture", systemImage: "pip.enter")
+                            }
+                        }
+                    }
+
                     if model.hosts.count > 1 {
                         Menu {
                             ForEach(model.hosts) { host in

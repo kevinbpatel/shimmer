@@ -78,7 +78,17 @@ extension VideoDecoder {
         // path can rebuild onto the same screen without touching the actor-
         // isolated StreamWindow.
         pacingDrivingView = view
+        pacer.detachedFromView = pacingDetachedFromView
         pacer.start(drivingView: view)
+    }
+
+    /// Picture in Picture edge: the stream window is ordered out while the
+    /// system PiP window shows the layer, so the pacer must ride a screen-bound
+    /// link (a view-bound one stops firing off screen). Remembered on the
+    /// decoder so a pacer re-enable after a give-up rebinds the same way.
+    public func setPacingDetachedFromView(_ detached: Bool) {
+        pacingDetachedFromView = detached
+        framePacer?.setDetachedFromView(detached)
     }
 
     /// Notify the pacer that the stream window changed display (moved to

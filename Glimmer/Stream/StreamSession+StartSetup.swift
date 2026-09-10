@@ -40,6 +40,9 @@ extension StreamSession {
         let controllerQuitChordProvider: @MainActor () -> ControllerQuitChord
         let customControllerChordProvider: @MainActor () -> Set<ControllerButton>
         let onBackgroundedChanged: (@MainActor (Bool) -> Void)?
+        let pipHotkeyProvider: @MainActor () -> HotkeyChord
+        let autoPictureInPictureProvider: @MainActor () -> Bool
+        let onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
     }
 
     /// Build the one-time leave-hint string: the keyboard hotkey, plus the
@@ -86,17 +89,30 @@ extension StreamSession {
         win.coversNotch = config.coversNotch
         let dec = VideoDecoder()
         dec.attach(to: win.displayLayer)
-        // Route the window's backgrounded/foregrounded signal to BOTH
-        // the caller (launcher "Back to stream" CTA) AND the decoder's
-        // present-suppression state. The decoder uses it to stop
-        // misreading the intentional non-present backlog as packet loss
-        // (no IDR/RFI spam while unfocused) and to flush+resync on
-        // refocus. Wrapping here keeps the single source of truth - the
-        // window's key/occlusion observers - driving both consumers.
-        win.onBackgroundedChanged = { [weak dec] backgrounded in
-            dec?.setPresentSuppressed(backgrounded)
+        // The window's backgrounded/foregrounded signal drives the launcher's
+        // "Back to stream" CTA. The decoder's present-suppression state is a
+        // SEPARATE signal now that Picture in Picture exists: a hidden window
+        // whose layer is showing in the PiP window is still being watched, so
+        // the decoder must not drain-to-newest / gate decode. StreamWindow
+        // computes that (`presentSuppressedState`) and emits only real edges;
+        // the decoder uses it to stop misreading the intentional non-present
+        // backlog as packet loss and to flush+resync on refocus.
+        win.onBackgroundedChanged = { backgrounded in
             onBackgroundedChanged?(backgrounded)
         }
+        win.onPresentSuppressionChanged = { [weak dec] suppressed in
+            dec?.setPresentSuppressed(suppressed)
+        }
+        // Picture in Picture up/down: the fullscreen window is ordered out
+        // while PiP shows the layer, and a view-bound CADisplayLink stops
+        // firing off screen - rebind the pacer to a screen link for the
+        // duration. The caller gets the edge for its UI.
+        let onPictureInPictureChanged = options.onPictureInPictureChanged
+        win.onPictureInPictureChanged = { [weak dec] active in
+            dec?.setPacingDetachedFromView(active)
+            onPictureInPictureChanged?(active)
+        }
+        win.autoPictureInPictureProvider = options.autoPictureInPictureProvider
         let inp = InputForwarder()
         // Hotkey chords need to be readable LIVE on every keyDown so
         // changes in Settings take effect without restarting the
@@ -105,6 +121,7 @@ extension StreamSession {
         // resolvers (typically `{ moonlight.quitHotkey }`).
         inp.quitHotkeyProvider = options.quitHotkeyProvider
         inp.statsHotkeyProvider = options.statsHotkeyProvider
+        inp.pipHotkeyProvider = options.pipHotkeyProvider
         inp.bookmarkHotkeyProvider = options.bookmarkHotkeyProvider
         inp.controllerQuitChordProvider = options.controllerQuitChordProvider
         inp.customControllerChordProvider = options.customControllerChordProvider
@@ -237,6 +254,12 @@ extension StreamSession {
         // StreamSession.stop().
         setup.1.onStatsHotkey = { [weak decoder = setup.2] in
             decoder?.toggleStatsOverlay()
+        }
+        // Picture-in-Picture chord: hide the fullscreen window and pop the
+        // stream out. The window owns the whole transition (see
+        // StreamWindow+PictureInPicture.swift).
+        setup.1.onPiPHotkey = { [weak win = setup.0] in
+            win?.enterPictureInPicture()
         }
         // Bookmark chord (signal 4 - "that felt bad"). Client-only: the chord
         // is consumed in the input path; this just records the marker into the

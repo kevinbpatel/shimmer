@@ -212,6 +212,12 @@ struct ShortcutsPane: View {
                 Text("Flips the overlay on or off for the current stream only - the next stream starts from your Quality preference.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                HotkeyRow(label: "Pop the stream out (Picture in Picture)", hotkey: $model.pipHotkey)
+                Text("Sends the stream to macOS's floating Picture in Picture window so it stays in a corner "
+                    + "while you use other apps. Controllers keep working; click the window's return button "
+                    + "or the Dock icon to go back to fullscreen.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Controller quit") {

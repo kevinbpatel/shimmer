@@ -269,6 +269,14 @@ final class FramePacer: @unchecked Sendable {
     @MainActor var displayLink: CADisplayLink?
     /// The view we bound the link to, kept so a screen change can rebind.
     @MainActor weak var boundView: NSView?
+    /// When true, `installLink` binds to the view's SCREEN
+    /// (`NSScreen.displayLink`) instead of the view itself. `NSView.displayLink`
+    /// stops firing the moment its window is ordered out - which is exactly the
+    /// state Picture in Picture streams in (the fullscreen window is hidden,
+    /// the system PiP window shows the layer). A screen-bound link keeps
+    /// ticking regardless of window visibility. Set via
+    /// `setDetachedFromView(_:)`, which rebinds.
+    @MainActor var detachedFromView = false
     /// Signature of the screen the link was last bound to (display ID |
     /// panel max | backing scale), seeded by `installLink`. `screenDidChange`
     /// rebinds ONLY when this changes: macOS posts screen-parameter

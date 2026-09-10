@@ -76,6 +76,16 @@ public actor StreamSession {
             win?.reengageForeground()
         }
     }
+
+    /// Pop the running stream out into the system Picture in Picture window
+    /// (menu bar / launcher entry point; the in-stream hotkey reaches the
+    /// window directly). No-op when not streaming or PiP is already up.
+    public func enterPictureInPicture() async {
+        let win = self.window
+        await MainActor.run {
+            win?.enterPictureInPicture()
+        }
+    }
     var input: InputForwarder?
     var network: NetworkClient?
 

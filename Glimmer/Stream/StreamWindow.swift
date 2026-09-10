@@ -171,6 +171,45 @@ public final class StreamWindow {
     /// affordance while the stream window is hidden.
     public var onBackgroundedChanged: (@MainActor (Bool) -> Void)?
 
+    // MARK: Picture in Picture state (see StreamWindow+PictureInPicture.swift)
+
+    /// AVKit Picture-in-Picture adapter built on `displayLayer` (re-targeted
+    /// by `rebuildDisplayLayer()`). The system PiP window shows the SAME layer
+    /// the fullscreen window paints into, so the two are mutually exclusive:
+    /// entering PiP hides this window, returning to this window stops PiP.
+    let pictureInPicture: StreamPictureInPicture
+    /// True from `hideStreamWindow()` (orderOut) until `reengageForeground()`.
+    var isBackgrounded = false
+    /// True while the system PiP window is up (AVKit didStart → didStop).
+    public private(set) var isPictureInPictureActive = false
+    /// True between our `start()` and AVKit's didStart / failedToStart, so
+    /// present suppression is NOT engaged for the ~100ms the PiP window takes
+    /// to come up (it would cost a drain + an IDR resync for nothing).
+    var pictureInPicturePending = false
+    /// The PiP window's play/pause control. Paused maps onto present
+    /// suppression (freeze on the newest frame, decode gates after 2s).
+    var pictureInPicturePaused = false
+    /// Last value handed to `onPresentSuppressionChanged`, so only real edges
+    /// reach the decoder (its transition work is not free).
+    var lastEmittedPresentSuppressed = false
+    /// `GCController.shouldMonitorBackgroundEvents` before we flipped it on
+    /// for PiP; restored on PiP stop / close. nil = we never touched it.
+    var savedControllerBackgroundFlag: Bool?
+    /// Read at the confirmed switch-away edge: should the stream pop out to
+    /// Picture in Picture instead of just hiding? Wired to the user's
+    /// Settings toggle by the session owner.
+    public var autoPictureInPictureProvider: (@MainActor () -> Bool) = { false }
+    /// PiP window came up / went away. The session owner rebinds the frame
+    /// pacer (screen link vs view link) and tells the launcher UI.
+    public var onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
+    /// The decoder's "nobody is looking at the layer" signal:
+    /// backgrounded AND not (in / entering) PiP, OR paused from the PiP
+    /// controls. Replaces the decoder's former use of `onBackgroundedChanged`,
+    /// which conflated "window hidden" with "nothing presents".
+    public var onPresentSuppressionChanged: (@MainActor (Bool) -> Void)?
+    /// Setter for the PiP-active flag scoped to the window's own files.
+    func setPictureInPictureActive(_ active: Bool) { isPictureInPictureActive = active }
+
     /// Called when the stream window moves to a different display (or its
     /// backing display's properties change - refresh rate, wake from sleep).
     /// The session owner wires this to `VideoDecoder.pacingScreenDidChange()`
@@ -384,6 +423,8 @@ public final class StreamWindow {
         self.leaveHintBanner = leaveHint
         self.displayView = view
         self.streamDelegate = delegate
+        self.pictureInPicture = StreamPictureInPicture(layer: layer)
+        installPictureInPictureHandlers()
     }
 
     /// Strong ref so the window delegate isn't deallocated mid-stream
@@ -433,6 +474,9 @@ public final class StreamWindow {
         view.layer = fresh
         view.wantsLayer = true
         self.displayLayer = fresh
+        // PiP is fed by the layer, not the view: re-target it (restarts the
+        // PiP window on the fresh layer if it was up).
+        pictureInPicture.retarget(layer: fresh)
         log.notice("Rebuilt AVSampleBufferDisplayLayer (present-path self-heal)")
         return fresh
     }

@@ -486,6 +486,25 @@ extension StreamWindow {
     /// never uncovered for a frame. didBecomeKey's reengageForeground() reverses
     /// all of this on the way back in.
     func backgroundStreamWindow() {
+        hideStreamWindow()
+        // Pop out to Picture in Picture instead of just vanishing, when the
+        // user wants that (Settings › Streaming). The PiP window is fed by the
+        // same layer, so it comes up showing the frame the fullscreen window
+        // was on. If PiP can't start (another app owns the system's single PiP
+        // slot) the plain hidden-window behaviour above is what remains.
+        if autoPictureInPictureProvider() {
+            startPictureInPictureNow()
+        }
+        publishPresentSuppression()
+    }
+
+    /// The window-hiding half of a switch-away: cursor back, orderOut, the
+    /// host's presentation options restored, launcher told. Shared by the
+    /// confirmed-background path above and the explicit PiP entry (hotkey /
+    /// menu bar), which hides the window on purpose and then pops out.
+    func hideStreamWindow() {
+        guard !isBackgrounded else { return }
+        isBackgrounded = true
         // Cursor: restore so the user can interact with whatever app they
         // Cmd-Tabbed to. Idempotent + latch-balanced via the single owner -
         // shows iff currently hidden, bringing the count to 0.

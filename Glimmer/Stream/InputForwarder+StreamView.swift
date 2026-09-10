@@ -44,6 +44,15 @@ extension InputForwarder: StreamInputViewDelegate {
             return true
         }
 
+        // Picture-in-Picture chord: pop the stream out into the system PiP
+        // window. Same intercept position as quit/stats (before the sys-keys
+        // gate), consumed, never forwarded.
+        if !event.isARepeat, pipHotkeyProvider().matches(event: event, modifiers: mods) {
+            log.info("Picture in Picture hotkey detected - invoking onPiPHotkey")
+            onPiPHotkey?()
+            return true
+        }
+
         // Telemetry-bookmark chord (signal 4 - "that felt bad"). CLIENT-ONLY:
         // consumed here and NEVER forwarded to the host, exactly like the
         // quit/stats intercepts above (and the exit-chord interception this

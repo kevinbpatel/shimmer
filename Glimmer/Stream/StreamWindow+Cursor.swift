@@ -104,6 +104,16 @@ extension StreamWindow {
     /// own the balanced show; this never fights them (it only ever hides).
     func reengageForeground() {
         guard !didClose else { return }
+        isBackgrounded = false
+        // Picture in Picture and the fullscreen window show the same layer, so
+        // coming back to the window means the PiP window has to go. Stop it
+        // AFTER the window is on screen (callers order front first) so the
+        // system's fly-back animation lands on the visible layer. Idempotent:
+        // a user-initiated PiP stop that routed here is already stopping.
+        if isPictureInPictureActive || pictureInPicturePending {
+            pictureInPicture.stop()
+        }
+        publishPresentSuppression()
         // Cursor: re-hide. Idempotent + latch-balanced via the single owner -
         // hides iff currently shown, capping the count at 1.
         setCursorHidden(true)

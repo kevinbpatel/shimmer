@@ -195,6 +195,11 @@ public struct HotkeyChord: Codable, Equatable, Sendable {
     ///     opt-in diagnostic session.
     public static let defaultBookmark = HotkeyChord(ctrl: true, alt: false, shift: false, cmd: false, keyChar: "b")
 
+    /// Default Picture-in-Picture chord: ⌃⌥P. Same shape as quit/stats (no
+    /// Cmd, so it fires regardless of `captureSysKeys`; no Shift) and "P" is
+    /// free of the other client-side chords (Q / S / B).
+    public static let defaultPiP = HotkeyChord(ctrl: true, alt: true, shift: false, cmd: false, keyChar: "p")
+
     var displayString: String {
         var parts: [String] = []
         if ctrl { parts.append("⌃") }

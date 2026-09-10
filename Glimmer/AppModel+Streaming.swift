@@ -171,6 +171,11 @@ extension AppModel {
                     },
                     onBackgroundedChanged: { [weak self] backgrounded in
                         self?.nativeStreamBackgrounded = backgrounded
+                    },
+                    pipHotkeyProvider: { [weak self] in self?.pipHotkey ?? .defaultPiP },
+                    autoPictureInPictureProvider: { [weak self] in self?.autoPictureInPicture ?? false },
+                    onPictureInPictureChanged: { [weak self] active in
+                        self?.nativeStreamPictureInPicture = active
                     }
                 )
                 for await event in events {
@@ -244,6 +249,7 @@ extension AppModel {
         // teardown site. No-op if the helper was never engaged.
         AWDLHelperManager.shared.releaseForStream()
         self.nativeStreamBackgrounded = false
+        self.nativeStreamPictureInPicture = false
         self.nativeSession = nil
         // Disconnect beat (#3) - surface the "Stream ended" toast on
         // the launcher only when we actually had a live session.

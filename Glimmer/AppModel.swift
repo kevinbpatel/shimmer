@@ -285,6 +285,34 @@ final class AppModel {
         }
     }
 
+    /// In-stream chord that pops the stream out into the system Picture in
+    /// Picture window. Read live via a provider like the quit/stats chords.
+    var pipHotkey: HotkeyChord = .defaultPiP {
+        didSet {
+            if let data = try? JSONEncoder().encode(pipHotkey) {
+                UserDefaults.standard.set(data, forKey: "pipHotkey")
+            }
+        }
+    }
+    /// Pop the stream out to Picture in Picture automatically when the user
+    /// switches away from the stream window (Cmd-Tab, Dock click, ...)
+    /// instead of just hiding it. Read live at the switch-away edge.
+    var autoPictureInPicture: Bool = true {
+        didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
+    }
+    /// True while the running stream is showing in the system Picture in
+    /// Picture window (the fullscreen window is hidden). Drives the menu-bar
+    /// items. Set from the session's PiP edge callback.
+    var nativeStreamPictureInPicture: Bool = false
+
+    /// Pop the running stream out into Picture in Picture (menu bar entry
+    /// point). No-op when nothing is streaming.
+    public func enterPictureInPicture() {
+        Task { [weak self] in
+            await self?.nativeSession?.enterPictureInPicture()
+        }
+    }
+
     var captureSysKeys: Bool = false {
         didSet { UserDefaults.standard.set(captureSysKeys, forKey: "captureSysKeys") }
     }
@@ -572,6 +600,8 @@ final class AppModel {
         statsThresholds = Self.persistedDecoded("statsThresholds", StatsThresholds.self) ?? statsThresholds
         quitHotkey = Self.persistedDecoded("quitHotkey", HotkeyChord.self) ?? quitHotkey
         statsHotkey = Self.persistedDecoded("statsHotkey", HotkeyChord.self) ?? statsHotkey
+        pipHotkey = Self.persistedDecoded("pipHotkey", HotkeyChord.self) ?? pipHotkey
+        autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 
