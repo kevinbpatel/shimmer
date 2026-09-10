@@ -39,6 +39,23 @@ extension NetworkClient {
                     extraQuery: String?,
                     usePaired: Bool,
                     timeout: TimeInterval) async throws -> XMLNode {
+        let body = try await rawData(path: path, query: query, extraQuery: extraQuery,
+                                     usePaired: usePaired, timeout: timeout)
+        do {
+            return try XMLTreeBuilder.parse(data: body)
+        } catch {
+            throw StreamError.launchFailed("Malformed XML on /\(path): \(error)")
+        }
+    }
+
+    /// The same mutual-TLS GET as `rawRequest`, handing back the response body
+    /// verbatim. `/appasset` answers with a PNG rather than the XML every other
+    /// GameStream endpoint returns, so it cannot go through the XML path.
+    func rawData(path: String,
+                 query: [String: String],
+                 extraQuery: String?,
+                 usePaired: Bool,
+                 timeout: TimeInterval) async throws -> Data {
 
         try await ensureIdentityLoaded()
 
@@ -98,11 +115,7 @@ extension NetworkClient {
         if !(200...299).contains(resp.status) {
             throw StreamError.launchFailed("HTTP \(resp.status) on /\(path)")
         }
-        do {
-            return try XMLTreeBuilder.parse(data: resp.body)
-        } catch {
-            throw StreamError.launchFailed("Malformed XML on /\(path): \(error)")
-        }
+        return resp.body
     }
 
     // MARK: - Status check

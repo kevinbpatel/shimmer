@@ -59,6 +59,10 @@ final class AppModel {
     var hosts: [Host] = []
     var selectedHost: Host?
 
+    /// Box art for the launcher's app tiles, fetched from the host and cached
+    /// on disk. Owned here so one store serves every view.
+    let artwork = AppArtworkStore()
+
     // Stream lifecycle
     var isStreaming = false
     /// Active native session, retained while streaming.
@@ -619,6 +623,10 @@ final class AppModel {
         // stays under the complexity bar). The persisted-key set is unchanged.
         isRestoringDefaults = true
         defer { isRestoringDefaults = false }
+        // The artwork store builds its own paired clients; hand it the same
+        // Host → ServerInfo bridge the stream path uses (authoritative cert
+        // pin included), rather than letting it reach into AppModel.
+        artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
         muteMacWhileStreaming = UserDefaults.standard.bool(forKey: "muteMacWhileStreaming")
         defaultLaunchApp = UserDefaults.standard.string(forKey: "defaultLaunchApp") ?? defaultLaunchApp
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset

@@ -41,6 +41,20 @@ extension AppModel {
             .flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// First loaded host whose name or address contains `match`.
+    func debugHost(matching match: String) -> Host? {
+        let host = hosts.first {
+            $0.name.localizedCaseInsensitiveContains(match)
+                || ($0.customName?.localizedCaseInsensitiveContains(match) ?? false)
+                || ($0.localAddress?.localizedCaseInsensitiveContains(match) ?? false)
+                || ($0.manualAddress?.localizedCaseInsensitiveContains(match) ?? false)
+        }
+        if host == nil {
+            log.error("DEBUG automation: no host matching '\(match, privacy: .public)' among \(self.hosts.map(\.name), privacy: .public)")
+        }
+        return host
+    }
+
     func runDebugAutomationIfRequested() {
         // `--debug-open-settings=<pane>[,<pane>...]`: open the Settings window
         // on each pane in turn, 3s apart (a screenshot loop for UI work), then
@@ -64,6 +78,32 @@ extension AppModel {
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { NSApp.terminate(nil) }
+            }
+            return
+        }
+        // `--debug-fetch-artwork=<host substr>`: pull every app's box art from
+        // that host and drop it in /tmp, logging sizes. Proves the /appasset
+        // endpoint against a real Sunshine before any UI is built on it.
+        if let hostMatch = Self.debugKnob("fetch-artwork") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self, let host = self.debugHost(matching: hostMatch) else { return }
+                Task { @MainActor in
+                    let info = self.nativeServerInfo(for: host)
+                    let client = NetworkClient(server: info)
+                    for app in host.apps {
+                        do {
+                            let data = try await client.appAsset(appID: app.id)
+                            let path = "/tmp/shimmer-art-\(app.id).png"
+                            try? data.write(to: URL(fileURLWithPath: path))
+                            let magic = data.prefix(4).map { String(format: "%02x", $0) }.joined()
+                            self.log.notice("ARTWORK \(app.name, privacy: .public): \(data.count) bytes magic=\(magic, privacy: .public) -> \(path, privacy: .public)")
+                        } catch {
+                            self.log.error("ARTWORK \(app.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                        }
+                    }
+                    await client.shutdown()
+                    NSApp.terminate(nil)
+                }
             }
             return
         }

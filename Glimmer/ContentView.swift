@@ -515,9 +515,11 @@ private struct HostHero: View {
             .padding(.vertical, 22)
             .padding(.horizontal, 24)
         }
-        // 248pt (was 270): content measures ~218pt, so this trims the hero's
-        // dead air ("a bit too much") while keeping honest breathing room.
-        .frame(height: 248)
+        // 326pt (was 248): the app tiles carry real cover art now, so their slot
+        // grew from 70pt to 148pt and the content measures ~296pt. Anything less
+        // and the spec chips below collide with the card's bottom edge. The
+        // window is sized from this column, so this number IS the window height.
+        .frame(height: 326)
         // `width`, not `maxWidth`: the window is sized from this column, and a
         // maxWidth has no size of its own to measure - which is why an earlier
         // attempt at a content-sized window stayed resizable anyway. 520 is the

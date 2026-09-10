@@ -22,6 +22,18 @@ under the **GNU General Public License v3** (see [LICENSE](LICENSE)), the same
 license as the originals. The GPLv3 notice on the ported files is accurate and
 intentional.
 
+shimmer's interface owes a debt to
+**[moonlight-macos-enhanced](https://github.com/skyhua0224/moonlight-macos-enhanced)**
+by [skyhua0224](https://github.com/skyhua0224) (GPLv3, a fork of Moonlight for
+macOS). Two things came from studying it: the way Settings are organised
+(Stream / Video / Audio / Input / App, with a single resolution picker, a
+frame-rate picker, and an always-visible bitrate control), and the idea of
+showing the host's real cover art for each app instead of a generic symbol.
+No code was copied — that project is Objective-C/AppKit over Core Data and
+shimmer is Swift/SwiftUI over a different model layer, so both were
+reimplemented — but the design is theirs, and the `/appasset` box-art request
+follows the same convention every Moonlight client uses. Thank you.
+
 ## MIT-licensed upstreams ported via moonlight-common-c
 
 Two of the components ported into the Swift engine originate from separately

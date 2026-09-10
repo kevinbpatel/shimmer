@@ -18,10 +18,11 @@ struct AppIconsRow: View {
     let host: Host
     @Environment(AppModel.self) private var model
 
-    /// Most tiles the row will ever show inline. Five 70pt tiles span
-    /// 5x70 + 4x10 = 390 inside the hero's 472pt content box, so the row stays
-    /// one comfortable line at the card's FIXED width.
-    private static let maxInlineTiles = 5
+    /// Most tiles the row will ever show inline. Four 100pt slots span
+    /// 4x100 + 3x10 = 430 inside the hero's 472pt content box, so the row stays
+    /// one comfortable line at the card's FIXED width. Four rather than the
+    /// old five because the tiles now carry real cover art and want the width.
+    private static let maxInlineTiles = 4
 
     /// Apps shown as tiles. At or under the inline cap every app gets one; past
     /// it the last slot is spent on the overflow menu instead of a tile, so the
@@ -69,18 +70,27 @@ struct AppIconsRow: View {
         // the old expand/collapse controls; it was lost in the revert.
         .opacity(model.isStreaming ? 0.45 : 1.0)
         .animation(.snappy(duration: 0.3), value: model.isStreaming)
+        // Pull every app's art at once, including the ones behind the overflow
+        // menu, so opening it doesn't start a burst of requests.
+        .task(id: host.id) { model.artwork.prefetch(apps: apps, on: host) }
     }
+
+    /// Artwork box: 3:4 portrait, the shape every GameStream host serves
+    /// (`/appasset` returns 600x800). 96pt wide is as large as four tiles - art
+    /// plus title - can be inside the hero card's fixed 472pt content box, and
+    /// large enough that a real cover reads as a cover rather than a chip.
+    static let artSize = CGSize(width: 96, height: 128)
+    /// Slot width: the art plus a little breathing room for a long title.
+    static let slotWidth: CGFloat = 100
 
     private func appTile(_ app: LibraryApp) -> some View {
         Button {
             model.requestStream(app: app, on: host)
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: app.systemImage)
-                    .font(.system(size: 18, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .frame(width: 44, height: 44)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+            VStack(spacing: 5) {
+                artwork(for: app)
+                    .frame(width: Self.artSize.width, height: Self.artSize.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay {
                         // Accent ring for the hero target (resume app, else
                         // default) so the ring always agrees with the hero
@@ -91,6 +101,7 @@ struct AppIconsRow: View {
                                 lineWidth: 2
                             )
                     }
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
                 Text(app.name)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -98,15 +109,35 @@ struct AppIconsRow: View {
             }
             // A `.plain` Button only hit-tests its LABEL, so without this the
             // padding around the icon and name was dead space. Fill the declared
-            // 70pt slot inside the label and claim it as the content shape.
+            // slot inside the label and claim it as the content shape.
             // (Salvaged from #49, which got this part right.)
-            .frame(width: 70, height: 70)
+            .frame(width: Self.slotWidth, height: Self.artSize.height + 20)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(model.isStreaming)
         .help(model.isStreaming
             ? "Finish the current stream first" : "Stream \(app.name)")
+    }
+
+    /// The host's cover art, or the symbol treatment while it loads / when the
+    /// host has none. Deliberately no spinner: art arrives in well under a
+    /// second off the disk cache, and a placeholder that flickers into a
+    /// picture reads worse than a picture that simply appears.
+    @ViewBuilder
+    private func artwork(for app: LibraryApp) -> some View {
+        if let image = model.artwork.image(for: app, on: host) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Image(systemName: app.systemImage)
+                .font(.system(size: 20, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: Self.artSize.width, height: Self.artSize.height)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+        }
     }
 
     /// The overflow dropdown: every app past the inline cap, in source order.
@@ -127,16 +158,16 @@ struct AppIconsRow: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .symbolRenderingMode(.hierarchical)
-                    .frame(width: 44, height: 44)
+                    .frame(width: Self.artSize.width, height: Self.artSize.height)
                     .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
                 Text("\(overflowApps.count) more")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .frame(width: 70, height: 70)
+            .frame(width: Self.slotWidth, height: Self.artSize.height + 20)
             .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
