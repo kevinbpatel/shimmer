@@ -212,6 +212,15 @@ struct ShortcutsPane: View {
                 Text("Flips the overlay on or off for the current stream only - the next stream starts from your Quality preference.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                HotkeyRow(label: "Capture or release the pointer", hotkey: $model.releasePointerHotkey)
+                // Window mode only: in full screen the pointer is hidden for
+                // the whole session and there is nothing to toggle, so the
+                // chord reaches the host there like any other key.
+                Text("When the stream is shown in a window the game takes your mouse while the pointer is "
+                    + "over it - hold Esc or switch apps to get it back, and this combo does either without "
+                    + "moving the mouse. In full screen this combo goes to the game.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Controller quit") {

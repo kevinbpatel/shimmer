@@ -219,10 +219,38 @@ extension AppModel {
         return "\(Self.resolutionLabel(width: display.width, height: display.height)) · \(display.fps) Hz"
     }
 
-    func autoUpdateCustomBitrate() {
-        guard customBitrateAuto else { return }
-        let kbps = bitrateKbps(width: customWidth, height: customHeight, fps: customFPS, preset: .matchDisplay)
-        customBitrateMbps = max(5, kbps / 1000)
+    /// Whether the display the stream would open on has a camera notch
+    /// (`safeAreaInsets.top > 0`). "Fill the notch" is only shown - and only
+    /// consulted - when this is true: on a notchless panel the toggle used to
+    /// silently switch the fullscreen MECHANISM (borderless cover vs a macOS
+    /// Space), which is how a Mac mini user landed in the vanishing-window
+    /// Space path of issue #84. Same `displayInfoRevision` tracking edge as
+    /// `currentDisplayDescription`, since NSScreen.main is a global.
+    var currentDisplayHasNotch: Bool {
+        _ = displayInfoRevision
+        return (NSScreen.main?.safeAreaInsets.top ?? 0) > 0
+    }
+
+    /// The notch choice the session actually gets: the user's persisted toggle
+    /// on a notched panel, always "cover" (Path A) elsewhere. The persisted
+    /// value is kept untouched for when a notched panel is present again.
+    var effectiveStreamCoversNotch: Bool {
+        currentDisplayHasNotch ? streamCoversNotch : true
+    }
+
+    /// The panel's CURRENT refresh (`NSScreen.maximumFramesPerSecond` reflects
+    /// the System Settings choice, not the capability), 60 when it can't say.
+    /// The cap a windowed stream's refresh takes, and the footnote's number.
+    var currentDisplayMaxHz: Int {
+        _ = displayInfoRevision
+        let hz = NSScreen.main?.maximumFramesPerSecond ?? 0
+        return hz > 0 ? hz : StreamDisplayMode.fallbackDisplayMaxHz
+    }
+
+    /// The mode a session actually gets: the window choice under Custom, full
+    /// screen under the panel-native presets (StreamDisplayMode.effective).
+    var effectiveDisplayMode: StreamDisplayMode {
+        StreamDisplayMode.effective(chosen: streamDisplayMode, preset: qualityPreset)
     }
 
     func shutdown() {
