@@ -216,14 +216,35 @@ extension StreamWindow {
         guard !pipSourceMode else { return }
         pipSourceMode = true
         savedFrameBeforePiP = window.frame
+        // Window mode (upstream's titled stream window) locks the content
+        // aspect, enforces a minimum size, and autosaves the frame - all three
+        // fight the mirror-source sizing below (the aspect lock would shrink
+        // the content inside the title-bar-reduced height and letterbox the
+        // PiP picture; autosave would persist the 480×270 source as the
+        // user's window). Suspend them for the duration; the borderless
+        // fullscreen cover has none of these set, so this is a no-op there.
+        savedChromeBeforePiP = (window.contentAspectRatio, window.contentMinSize,
+                                window.frameAutosaveName)
+        window.contentAspectRatio = .zero
+        window.contentMinSize = .zero
+        if !window.frameAutosaveName.isEmpty { window.setFrameAutosaveName("") }
         window.alphaValue = 0
         window.ignoresMouseEvents = true
         // Pre-shrink to a typical PiP size so the first ~200ms (before
         // matchSourceWindowToPiPPanel runs on didStart) don't mirror the
         // fullscreen source 1:1 - which would flash the bottom-left crop. The
         // exact size is applied the moment the PiP window exists.
-        let approx = NSSize(width: 480, height: 270)
-        window.setFrame(NSRect(origin: window.frame.origin, size: approx), display: false)
+        setSourceContent(origin: window.frame.origin, size: NSSize(width: 480, height: 270), display: false)
+    }
+
+    /// Place the mirror source so its CONTENT rect (what the display layer
+    /// fills) sits at `origin` with `size`. For the borderless fullscreen cover
+    /// the content rect is the frame; for a titled window (window mode) the
+    /// frame is taller by the title bar, and sizing the frame instead would
+    /// leave the content - and so the 1:1 mirror - short by that much.
+    func setSourceContent(origin: NSPoint, size: NSSize, display: Bool) {
+        window.setFrame(window.frameRect(forContentRect: NSRect(origin: origin, size: size)),
+                        display: display)
     }
 
     /// Size the alpha-0 source window to the system PiP window's content, and
@@ -241,19 +262,15 @@ extension StreamWindow {
                     String(describing: type(of: $0)).contains("PIPPanel")
                 }), let content = panel.contentView else {
                     self.log.error("PiP: could not locate the PIPPanel window - using a fallback source size (frame will still be whole, size approximate)")
-                    self.window.setFrame(
-                        NSRect(x: self.window.frame.origin.x, y: self.window.frame.origin.y, width: 640, height: 360),
-                        display: true)
+                    self.setSourceContent(origin: self.window.frame.origin,
+                                          size: NSSize(width: 640, height: 360), display: true)
                     return
                 }
                 let apply: @MainActor () -> Void = { [weak self] in
                     guard let self, self.pipSourceMode, !self.didClose else { return }
                     let size = content.bounds.size
                     guard size.width > 1, size.height > 1 else { return }
-                    let origin = panel.frame.origin
-                    self.window.setFrame(
-                        NSRect(x: origin.x, y: origin.y, width: size.width, height: size.height),
-                        display: true)
+                    self.setSourceContent(origin: panel.frame.origin, size: size, display: true)
                     // Part B of the workaround: AVKit draws an empty black
                     // overlay (AVPictureInPictureCALayerHostView) on top of the
                     // correctly-scaled content layer - the big black box. Hide
@@ -300,6 +317,15 @@ extension StreamWindow {
             pipPanelFrameObserver = nil
         }
         window.ignoresMouseEvents = false
+        if let chrome = savedChromeBeforePiP {
+            window.contentAspectRatio = chrome.aspect
+            window.contentMinSize = chrome.minSize
+            // Re-claiming the autosave name restores the LAST SAVED frame as a
+            // side effect - the pre-PiP one, since saving was off meanwhile -
+            // and the explicit restore below wins regardless.
+            if !chrome.autosaveName.isEmpty { window.setFrameAutosaveName(chrome.autosaveName) }
+            savedChromeBeforePiP = nil
+        }
         if let saved = savedFrameBeforePiP {
             window.setFrame(saved, display: false)
             savedFrameBeforePiP = nil

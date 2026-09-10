@@ -249,6 +249,11 @@ public final class StreamWindow {
     /// The fullscreen frame to restore when PiP ends (saved on entering source
     /// mode). nil when not in source mode.
     var savedFrameBeforePiP: NSRect?
+    /// Window-mode chrome suspended while acting as the mirror source: the
+    /// aspect lock and minimum size (both would refuse the PiP-panel-sized
+    /// content) and the frame autosave name (so the tiny source frame is never
+    /// persisted as "the user's window"). Restored by exitPiPSourceMode().
+    var savedChromeBeforePiP: (aspect: NSSize, minSize: NSSize, autosaveName: String)?
     /// Observer on the PiP panel's content view frame, so the mirror source
     /// window tracks PiP window resizes and keeps filling it 1:1.
     var pipPanelFrameObserver: NSObjectProtocol?
