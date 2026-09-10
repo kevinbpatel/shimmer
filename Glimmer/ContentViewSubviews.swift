@@ -18,6 +18,11 @@ struct AppIconsRow: View {
     let host: Host
     @Environment(AppModel.self) private var model
 
+    /// The tile under the pointer. moonlight-macos-enhanced grows a hovered
+    /// cover slightly rather than drawing a border; it reads as the art coming
+    /// forward instead of a control lighting up.
+    @State private var hoveredAppID: Int?
+
     /// Most tiles the row will ever show inline. Four 100pt slots span
     /// 4x100 + 3x10 = 430 inside the hero's 472pt content box, so the row stays
     /// one comfortable line at the card's FIXED width. Four rather than the
@@ -90,18 +95,32 @@ struct AppIconsRow: View {
             VStack(spacing: 5) {
                 artwork(for: app)
                     .frame(width: Self.artSize.width, height: Self.artSize.height)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    // 12pt CONTINUOUS, the radius and curve the reference app
+                    // uses on its covers - a plain `cornerRadius` corner reads
+                    // visibly tighter next to it.
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay {
                         // Accent ring for the hero target (resume app, else
                         // default) so the ring always agrees with the hero
                         // button's verb.
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .stroke(
                                 app.name == model.heroTargetAppName ? Color.accentColor : Color.clear,
                                 lineWidth: 2
                             )
                     }
+                    // The badge is a SIBLING of the clipped art, not a subview,
+                    // so it can overhang the corner mask the way the reference
+                    // app's does.
+                    .overlay(alignment: .topTrailing) {
+                        if app.name == model.runningAppName { runningBadge }
+                    }
                     .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                    .scaleEffect(hoveredAppID == app.id ? 1.06 : 1.0)
+                    .animation(.snappy(duration: 0.2), value: hoveredAppID)
+                    .onHover { inside in
+                        hoveredAppID = inside ? app.id : (hoveredAppID == app.id ? nil : hoveredAppID)
+                    }
                 Text(app.name)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -118,6 +137,21 @@ struct AppIconsRow: View {
         .disabled(model.isStreaming)
         .help(model.isStreaming
             ? "Finish the current stream first" : "Stream \(app.name)")
+    }
+
+    /// "This is the app your PC is running right now", straight from the
+    /// host's own /serverinfo reading. Same idea as the reference app's blue
+    /// runner badge: a filled circle overhanging the artwork's top-right.
+    private var runningBadge: some View {
+        Image(systemName: "figure.run")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 20, height: 20)
+            .background(Circle().fill(Color.accentColor))
+            .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.30), radius: 3, y: 1)
+            .offset(x: 6, y: -6)
+            .help("Running on this PC now")
     }
 
     /// The host's cover art, or the symbol treatment while it loads / when the

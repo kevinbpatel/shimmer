@@ -86,6 +86,22 @@ extension AppModel {
         "glimmer.lastPlayedApp.\(hostId)"
     }
 
+    /// The app the HOST says is running right now, if the reading is fresh.
+    ///
+    /// Deliberately narrower than `resumableAppName`: no last-played fallback.
+    /// This drives the badge on the app tile, and a badge that claims a game is
+    /// running because it ran yesterday is a lie, whereas the hero button
+    /// falling back to "the thing you last played" is a reasonable guess.
+    var runningAppName: String? {
+        guard let host = selectedHost,
+              let live = hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
+              case .streamingApp(let name) = live.state,
+              host.apps.contains(where: { $0.name == name })
+        else { return nil }
+        return name
+    }
+
     /// The app the hero button can meaningfully resume on the selected host.
     /// Host-reported truth wins: a fresh /serverinfo snapshot naming an
     /// in-flight session (aged out on the same `HostLiveStatus.stale` horizon

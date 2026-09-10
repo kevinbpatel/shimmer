@@ -7,7 +7,8 @@ the host serves for that app (`/appasset` — the same box art Moonlight shows,
 600×800), fetched once over the existing paired mutual-TLS connection and
 cached on disk under `~/Library/Caches/Shimmer/BoxArt`. Apps the host has no
 art for keep the old symbol treatment. Tiles are larger to suit, so the
-launcher window is a little taller.
+launcher window is a little taller. The app your PC is running right now wears
+a badge on its tile, and hovering a cover brings it forward.
 
 Settings are reorganised into Stream, Video, Audio, Input, PCs, App,
 Diagnostics, and About - the layout moonlight-macos-enhanced uses, on top of
