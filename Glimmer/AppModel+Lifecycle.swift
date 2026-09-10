@@ -28,6 +28,9 @@ extension AppModel {
         // registration drifted (invalidated by an app update / move), re-assert
         // it now. This is the fix for "doesn't start after reboot" - the next
         // reboot picks up the freshly-reconciled registration.
+        // Before anything draws: the restore in init() is latched, so the
+        // persisted choice has to be applied here.
+        appAppearance.apply()
         LoginItemManager.reconcile()
         // Same self-heal for the privileged AWDL daemon: an app update / reinstall
         // swaps the bundle (and the daemon binary inside it), which can wedge the

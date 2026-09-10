@@ -16,6 +16,36 @@ import os
 import ServiceManagement
 import SwiftUI
 
+/// The app's appearance. macOS follows the system by default, but a streaming
+/// client is often used in a dark room next to a TV while the Mac itself is in
+/// light mode - so it is worth being able to pin, the way the reference app
+/// (moonlight-macos-enhanced) does.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "Match System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    /// nil means "inherit", which is what an unset `NSApp.appearance` does.
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /// Applies to every window the app owns, including ones already on screen.
+    @MainActor func apply() { NSApp.appearance = nsAppearance }
+}
+
 // MARK: - App
 
 struct AppPane: View {
@@ -112,6 +142,14 @@ struct AppPane: View {
                         Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }
+            }
+            Section("Appearance") {
+                Picker("Appearance", selection: $model.appAppearance) {
+                    ForEach(AppAppearance.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
             Section("Default action") {
                 // Picker sourced from the selected host's announced app

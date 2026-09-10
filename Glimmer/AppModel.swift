@@ -174,6 +174,15 @@ final class AppModel {
             persistQualitySettings()
         }
     }
+    /// Light, dark, or whatever the system is doing. Applied to NSApp on every
+    /// change and once at launch.
+    var appAppearance: AppAppearance = .system {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(appAppearance.rawValue, forKey: "appAppearance")
+            appAppearance.apply()
+        }
+    }
     /// Audio channel layout asked of the host: follow the Mac's output device
     /// or force a layout (a stereo headset on a Mac whose default output is a
     /// 7.1 receiver, and vice versa).
@@ -645,6 +654,7 @@ final class AppModel {
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
         audioLayout = Self.persistedRawValue("audioLayout", AudioLayout.self) ?? audioLayout
+        appAppearance = Self.persistedRawValue("appAppearance", AppAppearance.self) ?? appAppearance
         // One-shot: HDR was hard-coded ON for the panel presets and only asked
         // under Custom, so an install that turned it off under Custom and then
         // went back to a panel preset was still being sent HDR. It applies

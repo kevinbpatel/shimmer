@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Settings are legible again. The window was translucent (`.thinMaterial`) with
+the form's own background hidden, so whatever sat behind it showed through the
+CONTENT - park Settings over the launcher's purple card and every row became a
+low-contrast lavender smear. The content is opaque now, like System Settings;
+the sidebar keeps the translucency that is actually meant to be translucent.
+
+Settings > App > Appearance pins the app to Light or Dark instead of always
+following the system.
+
 The launcher shows your PC's real cover art. Each app tile is now the artwork
 the host serves for that app (`/appasset` — the same box art Moonlight shows,
 600×800), fetched once over the existing paired mutual-TLS connection and
