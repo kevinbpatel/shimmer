@@ -255,6 +255,9 @@ struct QualityPane: View {
                 Toggle("Pop out to Picture in Picture when you switch away", isOn: $model.autoPictureInPicture)
                     .toggleStyle(.switch)
                     .help("Cmd-Tab away and the stream keeps playing in macOS's floating Picture in Picture window.")
+                Toggle("Mouse over the PiP window moves the host pointer", isOn: $model.pipPointerMirror)
+                    .toggleStyle(.switch)
+                    .help("The host's pointer follows yours across the picture while it's popped out, and a click on the picture clicks there. Dragging the window or its controls never reaches the host.")
             } footer: {
                 Text("When you switch to another app, the stream keeps playing in a small floating window "
                     + "you can drag to any corner - controllers keep working. Off just hides the stream "

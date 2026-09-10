@@ -280,6 +280,7 @@ extension StreamWindow {
                     self.hidePiPBlackOverlay(in: content)
                 }
                 apply()
+                self.onPictureInPicturePanelChanged?(panel)
                 content.postsFrameChangedNotifications = true
                 self.pipPanelFrameObserver = NotificationCenter.default.addObserver(
                     forName: NSView.frameDidChangeNotification, object: content, queue: .main
@@ -312,6 +313,7 @@ extension StreamWindow {
     func exitPiPSourceMode() {
         guard pipSourceMode else { return }
         pipSourceMode = false
+        onPictureInPicturePanelChanged?(nil)
         if let obs = pipPanelFrameObserver {
             NotificationCenter.default.removeObserver(obs)
             pipPanelFrameObserver = nil

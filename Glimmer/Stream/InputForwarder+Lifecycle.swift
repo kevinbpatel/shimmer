@@ -108,6 +108,10 @@ extension InputForwarder {
         // Raise every held key/button/modifier so a mid-press teardown can't
         // leave the host with phantom-held input.
         raiseAllHeldInputs(reason: "stream teardown")
+        // The PiP pointer mirror's timer and monitor must not outlive the
+        // session (the window's exit path already stops it; this is the
+        // backstop for a teardown that never went through it).
+        stopPiPPointerMirror()
 
         // Disengage relative-aim mode + remove gesture defaults.
         // `exitCapturedMode()` RE-ASSOCIATES the cursor

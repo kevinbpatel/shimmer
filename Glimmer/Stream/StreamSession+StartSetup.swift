@@ -44,6 +44,7 @@ extension StreamSession {
         let pipHotkeyProvider: @MainActor () -> HotkeyChord
         let autoPictureInPictureProvider: @MainActor () -> Bool
         let onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
+        let pipPointerProvider: @MainActor () -> Bool
     }
 
     /// Build the one-time leave-hint string: the keyboard hotkey, plus the
@@ -125,6 +126,13 @@ extension StreamSession {
             dec?.setPacingDetachedFromView(active)
             inp?.setPiPSuspended(active)
             onPictureInPictureChanged?(active)
+        }
+        // The Mac pointer over the PiP panel mirrors onto the host (absolute
+        // positions, like window mode's free pointer). Toggle read as the
+        // panel arrives so a Settings change applies to the next pop-out.
+        inp.pipPointerEnabledProvider = options.pipPointerProvider
+        win.onPictureInPicturePanelChanged = { [weak inp] panel in
+            inp?.setPiPPointerPanel(panel)
         }
         // Hotkey chords need to be readable LIVE on every keyDown so
         // changes in Settings take effect without restarting the

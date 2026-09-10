@@ -264,6 +264,10 @@ public final class StreamWindow {
     /// PiP window came up / went away. The session owner rebinds the frame
     /// pacer (screen link vs view link) and tells the launcher UI.
     public var onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
+    /// The system PiP panel was located (non-nil, on didStart) or PiP ended
+    /// (nil). The session owner points the input forwarder's pointer mirror
+    /// at it so the Mac pointer over the PiP window drives the host pointer.
+    public var onPictureInPicturePanelChanged: (@MainActor (NSWindow?) -> Void)?
     /// The decoder's "nobody is looking at the layer" signal:
     /// backgrounded AND not (in / entering) PiP, OR paused from the PiP
     /// controls. Replaces the decoder's former use of `onBackgroundedChanged`,
