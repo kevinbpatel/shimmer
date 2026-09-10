@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Fix: the Picture in Picture window showed only the bottom-left corner of the
+stream. macOS's sample-buffer PiP mirrors the source layer at 1:1 pixels with
+no scaling (an Apple bug, FB22411168), so a fullscreen source only ever filled
+one corner of the PiP window. Glimmer now keeps the stream window on screen but
+invisible while popped out and sizes it to the PiP window, so the whole frame
+shows and stays filled as you resize PiP. Verified against a live stream.
+
 Pop the stream out into macOS's Picture in Picture window.
 
 Press ⌃⌥P during a stream (rebindable in Settings › Shortcuts) and the game
