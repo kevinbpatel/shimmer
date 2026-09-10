@@ -66,22 +66,24 @@
 		<string>_nvstream._tcp</string>
 		<string>_nvstream-tcp._tcp</string>
 	</array>
-	<!-- Sparkle auto-update (unsandboxed, Developer-ID). SUFeedURL is the public
-	     appcast on the glimmer repo's GitHub Pages site; SUPublicEDKey is the
-	     ed25519 PUBLIC key (private key lives in the signing creds file, used by
-	     `make release-publish`). SUEnableInstallerLauncherService routes the
-	     install through Sparkle's XPC installer service; now that the app is
-	     unsandboxed it needs no entitlement to reach it (the sandbox-era
-	     mach-lookup exception is gone). Daily background checks; the user is
-	     prompted before an update installs (Sparkle default). -->
+	<!-- Sparkle auto-update. shimmer is a fork: SUFeedURL is DELIBERATELY moved
+	     off upstream glimmer's appcast (se7enbrc.github.io/glimmer), otherwise a
+	     shimmer build would offer to "update" itself into stock glimmer and lose
+	     Picture in Picture. It now points at shimmer's own (not-yet-published)
+	     appcast, so no update is ever offered until releases exist there; when
+	     they do, SUPublicEDKey must be replaced with shimmer's own ed25519
+	     public key (the one below is upstream's and will not verify shimmer
+	     releases). Automatic checks are off for the same reason.
+	     SUEnableInstallerLauncherService routes the install through Sparkle's XPC
+	     installer service (unsandboxed, no entitlement needed). -->
 	<key>SUFeedURL</key>
-	<string>https://se7enbrc.github.io/glimmer/appcast.xml</string>
+	<string>https://kevinbpatel.github.io/shimmer/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>bUc9IWEtH/FuDUIsGqyDIVy/1gvlPtBkFXNcVO/TrPU=</string>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUEnableAutomaticChecks</key>
-	<true/>
+	<false/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>

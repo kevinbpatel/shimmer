@@ -1,5 +1,11 @@
 # Credits
 
+**shimmer is a fork of [glimmer](https://github.com/Se7enbrc/glimmer)** by
+[Se7enbrc](https://github.com/Se7enbrc) (Copyright © 2026 ugfugl.io, GPLv3).
+shimmer adds macOS Picture in Picture on top of glimmer's engine and is
+distributed under the same license; everything below about Glimmer's lineage
+applies to shimmer unchanged.
+
 Glimmer's Swift streaming transport was **ported from
 [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c)**,
 the core protocol library written by the

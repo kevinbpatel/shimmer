@@ -1,17 +1,39 @@
 <p align="center">
-  <img src="docs/assets/icon-512.png" width="140" alt="Glimmer">
+  <img src="docs/assets/icon-512.png" width="140" alt="shimmer">
 </p>
 
-# Glimmer
+# shimmer
 
-A Mac-native client for [Sunshine](https://github.com/LizardByte/Sunshine). Pure
-Swift, Apple Silicon only, built so a gaming PC in the other room feels plugged
-into your Mac.
+A Mac-native client for [Sunshine](https://github.com/LizardByte/Sunshine) that
+can pop the game out into macOS's floating **Picture in Picture** window - so it
+stays in a corner while you use other apps, and your controller keeps playing.
 
-![The Glimmer launcher](docs/assets/launcher.png)
+shimmer is a fork of [glimmer](https://github.com/Se7enbrc/glimmer) by
+[Se7enbrc](https://github.com/Se7enbrc): pure Swift, Apple Silicon only, the
+whole pipeline - socket, decoder, display, audio, input - in one process with no
+external player and no C engine. Everything glimmer does, shimmer does. The name
+is a nod to the moonlight → sunshine → glimmer lineage it sits in.
 
-The whole pipeline - socket, decoder, display, audio, input - runs in one Swift
-process. No external player, no C engine.
+![The launcher](docs/assets/launcher.png)
+
+## What shimmer adds
+
+- **Picture in Picture.** Press **⌃⌥P** during a stream (rebindable in
+  Settings › Shortcuts) and the game moves into the same floating,
+  corner-snapping window macOS uses for movies - on top of your other apps.
+  It's fed by the very layer the fullscreen window paints into, so there is no
+  second decode path and no extra latency; the frame pacer just rides the
+  display's own refresh instead of the now-hidden window's. Controllers keep
+  driving the game from the corner. Keyboard and mouse stay with whatever app
+  is frontmost, the way any PiP video behaves.
+- **Pop out automatically** when you switch away from the stream (Settings ›
+  Streaming, on by default). Close the PiP window and the stream simply waits
+  in the background like a Cmd-Tab-away; the return button, the Dock icon, or
+  the menu bar brings it back full screen.
+- **Works around two macOS AVKit bugs** in sample-buffer PiP that would
+  otherwise show only the bottom-left corner of the picture with a black box on
+  top (Apple FB22411168). Design notes and the manual test plan live under
+  [`docs/superpowers/specs/`](docs/superpowers/specs/).
 
 ## What you get
 
@@ -34,27 +56,20 @@ process. No external player, no C engine.
 - **Hosts.** mDNS discovery, PIN pairing, hosts by IP or name (Tailscale works),
   one-time import of moonlight-qt pairings.
 - **Mac things.** Menu bar item, display-matched quality presets, stats overlay,
-  hotkeys, notarized, self-updating.
+  hotkeys.
 
 Nothing leaves your Mac. Diagnostics are off by default and write local files
 under `~/Library/Logs/Glimmer`.
 
 ## Install
 
-macOS 26+, Apple Silicon.
+macOS 26+, Apple Silicon. Build from source (below) - shimmer isn't in a
+Homebrew tap yet, and it does not auto-update (the upstream update feed is
+deliberately disconnected so a shimmer build never replaces itself with stock
+glimmer).
 
-```bash
-brew tap se7enbrc/glimmer
-brew trust --tap se7enbrc/glimmer   # Homebrew requires this for third-party taps
-brew install --cask glimmer
-```
-
-Or the notarized `.dmg` from
-[Releases](https://github.com/Se7enbrc/glimmer/releases). Either way it updates
-itself.
-
-Signed and notarized, not sandboxed, not on the App Store - the Wi-Fi helper
-needs that freedom ([docs/SECURITY.md](docs/SECURITY.md)).
+Signed ad-hoc when built locally, not sandboxed, not on the App Store - the
+Wi-Fi helper needs that freedom ([docs/SECURITY.md](docs/SECURITY.md)).
 
 Your host needs Sunshine and a display that can present the exact mode you ask
 for: a virtual display driver on Windows, a current Sunshine on Linux.
@@ -69,37 +84,44 @@ approval under Login Items & Extensions. If it reports `rejected by BTM`, run
 Xcode 26 (Swift 6) and Homebrew.
 
 ```bash
-git clone https://github.com/Se7enbrc/glimmer.git
-cd glimmer
+git clone https://github.com/kevinbpatel/shimmer.git
+cd shimmer
 brew install openssl@3 opus
 make
 ```
 
 `make` builds and installs to /Applications the same way a release ships.
 `make app` compile-checks, `make test` runs the unit tests, `make uninstall`
-removes it. The engine is under `Glimmer/Stream/`, no submodules.
+removes it. The engine is under `Glimmer/Stream/`, no submodules. The app
+bundle, log directory, and internal identifiers still carry glimmer's name for
+now - a full in-app rebrand is a follow-up.
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Why not Moonlight
 
-Moonlight is excellent and Glimmer would not exist without it. But moonlight-qt
-is a Qt port of cross-platform C++, one layer from the hardware. Glimmer talks
-to VideoToolbox, AVAudioEngine, and GameController directly - that is where the
-pacing, HDR, and controller work comes from - and it behaves like a Mac app
-because it is one.
+Moonlight is excellent and glimmer would not exist without it. But moonlight-qt
+is a Qt port of cross-platform C++, one layer from the hardware. glimmer - and so
+shimmer - talks to VideoToolbox, AVAudioEngine, and GameController directly;
+that is where the pacing, HDR, and controller work comes from, and it behaves
+like a Mac app because it is one. It is also why Picture in Picture was
+tractable here: the stream already renders through an
+`AVSampleBufferDisplayLayer`, which is exactly what macOS PiP takes as a source.
 
 ## Support
 
-Free software, spare time.
-[Sponsor it on GitHub](https://github.com/sponsors/Se7enbrc) if it makes your
-setup better.
+glimmer is free software written in spare time.
+[Sponsor its author on GitHub](https://github.com/sponsors/Se7enbrc) if it
+makes your setup better.
 
 ## License
 
-GPLv3. Copyright © 2026 ugfugl.io. See [LICENSE](LICENSE).
+GPLv3. shimmer is a fork of glimmer, Copyright © 2026 ugfugl.io; shimmer's
+additions are Copyright © 2026 Kevin Patel and are released under the same
+license. See [LICENSE](LICENSE).
 
 The transport is ported from
 [moonlight-common-c](https://github.com/moonlight-stream/moonlight-common-c) and
 [moonlight-qt](https://github.com/moonlight-stream/moonlight-qt), both GPLv3, so
-Glimmer is too. Full acknowledgment in [CREDITS.md](CREDITS.md).
+glimmer is too, and so is shimmer. Full acknowledgment in
+[CREDITS.md](CREDITS.md).
