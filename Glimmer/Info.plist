@@ -29,7 +29,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 ugfugl.io. GNU GPL v3.</string>
+	<string>Copyright © 2026 ugfugl.io (glimmer) and Kevin Patel (shimmer). GNU GPL v3.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Shimmer</string>
 	<key>NSPrincipalClass</key>
@@ -53,14 +53,14 @@
 	     type the app browses - Discovery.swift browses _nvstream._tcp (GFE)
 	     and _nvstream-tcp._tcp (Sunshine). -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Glimmer finds and connects to your gaming PCs on your local network.</string>
+	<string>Shimmer finds and connects to your gaming PCs on your local network.</string>
 	<!-- Input Monitoring (kIOHIDRequestTypeListenEvent). REQUIRED for the
 	     permission API to behave: without this key IOHIDCheckAccess /
 	     IOHIDRequestAccess return denied even when the user HAS granted the
 	     app in System Settings (Apple DTS forum 809431). Covers raw-HID
 	     controller reads (DualSense) and raw mouse input. -->
 	<key>NSInputMonitoringUsageDescription</key>
-	<string>Glimmer reads game controllers and raw mouse motion so your input reaches the gaming PC accurately.</string>
+	<string>Shimmer reads game controllers and raw mouse motion so your input reaches the gaming PC accurately.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_nvstream._tcp</string>
