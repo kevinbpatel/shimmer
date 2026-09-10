@@ -48,7 +48,10 @@ extension StreamSession {
         statsThresholdsProvider: @escaping @MainActor () -> StatsThresholds = { .default },
         controllerQuitChordProvider: @escaping @MainActor () -> ControllerQuitChord = { .none },
         customControllerChordProvider: @escaping @MainActor () -> Set<ControllerButton> = { [] },
-        onBackgroundedChanged: (@MainActor (Bool) -> Void)? = nil
+        onBackgroundedChanged: (@MainActor (Bool) -> Void)? = nil,
+        pipHotkeyProvider: @escaping @MainActor () -> HotkeyChord = { .defaultPiP },
+        autoPictureInPictureProvider: @escaping @MainActor () -> Bool = { false },
+        onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil
     ) async throws -> AsyncStream<StreamEvent> {
         guard !isStreaming else {
             throw StreamError.sessionFailed(-1)
@@ -150,7 +153,10 @@ extension StreamSession {
             releasePointerHotkeyProvider: releasePointerHotkeyProvider,
             controllerQuitChordProvider: controllerQuitChordProvider,
             customControllerChordProvider: customControllerChordProvider,
-            onBackgroundedChanged: onBackgroundedChanged))
+            onBackgroundedChanged: onBackgroundedChanged,
+            pipHotkeyProvider: pipHotkeyProvider,
+            autoPictureInPictureProvider: autoPictureInPictureProvider,
+            onPictureInPictureChanged: onPictureInPictureChanged))
 
         // --- 4a) Build + publish the session bridge (see publishBridge): weak
         // refs to every subsystem + self so a torn-down subsystem just makes its
@@ -234,7 +240,7 @@ extension StreamSession {
                 .userInitiated, .latencyCritical,
                 .idleDisplaySleepDisabled, .idleSystemSleepDisabled
             ],
-            reason: "Glimmer is streaming")
+            reason: "Shimmer is streaming")
     }
 
     /// Step 1 of start(): fetch /serverinfo, stamp its launch sub-leg, log the

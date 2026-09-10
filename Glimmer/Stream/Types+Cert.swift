@@ -157,7 +157,7 @@ public enum PinnedCertStore {
 
     // MARK: File-store internals
 
-    /// `~/Library/Application Support/Glimmer/PinnedHosts/`. Created at
+    /// `~/Library/Application Support/Shimmer/PinnedHosts/`. Created at
     /// mode 0700 on first write.
     private static func directoryURL() throws -> URL {
         let fm = FileManager.default
@@ -165,7 +165,7 @@ public enum PinnedCertStore {
                               in: .userDomainMask,
                               appropriateFor: nil,
                               create: true)
-        return base.appendingPathComponent("Glimmer/PinnedHosts", isDirectory: true)
+        return base.appendingPathComponent("Shimmer/PinnedHosts", isDirectory: true)
     }
 
     /// Restrict host-id characters in the filename to a known-safe set

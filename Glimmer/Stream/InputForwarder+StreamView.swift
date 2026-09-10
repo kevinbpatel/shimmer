@@ -44,6 +44,15 @@ extension InputForwarder: StreamInputViewDelegate {
             return true
         }
 
+        // Picture-in-Picture chord: pop the stream out into the system PiP
+        // window. Same intercept position as quit/stats (before the sys-keys
+        // gate), consumed, never forwarded.
+        if !event.isARepeat, pipHotkeyProvider().matches(event: event, modifiers: mods) {
+            log.info("Picture in Picture hotkey detected - invoking onPiPHotkey")
+            onPiPHotkey?()
+            return true
+        }
+
         // Telemetry-bookmark chord (signal 4 - "that felt bad"). CLIENT-ONLY:
         // consumed here and NEVER forwarded to the host, exactly like the
         // quit/stats intercepts above (and the exit-chord interception this
@@ -131,7 +140,7 @@ extension InputForwarder: StreamInputViewDelegate {
         }
 
         // Ignore auto-repeated keys; the host generates its own repeats.
-        guard !event.isARepeat, isReady else { return true }
+        guard !event.isARepeat, isReady, !pipSuspended else { return true }
         guard let vk = vkScanCode(forCarbonKeyCode: Int(event.keyCode)) else { return true }
         let wireCode = Int16(bitPattern: 0x8000 | UInt16(bitPattern: vk))
         let rc = backend?.sendKeyboard(
@@ -150,7 +159,7 @@ extension InputForwarder: StreamInputViewDelegate {
         // must behave exactly as it did before the gesture existed, including
         // while the stream is mid-handshake and forwarding nothing.
         noteEscapeKeyUp(event)
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         // Mirror the sys-key gate from handleKeyDown: if Cmd is held and
@@ -178,7 +187,7 @@ extension InputForwarder: StreamInputViewDelegate {
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let changed = mods.symmetricDifference(lastModFlags)
         lastModFlags = mods
-        guard isReady else { return }
+        guard isReady, !pipSuspended else { return }
 
         // Use the OS keyCode to figure out which side (L vs R) of the modifier
         // changed - Win VK has separate codes for LSHIFT (0xA0) and RSHIFT
@@ -242,7 +251,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseMoved event: NSEvent) {
-        guard isReady, forwardsMouseEvents else { return }
+        guard isReady, forwardsMouseEvents, !pipSuspended else { return }
 
         // WINDOW MODE with the pointer free: the host cursor tracks this Mac's
         // cursor 1:1, so send WHERE the pointer is rather than how far it
@@ -403,7 +412,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseDown event: NSEvent) {
-        guard isReady, forwardsMouseEvents else { return }
+        guard isReady, forwardsMouseEvents, !pipSuspended else { return }
         // A click in a window reaches the HOST - that is the whole point of
         // absolute mode, and the reason click-to-capture is gone. Send the
         // position first so the host's cursor is under the click before the
@@ -418,7 +427,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleMouseUp event: NSEvent) {
-        guard isReady, forwardsMouseEvents else { return }
+        guard isReady, forwardsMouseEvents, !pipSuspended else { return }
         let hostButton = button(for: event)
         // Window mode: never send a release for a press the host has already
         // been told about. `releasePointer` raises held buttons first, so a
@@ -451,7 +460,7 @@ extension InputForwarder: StreamInputViewDelegate {
     }
 
     func streamView(_ view: StreamInputView, handleScroll event: NSEvent) {
-        guard isReady, forwardsMouseEvents else { return }
+        guard isReady, forwardsMouseEvents, !pipSuspended else { return }
         // DEADZONE REMOVED. This handler
         // used to clamp each event's delta to ±1.0 line before the WHEEL_DELTA
         // scale - a per-event magnitude cap added

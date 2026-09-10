@@ -147,6 +147,16 @@ public final class InputForwarder {
     /// why this is a closure rather than a stored chord value.
     public var statsHotkeyProvider: (@MainActor () -> HotkeyChord) = { .defaultStats }
 
+    /// Called when the user presses the Picture-in-Picture chord. The session
+    /// owner wires this to `StreamWindow.enterPictureInPicture()`. Same
+    /// intercept story as quit/stats: fires BEFORE the sys-key-capture gate,
+    /// consumed, never forwarded to the host.
+    public var onPiPHotkey: (@MainActor () -> Void)?
+
+    /// Provider for the Picture-in-Picture chord. See `quitHotkeyProvider` for
+    /// why this is a closure rather than a stored chord value.
+    public var pipHotkeyProvider: (@MainActor () -> HotkeyChord) = { .defaultPiP }
+
     /// Called when the user presses the telemetry-bookmark chord (signal 4 -
     /// "that felt bad"). CLIENT-ONLY: the chord is consumed in the input path and
     /// NEVER forwarded to the host (mirrors the quit/stats intercept). The session
@@ -276,6 +286,16 @@ public final class InputForwarder {
     /// write it from InputForwarder+Lifecycle.swift. Still read-only outside the
     /// module.
     public internal(set) var isReady: Bool = false
+
+    /// True while the stream is popped out to Picture in Picture. The window is
+    /// then an alpha-0 mirror source, not a focused game surface, so keyboard
+    /// and mouse must NOT be forwarded to the host - otherwise the global
+    /// relative-aim cursor freeze (associate-false) stays engaged and every Mac
+    /// mouse move drives the game pointer, wherever the pointer is. Controller
+    /// input is unaffected (it goes through the GameController path, not the
+    /// StreamInputView handlers this gates) - keep-playing-with-the-pad is the
+    /// whole point of PiP. Set via `setPiPSuspended(_:)`.
+    public internal(set) var pipSuspended: Bool = false
 
     /// The streaming engine input is forwarded to. Injected by StreamSession at
     /// attach time so the forwarder talks to the protocol (`backend.send*`)

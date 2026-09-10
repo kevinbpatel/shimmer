@@ -74,7 +74,7 @@ struct GeneralPane: View {
                 // tradeoff in the parenthetical. The mechanism (login items,
                 // SMAppService) stays in code comments and help text.
                 Toggle("Be ready at login (starts automatically with your Mac)", isOn: $launchAtLogin)
-                    .help("Registers Glimmer as a macOS login item.")
+                    .help("Registers Shimmer as a macOS login item.")
                     .onChange(of: launchAtLogin) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
                     }
@@ -83,14 +83,14 @@ struct GeneralPane: View {
                         scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
                     }
                     .disabled(!launchAtLogin)
-                Text("When on, Glimmer launches into the menu bar at login without showing the "
+                Text("When on, Shimmer launches into the menu bar at login without showing the "
                     + "main window. Toggle it off to have the launcher open at login like a normal "
                     + "app. Manual launches via Spotlight, Finder, or the Dock always open the window.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if loginItemNeedsApproval {
                     HStack(spacing: 8) {
-                        Label("macOS needs you to approve Glimmer in Login Items, "
+                        Label("macOS needs you to approve Shimmer in Login Items, "
                             + "or it won't start at the next reboot.",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote).foregroundStyle(.orange)
@@ -251,6 +251,16 @@ struct QualityPane: View {
                 }
             }
 
+            Section {
+                Toggle("Pop out to Picture in Picture when you switch away", isOn: $model.autoPictureInPicture)
+                    .toggleStyle(.switch)
+                    .help("Cmd-Tab away and the stream keeps playing in macOS's floating Picture in Picture window.")
+            } footer: {
+                Text("When you switch to another app, the stream keeps playing in a small floating window "
+                    + "you can drag to any corner - controllers keep working. Off just hides the stream "
+                    + "until you come back. \(model.pipHotkey.displayString) pops it out on demand either way.")
+            }
+
             if model.qualityPreset == .custom {
                 // "Custom" alone: the section owns the window choice now, not
                 // just overrides of the preset numbers.
@@ -397,7 +407,7 @@ struct QualityPane: View {
                 .help("Holds awdl0 down for the duration of each stream via a privileged helper.")
                 if case .requiresApproval = awdl.state {
                     HStack(spacing: 8) {
-                        Label("macOS needs you to approve the Glimmer network helper in Login Items.",
+                        Label("macOS needs you to approve the Shimmer network helper in Login Items.",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote).foregroundStyle(.orange)
                         Spacer()

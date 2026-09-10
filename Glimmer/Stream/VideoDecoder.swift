@@ -469,6 +469,10 @@ public final class VideoDecoder {
     /// view alive past teardown. MainActor-touched only (start/re-enable both run
     /// there); `@MainActor` keeps it off the nonisolated decode path.
     @MainActor weak var pacingDrivingView: NSView?
+    /// Mirror of `FramePacer.detachedFromView` held here so a pacer rebuilt
+    /// after a present-path give-up (`reenablePacing`) inherits the Picture in
+    /// Picture binding instead of silently coming back view-bound (and dead).
+    @MainActor var pacingDetachedFromView = false
 
     /// Rebuild the AVSampleBufferDisplayLayer and re-point the decoder at the
     /// fresh one. Wired by StreamSession to `StreamWindow.rebuildDisplayLayer()`

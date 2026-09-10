@@ -17,10 +17,10 @@ SHORT="$1"; BUILD="$2"; APP="$3"; DIST="$4"; REPO="$5"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 CREDS="$HERE/scripts/signing-creds.sh"
 TOOLS="$("$HERE/scripts/sparkle-tools.sh")"
-ZIP="$DIST/Glimmer-$SHORT.zip"
-DMG="$DIST/Glimmer-$SHORT.dmg"
+ZIP="$DIST/Shimmer-$SHORT.zip"
+DMG="$DIST/Shimmer-$SHORT.dmg"
 TAG="$SHORT"
-ASSET_URL="https://github.com/$REPO/releases/download/$TAG/Glimmer-$SHORT.zip"
+ASSET_URL="https://github.com/$REPO/releases/download/$TAG/Shimmer-$SHORT.zip"
 APPCAST="appcast.xml"
 
 [ -d "$APP" ] || { echo "ERR: app bundle not found at $APP - run via 'make release-publish'" >&2; exit 1; }

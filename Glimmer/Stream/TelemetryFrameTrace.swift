@@ -79,7 +79,7 @@ final class FrameTraceWriter: @unchecked Sendable {
         flushQueue.async { [weak self] in
             guard let self else { return }
             let dir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Logs/Glimmer", isDirectory: true)
+                .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
             do {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             } catch {

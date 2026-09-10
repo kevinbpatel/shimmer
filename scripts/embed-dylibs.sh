@@ -57,7 +57,7 @@ fi
 OPENSSL_PREFIX="$(brew --prefix openssl@3)"
 OPUS_PREFIX="$(brew --prefix opus)"
 
-BIN="$APP/Contents/MacOS/Glimmer"
+BIN="$APP/Contents/MacOS/Shimmer"
 FRAMEWORKS="$APP/Contents/Frameworks"
 mkdir -p "$FRAMEWORKS"
 

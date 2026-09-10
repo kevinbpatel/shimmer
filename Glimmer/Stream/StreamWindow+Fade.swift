@@ -88,6 +88,10 @@ extension StreamWindow {
         guard !didClose else { return }
         didClose = true
 
+        // Picture in Picture first: the system PiP window is fed by our layer
+        // and would otherwise outlive the session showing a frozen frame.
+        tearDownPictureInPicture()
+
         // 1. Display-layer flush is DEFERRED to the fade completion (step 5).
         //    Flushing here (removingDisplayedImage) blanks the layer before the
         //    fade runs, so the user only ever sees an already-empty window fade
@@ -207,7 +211,7 @@ extension StreamWindow {
         // invisible (defensive - close() is currently the last call).
         window.alphaValue = 1.0
         NSApp.activate()
-        if let main = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Glimmer" }) {
+        if let main = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Shimmer" }) {
             main.makeKeyAndOrderFront(nil)
         }
     }

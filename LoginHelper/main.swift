@@ -30,7 +30,7 @@ let mainAppURL = helperURL
 // embedded location we'd rather exit silently than launch the wrong app.
 guard mainAppURL.pathExtension == "app",
       FileManager.default.fileExists(atPath: mainAppURL.path) else {
-    NSLog("Glimmer Login Helper: couldn't resolve main app at \(mainAppURL.path) - exiting")
+    NSLog("Shimmer Login Helper: couldn't resolve main app at \(mainAppURL.path) - exiting")
     exit(0)
 }
 
@@ -42,7 +42,7 @@ config.createsNewApplicationInstance = false
 
 NSWorkspace.shared.openApplication(at: mainAppURL, configuration: config) { _, error in
     if let error {
-        NSLog("Glimmer Login Helper: failed to launch main app: \(error)")
+        NSLog("Shimmer Login Helper: failed to launch main app: \(error)")
     }
     // Exit either way - the helper has no further job after this.
     DispatchQueue.main.async { exit(0) }

@@ -228,7 +228,7 @@ private struct HostChooser: View {
             // land within a second of the sheet opening. Rendered FIRST, in the
             // same body pass that arms discovery, so the reason is already on
             // screen when the prompt arrives - not somewhere behind it.
-            Text("Glimmer looks for PCs running Sunshine on your local network; "
+            Text("Shimmer looks for PCs running Sunshine on your local network; "
                 + "macOS will ask to allow that.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

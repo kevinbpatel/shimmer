@@ -113,7 +113,7 @@ struct MainWindow: View {
                 }
             }
         }
-        .navigationTitle("Glimmer")
+        .navigationTitle("Shimmer")
     }
 }
 

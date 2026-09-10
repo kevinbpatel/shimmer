@@ -123,7 +123,7 @@ extension NetworkClient {
         if detail.hasPrefix("connect to") {
             return .hostUnreachable(
                 "\(name) is awake, but Sunshine's secure port (47984) is refusing connections - "
-                + "its HTTPS listener is stuck. Restart Sunshine on the PC; quitting Glimmer will not help."
+                + "its HTTPS listener is stuck. Restart Sunshine on the PC; quitting Shimmer will not help."
             )
         }
         if detail.contains("Host requires pairing") {

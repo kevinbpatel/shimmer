@@ -213,6 +213,60 @@ public final class StreamWindow {
     /// affordance while the stream window is hidden.
     public var onBackgroundedChanged: (@MainActor (Bool) -> Void)?
 
+    // MARK: Picture in Picture state (see StreamWindow+PictureInPicture.swift)
+
+    /// AVKit Picture-in-Picture adapter built on `displayLayer` (re-targeted
+    /// by `rebuildDisplayLayer()`). The system PiP window shows the SAME layer
+    /// the fullscreen window paints into, so the two are mutually exclusive:
+    /// entering PiP hides this window, returning to this window stops PiP.
+    let pictureInPicture: StreamPictureInPicture
+    /// True from `hideStreamWindow()` (orderOut) until `reengageForeground()`.
+    var isBackgrounded = false
+    /// True while the system PiP window is up (AVKit didStart → didStop).
+    public private(set) var isPictureInPictureActive = false
+    /// True between our `start()` and AVKit's didStart / failedToStart, so
+    /// present suppression is NOT engaged for the ~100ms the PiP window takes
+    /// to come up (it would cost a drain + an IDR resync for nothing).
+    var pictureInPicturePending = false
+    /// The PiP window's play/pause control. Paused maps onto present
+    /// suppression (freeze on the newest frame, decode gates after 2s).
+    var pictureInPicturePaused = false
+    /// Last value handed to `onPresentSuppressionChanged`, so only real edges
+    /// reach the decoder (its transition work is not free).
+    var lastEmittedPresentSuppressed = false
+    /// `GCController.shouldMonitorBackgroundEvents` before we flipped it on
+    /// for PiP; restored on PiP stop / close. nil = we never touched it.
+    var savedControllerBackgroundFlag: Bool?
+    /// True while the stream window is acting as the alpha-0, PiP-window-sized
+    /// MIRROR SOURCE for the system Picture in Picture window. macOS's
+    /// sample-buffer PiP copies the source layer's pixels 1:1 with no scaling
+    /// (a documented AVKit bug - see StreamWindow+PictureInPicture.swift), so
+    /// the source window must stay ON SCREEN and be sized to the PiP window, or
+    /// PiP shows only the bottom-left crop. While this is true the window's
+    /// own key/resign observers are gated off (it's intentionally invisible;
+    /// returns come through the explicit PiP/Dock/menu paths).
+    var pipSourceMode = false
+    /// The fullscreen frame to restore when PiP ends (saved on entering source
+    /// mode). nil when not in source mode.
+    var savedFrameBeforePiP: NSRect?
+    /// Observer on the PiP panel's content view frame, so the mirror source
+    /// window tracks PiP window resizes and keeps filling it 1:1.
+    var pipPanelFrameObserver: NSObjectProtocol?
+    /// Read at the confirmed switch-away edge: should the stream pop out to
+    /// Picture in Picture instead of just hiding? Wired to the user's
+    /// Settings toggle by the session owner.
+    public var autoPictureInPictureProvider: (@MainActor () -> Bool) = { false }
+    /// PiP window came up / went away. The session owner rebinds the frame
+    /// pacer (screen link vs view link) and tells the launcher UI.
+    public var onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
+    /// The decoder's "nobody is looking at the layer" signal:
+    /// backgrounded AND not (in / entering) PiP, OR paused from the PiP
+    /// controls. Replaces the decoder's former use of `onBackgroundedChanged`,
+    /// which conflated "window hidden" with "nothing presents".
+    public var onPresentSuppressionChanged: (@MainActor (Bool) -> Void)?
+    /// Setter for the PiP-active flag scoped to the window's own files.
+    func setPictureInPictureActive(_ active: Bool) { isPictureInPictureActive = active }
+
     /// Called when the stream window moves to a different display (or its
     /// backing display's properties change - refresh rate, wake from sleep).
     /// The session owner wires this to `VideoDecoder.pacingScreenDidChange()`
@@ -441,6 +495,8 @@ public final class StreamWindow {
         self.captureHintBanner = captureHint
         self.displayView = view
         self.streamDelegate = delegate
+        self.pictureInPicture = StreamPictureInPicture(layer: layer)
+        installPictureInPictureHandlers()
         // Window mode: the red button / Cmd-W route through the delegate to
         // the session's stop() (StreamWindow+Windowed.swift). Wired after
         // full initialization because it captures self.
@@ -495,6 +551,13 @@ public final class StreamWindow {
         view.layer = fresh
         view.wantsLayer = true
         self.displayLayer = fresh
+        // PiP is fed by the layer, not the view: re-target it onto the fresh
+        // layer. If PiP was up when the renderer hard-failed, don't try to
+        // relaunch it into the slot the dismissing old window still holds -
+        // exit PiP cleanly and surface the recovering stream fullscreen.
+        if pictureInPicture.retarget(layer: fresh) || pictureInPicturePending {
+            handleLayerRebuildDuringPiP()
+        }
         log.notice("Rebuilt AVSampleBufferDisplayLayer (present-path self-heal)")
         return fresh
     }

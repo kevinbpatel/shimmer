@@ -22,6 +22,7 @@
 		A10000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* SettingsView.swift */; };
 		A1000009A /* PairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000009B /* PairSheet.swift */; };
 		A100030A /* ContainerMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100030B /* ContainerMigration.swift */; };
+		A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE001120000000000000 /* BundleIDMigration.swift */; };
 		A100010A /* TroubleshootingPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100010B /* TroubleshootingPane.swift */; };
 		A100011A /* DualSenseHID.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100011B /* DualSenseHID.swift */; };
 		D20000A3 /* DualSenseHID+Decode.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000A2 /* DualSenseHID+Decode.swift */; };
@@ -134,6 +135,7 @@
 		D100005A /* Identity+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000059 /* Identity+Loading.swift */; };
 		D100005C /* Identity+Crypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005B /* Identity+Crypto.swift */; };
 		D100005E /* AppModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005D /* AppModel+Lifecycle.swift */; };
+		A1C0DE000910000000000000 /* DebugAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000920000000000000 /* DebugAutomation.swift */; };
 		D2000097 /* AppModel+Defaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000096 /* AppModel+Defaults.swift */; };
 		D1000060 /* AppModel+Streaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005F /* AppModel+Streaming.swift */; };
 		D1000062 /* AppModel+Pairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000061 /* AppModel+Pairing.swift */; };
@@ -202,6 +204,8 @@
 		D6D80A720000000000000009 /* StreamSession+StatsOverlayTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000010 /* StreamSession+StatsOverlayTimer.swift */; };
 		D6D80A720000000000000011 /* StreamSession+FrameWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000012 /* StreamSession+FrameWatchdog.swift */; };
 		D6D80A720000000000000013 /* StreamWindow+Fade.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000014 /* StreamWindow+Fade.swift */; };
+		A1C0DE000210000000000000 /* StreamPictureInPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000220000000000000 /* StreamPictureInPicture.swift */; };
+		A1C0DE000110000000000000 /* StreamWindow+PictureInPicture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000120000000000000 /* StreamWindow+PictureInPicture.swift */; };
 		D6D80A720000000000000015 /* StatsOverlayLayer+Rows.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000016 /* StatsOverlayLayer+Rows.swift */; };
 		D6D80A720000000000000017 /* EnvSignalController+Tunables.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000018 /* EnvSignalController+Tunables.swift */; };
 		D6D80A720000000000000019 /* EnvSignalController+Evidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D80A720000000000000020 /* EnvSignalController+Evidence.swift */; };
@@ -260,6 +264,7 @@
 		DEC0DE2026083000000000A2 /* IOReportSamplerLifetimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */; };
 		D2000037 /* KeyboardScanMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000036 /* KeyboardScanMapTests.swift */; };
 		D20000A1 /* ControllerQuitChordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000A0 /* ControllerQuitChordTests.swift */; };
+		A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000320000000000000 /* PictureInPictureTests.swift */; };
 		D2000039 /* StreamProtocolConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000038 /* StreamProtocolConstantsTests.swift */; };
 		D5CD78BE12E450A9FDBE6424 /* FuzzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 064F5F39A59E54E022FEE74E /* FuzzTests.swift */; };
 		D96F6019901B5705F1040F52 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 505E37FB63C22AC476506587 /* Foundation.framework */; };
@@ -311,7 +316,7 @@
 		68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Glimmer Login Helper.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		71A5B2E11628E68BFAF05421 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		9158C8506080330EC17875A9 /* Host.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Host.swift; sourceTree = "<group>"; };
-		A10000010 /* Glimmer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Glimmer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000010 /* Shimmer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shimmer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000011 /* GlimmerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlimmerApp.swift; sourceTree = "<group>"; };
 		A10000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A10000013 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -321,6 +326,7 @@
 		A10000017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000009B /* PairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairSheet.swift; sourceTree = "<group>"; };
 		A100030B /* ContainerMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerMigration.swift; sourceTree = "<group>"; };
+		A1C0DE001120000000000000 /* BundleIDMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BundleIDMigration.swift"; sourceTree = "<group>"; };
 		A100010B /* TroubleshootingPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TroubleshootingPane.swift; sourceTree = "<group>"; };
 		A100011B /* DualSenseHID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DualSenseHID.swift; path = Stream/DualSenseHID.swift; sourceTree = "<group>"; };
 		D20000A2 /* DualSenseHID+Decode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DualSenseHID+Decode.swift"; path = "Stream/DualSenseHID+Decode.swift"; sourceTree = "<group>"; };
@@ -431,6 +437,7 @@
 		D1000059 /* Identity+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/Identity+Loading.swift"; sourceTree = "<group>"; };
 		D100005B /* Identity+Crypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/Identity+Crypto.swift"; sourceTree = "<group>"; };
 		D100005D /* AppModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Lifecycle.swift"; sourceTree = "<group>"; };
+		A1C0DE000920000000000000 /* DebugAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugAutomation.swift"; sourceTree = "<group>"; };
 		D2000096 /* AppModel+Defaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Defaults.swift"; sourceTree = "<group>"; };
 		D100005F /* AppModel+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Streaming.swift"; sourceTree = "<group>"; };
 		D1000061 /* AppModel+Pairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Pairing.swift"; sourceTree = "<group>"; };
@@ -499,6 +506,8 @@
 		D6D80A720000000000000010 /* StreamSession+StatsOverlayTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamSession+StatsOverlayTimer.swift"; sourceTree = "<group>"; };
 		D6D80A720000000000000012 /* StreamSession+FrameWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamSession+FrameWatchdog.swift"; sourceTree = "<group>"; };
 		D6D80A720000000000000014 /* StreamWindow+Fade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamWindow+Fade.swift"; sourceTree = "<group>"; };
+		A1C0DE000220000000000000 /* StreamPictureInPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamPictureInPicture.swift"; sourceTree = "<group>"; };
+		A1C0DE000120000000000000 /* StreamWindow+PictureInPicture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamWindow+PictureInPicture.swift"; sourceTree = "<group>"; };
 		D6D80A720000000000000016 /* StatsOverlayLayer+Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StatsOverlayLayer+Rows.swift"; sourceTree = "<group>"; };
 		D6D80A720000000000000018 /* EnvSignalController+Tunables.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/EnvSignalController+Tunables.swift"; sourceTree = "<group>"; };
 		D6D80A720000000000000020 /* EnvSignalController+Evidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/EnvSignalController+Evidence.swift"; sourceTree = "<group>"; };
@@ -558,6 +567,7 @@
 		DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportSamplerLifetimeTests.swift; sourceTree = "<group>"; };
 		D2000036 /* KeyboardScanMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardScanMapTests.swift; sourceTree = "<group>"; };
 		D20000A0 /* ControllerQuitChordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerQuitChordTests.swift; sourceTree = "<group>"; };
+		A1C0DE000320000000000000 /* PictureInPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PictureInPictureTests.swift"; sourceTree = "<group>"; };
 		D2000038 /* StreamProtocolConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamProtocolConstantsTests.swift; sourceTree = "<group>"; };
 		E9A93C80B589802B27974D75 /* LoginHelper.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = LoginHelper.entitlements; sourceTree = "<group>"; };
 		FA5CD63C82A1DCE2E8BA445D /* main.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -649,6 +659,7 @@
 				A10000017 /* SettingsView.swift */,
 				A1000009B /* PairSheet.swift */,
 				A100030B /* ContainerMigration.swift */,
+				A1C0DE001120000000000000 /* BundleIDMigration.swift */,
 				A100010B /* TroubleshootingPane.swift */,
 				A100020B /* DiagnosticsPane.swift */,
 				A100012B /* LogStore.swift */,
@@ -688,6 +699,8 @@
 				D6D80A720000000000000010 /* StreamSession+StatsOverlayTimer.swift */,
 				D6D80A720000000000000012 /* StreamSession+FrameWatchdog.swift */,
 				D6D80A720000000000000014 /* StreamWindow+Fade.swift */,
+				A1C0DE000220000000000000 /* StreamPictureInPicture.swift */,
+				A1C0DE000120000000000000 /* StreamWindow+PictureInPicture.swift */,
 				D6D80A720000000000000016 /* StatsOverlayLayer+Rows.swift */,
 				D6D80A720000000000000018 /* EnvSignalController+Tunables.swift */,
 				D6D80A720000000000000020 /* EnvSignalController+Evidence.swift */,
@@ -735,6 +748,7 @@
 				D1A00001 /* AppModel+HostRoute.swift */,
 				D1A00003 /* AppModel+SessionReceipt.swift */,
 				D100005D /* AppModel+Lifecycle.swift */,
+				A1C0DE000920000000000000 /* DebugAutomation.swift */,
 				D2000096 /* AppModel+Defaults.swift */,
 				D100005B /* Identity+Crypto.swift */,
 				D1000059 /* Identity+Loading.swift */,
@@ -876,7 +890,7 @@
 		A10000032 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000010 /* Glimmer.app */,
+				A10000010 /* Shimmer.app */,
 				68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */,
 				D2000019 /* GlimmerTests.xctest */,
 			);
@@ -912,6 +926,7 @@
 				DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */,
 				D2000036 /* KeyboardScanMapTests.swift */,
 				D20000A0 /* ControllerQuitChordTests.swift */,
+				A1C0DE000320000000000000 /* PictureInPictureTests.swift */,
 				D2000038 /* StreamProtocolConstantsTests.swift */,
 				064F5F39A59E54E022FEE74E /* FuzzTests.swift */,
 			);
@@ -941,7 +956,7 @@
 				A1009011 /* Sparkle */,
 			);
 			productName = Glimmer;
-			productReference = A10000010 /* Glimmer.app */;
+			productReference = A10000010 /* Shimmer.app */;
 			productType = "com.apple.product-type.application";
 		};
 		AD84EE95363FBCE53F028062 /* Glimmer Login Helper */ = {
@@ -1054,6 +1069,7 @@
 				A10000005 /* SettingsView.swift in Sources */,
 				A1000009A /* PairSheet.swift in Sources */,
 				A100030A /* ContainerMigration.swift in Sources */,
+				A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */,
 				A100010A /* TroubleshootingPane.swift in Sources */,
 				A100020A /* DiagnosticsPane.swift in Sources */,
 				A100012A /* LogStore.swift in Sources */,
@@ -1090,6 +1106,8 @@
 				D6D80A720000000000000009 /* StreamSession+StatsOverlayTimer.swift in Sources */,
 				D6D80A720000000000000011 /* StreamSession+FrameWatchdog.swift in Sources */,
 				D6D80A720000000000000013 /* StreamWindow+Fade.swift in Sources */,
+				A1C0DE000210000000000000 /* StreamPictureInPicture.swift in Sources */,
+				A1C0DE000110000000000000 /* StreamWindow+PictureInPicture.swift in Sources */,
 				D6D80A720000000000000015 /* StatsOverlayLayer+Rows.swift in Sources */,
 				D6D80A720000000000000017 /* EnvSignalController+Tunables.swift in Sources */,
 				D6D80A720000000000000019 /* EnvSignalController+Evidence.swift in Sources */,
@@ -1142,6 +1160,7 @@
 				D1A00002 /* AppModel+HostRoute.swift in Sources */,
 				D1A00004 /* AppModel+SessionReceipt.swift in Sources */,
 				D100005E /* AppModel+Lifecycle.swift in Sources */,
+				A1C0DE000910000000000000 /* DebugAutomation.swift in Sources */,
 				D2000097 /* AppModel+Defaults.swift in Sources */,
 				D100005C /* Identity+Crypto.swift in Sources */,
 				D100005A /* Identity+Loading.swift in Sources */,
@@ -1305,6 +1324,7 @@
 				DEC0DE2026083000000000A2 /* IOReportSamplerLifetimeTests.swift in Sources */,
 				D2000037 /* KeyboardScanMapTests.swift in Sources */,
 				D20000A1 /* ControllerQuitChordTests.swift in Sources */,
+				A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */,
 				D2000039 /* StreamProtocolConstantsTests.swift in Sources */,
 				D5CD78BE12E450A9FDBE6424 /* FuzzTests.swift in Sources */,
 			);
@@ -1341,8 +1361,8 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoginHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer.LoginHelper;
-				PRODUCT_NAME = "Glimmer Login Helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer.LoginHelper;
+				PRODUCT_NAME = "Shimmer Login Helper";
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
@@ -1492,8 +1512,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer;
+				PRODUCT_NAME = Shimmer;
+				PRODUCT_MODULE_NAME = Glimmer;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_INFERSENDABLEFROMCAPTURES = YES;
@@ -1524,8 +1545,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer;
+				PRODUCT_NAME = Shimmer;
+				PRODUCT_MODULE_NAME = Glimmer;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_INFERSENDABLEFROMCAPTURES = YES;
@@ -1545,7 +1567,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glimmer.app/Contents/MacOS/Glimmer";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shimmer.app/Contents/MacOS/Shimmer";
 			};
 			name = Debug;
 		};
@@ -1559,7 +1581,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Glimmer.app/Contents/MacOS/Glimmer";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Shimmer.app/Contents/MacOS/Shimmer";
 			};
 			name = Release;
 		};
@@ -1576,8 +1598,8 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LoginHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = io.ugfugl.Glimmer.LoginHelper;
-				PRODUCT_NAME = "Glimmer Login Helper";
+				PRODUCT_BUNDLE_IDENTIFIER = com.kevinbpatel.shimmer.LoginHelper;
+				PRODUCT_NAME = "Shimmer Login Helper";
 				SKIP_INSTALL = NO;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;

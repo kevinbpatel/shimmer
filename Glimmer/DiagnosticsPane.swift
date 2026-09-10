@@ -34,7 +34,7 @@ struct DiagnosticsPane: View {
     /// + LogStore). Resolved live so it shows the real per-user path.
     private var telemetryLogDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/Glimmer", isDirectory: true)
+            .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
     }
 
     var body: some View {
@@ -63,7 +63,7 @@ struct DiagnosticsPane: View {
             } header: {
                 Text("Logs")
             } footer: {
-                Text("Recent entries from Glimmer's unified log. Copy them when "
+                Text("Recent entries from Shimmer's unified log. Copy them when "
                     + "filing an issue.")
             }
 

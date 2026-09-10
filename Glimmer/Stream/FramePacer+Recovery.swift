@@ -115,7 +115,15 @@ extension FramePacer {
         let proxy = DisplayLinkProxy { [weak self] link in
             self?.handleTick(link)
         }
-        let link = view.displayLink(target: proxy, selector: #selector(DisplayLinkProxy.tick(_:)))
+        let link: CADisplayLink
+        if detachedFromView, let screen = view.window?.screen ?? NSScreen.main {
+            // Picture in Picture: the stream window is ordered out, so a
+            // view-bound link would never fire again. Bind to the screen the
+            // window last sat on (an ordered-out NSWindow still reports it).
+            link = screen.displayLink(target: proxy, selector: #selector(DisplayLinkProxy.tick(_:)))
+        } else {
+            link = view.displayLink(target: proxy, selector: #selector(DisplayLinkProxy.tick(_:)))
+        }
         // FORBID macOS from throttling the PRESENT CALLBACK below stream
         // cadence on a static/AFK layer. Without a floor, macOS slows the
         // CADisplayLink callback on a flat layer (NOT a ProMotion display
@@ -188,8 +196,28 @@ extension FramePacer {
             // so the 0 fallback can't appear in practice.
             "FramePacer link installed - floor=\(Double(range.minimum))Hz "
             + "preferred=\(Double(range.preferred ?? 0))Hz max=\(Double(range.maximum))Hz "
-            + "(panelMax=\(panelMax)Hz)",
+            + "(panelMax=\(panelMax)Hz, bound=\(detachedFromView ? "screen" : "view"))",
             "Stream.Pacer")
+    }
+
+    /// Switch between the view-bound link (normal fullscreen streaming) and a
+    /// screen-bound link (Picture in Picture, window ordered out). Rebinds
+    /// immediately when running; otherwise the flag is picked up by the next
+    /// `start`. Idempotent on a same-value call.
+    @MainActor
+    func setDetachedFromView(_ detached: Bool) {
+        guard detached != detachedFromView else { return }
+        detachedFromView = detached
+        let isRunning: Bool = {
+            os_unfair_lock_lock(&lock); defer { os_unfair_lock_unlock(&lock) }
+            return running
+        }()
+        guard isRunning, let view = boundView else { return }
+        log.info("FramePacer rebinding display link (detachedFromView=\(detached, privacy: .public))")
+        Diag.info("FramePacer rebinding display link (bound=\(detached ? "screen" : "view"))", "Stream.Pacer")
+        displayLink?.invalidate()
+        displayLink = nil
+        installLink(on: view)
     }
 
     /// Rebind the link to a new screen - the stream window moved to another

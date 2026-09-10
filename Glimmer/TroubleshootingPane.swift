@@ -70,8 +70,8 @@ struct RawHIDControl: View {
                 .font(.title3).foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text("One more step - turn on Input Monitoring").fontWeight(.medium)
-                Text("Flip **Glimmer** on under Input Monitoring, then **quit & reopen** "
-                    + "Glimmer - macOS only applies the change on relaunch.")
+                Text("Flip **Shimmer** on under Input Monitoring, then **quit & reopen** "
+                    + "Shimmer - macOS only applies the change on relaunch.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()

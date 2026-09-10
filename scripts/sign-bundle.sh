@@ -52,7 +52,7 @@ if [ -d "$FW" ]; then
 	sign_plain "$FW"
 fi
 
-HELPER="$APP/Contents/Library/LoginItems/Glimmer Login Helper.app"
+HELPER="$APP/Contents/Library/LoginItems/Shimmer Login Helper.app"
 if [ -d "$HELPER" ]; then
 	echo "Signing Login Helper with its own entitlements"
 	if [ -f "$HELPER_ENT" ]; then
@@ -69,7 +69,7 @@ if [ -f "$DAEMON" ]; then
 	codesign --force --options runtime $TS $KCF --sign "$ID" --identifier "io.ugfugl.glimmer.helper" "$DAEMON"
 fi
 
-echo "Signing the app bundle (Glimmer entitlements, no --deep)"
+echo "Signing the app bundle (app entitlements, no --deep)"
 codesign --force --options runtime $TS $KCF --sign "$ID" --entitlements "$ENT" "$APP"
 
 echo "Verifying the whole bundle (deep + strict)"

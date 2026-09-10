@@ -17,7 +17,7 @@ import ServiceManagement
 ///   * minimized → register the HELPER (relaunches the main app suppressed)
 ///   * not minimized → register the main app (normal open at login)
 enum LoginItemManager {
-    static let helperBundleID = "io.ugfugl.Glimmer.LoginHelper"
+    static let helperBundleID = "com.kevinbpatel.shimmer.LoginHelper"
 
     /// The service that backs the user's current intent.
     private static func activeService(minimized: Bool) -> SMAppService {

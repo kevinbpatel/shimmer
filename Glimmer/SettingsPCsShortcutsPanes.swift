@@ -202,7 +202,7 @@ struct ShortcutsPane: View {
         Form {
             Section("In-stream shortcuts") {
                 HotkeyRow(label: "Leave the stream", hotkey: $model.quitHotkey)
-                Text("Press this combo at any time during a stream to return to Glimmer.")
+                Text("Press this combo at any time during a stream to return to Shimmer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 HotkeyRow(label: "Show or hide stream stats", hotkey: $model.statsHotkey)
@@ -210,6 +210,12 @@ struct ShortcutsPane: View {
                 // only for the current stream. The next stream starts from
                 // the stats-overlay toggle in Quality.
                 Text("Flips the overlay on or off for the current stream only - the next stream starts from your Quality preference.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                HotkeyRow(label: "Pop the stream out (Picture in Picture)", hotkey: $model.pipHotkey)
+                Text("Sends the stream to macOS's floating Picture in Picture window so it stays in a corner "
+                    + "while you use other apps. Controllers keep working; click the window's return button "
+                    + "or the Dock icon to go back to fullscreen.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 HotkeyRow(label: "Capture or release the pointer", hotkey: $model.releasePointerHotkey)

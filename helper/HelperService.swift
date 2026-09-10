@@ -12,7 +12,7 @@ final class HelperService: NSObject, NSXPCListenerDelegate, GlimmerHelperProtoco
     // Developer-ID certificate chain: a process can drive this root helper only
     // if it is genuinely our signed app, not merely something claiming our id.
     private static let designatedRequirement =
-        "identifier \"io.ugfugl.Glimmer\" and anchor apple generic "
+        "identifier \"com.kevinbpatel.shimmer\" and anchor apple generic "
         + "and certificate leaf[subject.OU] = \"5T7M4RH3F8\""
 
     init(suppressor: AWDLSuppressor) {

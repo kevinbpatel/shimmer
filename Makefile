@@ -13,7 +13,7 @@
 #   make release           Build the notarized Release app only (no install).
 #   make app               Quick compile-only check (no signing / notarize).
 #   make test              Build + run the GlimmerTests unit-test bundle.
-#   make uninstall         Remove Glimmer.app.
+#   make uninstall         Remove Shimmer.app.
 #   make clean             Remove build outputs.
 #
 # RELEASE (one published, auto-updatable build - everything flows here):
@@ -36,10 +36,10 @@
 #   make enable-telem      Turn the app's opt-in telemetry exporter on.
 #   make disable-telem     Turn the app's opt-in telemetry exporter off.
 
-GLIMMER_APP_DST ?= /Applications/Glimmer.app
+GLIMMER_APP_DST ?= /Applications/Shimmer.app
 CONFIG          ?= Debug
 DERIVED         := $(CURDIR)/build
-GLIMMER_APP_SRC := $(DERIVED)/Build/Products/$(CONFIG)/Glimmer.app
+GLIMMER_APP_SRC := $(DERIVED)/Build/Products/$(CONFIG)/Shimmer.app
 OPENSSL_PREFIX  := $(shell brew --prefix openssl@3)
 OPUS_PREFIX     := $(shell brew --prefix opus)
 STREAM_XCCONFIG := Glimmer/StreamLib.xcconfig
@@ -77,7 +77,7 @@ CREDS           := scripts/signing-creds.sh
 SIGN_KEYCHAIN   := $(HOME)/Library/Keychains/glimmer-signing.keychain-db
 # Version single source of truth: Glimmer/Version.xcconfig (NOT pbxproj).
 MARKETING_VERSION := $(shell sed -n 's/^MARKETING_VERSION = \(.*\)/\1/p' Glimmer/Version.xcconfig | tr -d ' ')
-DMG_NAME        := Glimmer-$(MARKETING_VERSION).dmg
+DMG_NAME        := Shimmer-$(MARKETING_VERSION).dmg
 DIST_DIR        := $(DERIVED)/dist
 # Build number (CFBundleVersion) - the monotonic stamp Sparkle keys updates on.
 BUILD_NUMBER    := $(shell sed -n 's/^CURRENT_PROJECT_VERSION = \(.*\)/\1/p' Glimmer/Version.xcconfig | tr -d ' ')
@@ -147,7 +147,7 @@ test:
 	  CODE_SIGNING_ALLOWED=NO -derivedDataPath $(DERIVED) -destination 'platform=macOS'
 
 app:
-	@echo "▶ Building Glimmer.app ($(CONFIG))..."
+	@echo "▶ Building Shimmer.app ($(CONFIG))..."
 	@scripts/generate-build-info.sh
 	xcodebuild -project Glimmer.xcodeproj -scheme Glimmer -configuration $(CONFIG) \
 		-xcconfig $(STREAM_XCCONFIG) \
@@ -248,14 +248,14 @@ embed: sign
 # Install the everything-but-publish build (see `release`) to /Applications.
 # `reinstall`/`open`/`dev` build on this.
 install: release
-	@SRC="$(DERIVED)/Build/Products/Release/Glimmer.app"; \
-	echo "▶ Installing Glimmer.app to $(GLIMMER_APP_DST)..."; \
+	@SRC="$(DERIVED)/Build/Products/Release/Shimmer.app"; \
+	echo "▶ Installing Shimmer.app to $(GLIMMER_APP_DST)..."; \
 	if [ -d "$(GLIMMER_APP_DST)" ]; then echo "  removing existing $(GLIMMER_APP_DST)"; rm -rf "$(GLIMMER_APP_DST)"; fi; \
 	cp -R "$$SRC" "$(GLIMMER_APP_DST)"; \
 	COMMIT=$$(sed -nE 's/.*static let commit = "([^"]+)".*/\1/p' Glimmer/BuildInfo.generated.swift); \
 	echo "  ✓ installed build $$COMMIT"; \
-	if pgrep -x Glimmer >/dev/null 2>&1; then \
-		echo "  ⚠ Glimmer is RUNNING an older build - it will NOT load $$COMMIT until you"; \
+	if pgrep -x Shimmer >/dev/null 2>&1; then \
+		echo "  ⚠ Shimmer is RUNNING an older build - it will NOT load $$COMMIT until you"; \
 		echo "    fully QUIT (⌘Q) and relaunch. Run 'make reinstall' to do it automatically."; \
 	fi
 
@@ -269,11 +269,11 @@ open: install
 # test stale code for an hour. Use this when iterating on a dev build. (Builds
 # FIRST via the `install` prereq, so a failed build never quits a good session.)
 reinstall: install
-	@if pgrep -x Glimmer >/dev/null 2>&1; then \
-		echo "▶ Quitting the running Glimmer so the new build can load..."; \
-		osascript -e 'tell application "Glimmer" to quit' >/dev/null 2>&1 || true; \
-		for i in 1 2 3 4 5 6 7 8; do pgrep -x Glimmer >/dev/null 2>&1 || break; sleep 1; done; \
-		pkill -x Glimmer >/dev/null 2>&1 || true; \
+	@if pgrep -x Shimmer >/dev/null 2>&1; then \
+		echo "▶ Quitting the running Shimmer so the new build can load..."; \
+		osascript -e 'tell application "Shimmer" to quit' >/dev/null 2>&1 || true; \
+		for i in 1 2 3 4 5 6 7 8; do pgrep -x Shimmer >/dev/null 2>&1 || break; sleep 1; done; \
+		pkill -x Shimmer >/dev/null 2>&1 || true; \
 	fi
 	@echo "▶ Relaunching..."; open "$(GLIMMER_APP_DST)"
 	@COMMIT=$$(sed -nE 's/.*static let commit = "([^"]+)".*/\1/p' Glimmer/BuildInfo.generated.swift); \
@@ -286,7 +286,7 @@ reinstall: install
 dev: test reinstall
 
 uninstall:
-	@echo "▶ Uninstalling Glimmer..."
+	@echo "▶ Uninstalling Shimmer..."
 	@rm -rf "$(GLIMMER_APP_DST)"
 	@echo "  ✓ removed"
 
@@ -425,7 +425,7 @@ dmg:
 	@test -d "$(GLIMMER_APP_SRC)" || { echo "ERR: build first (make release embed)" >&2; exit 1; }
 	@echo "▶ Building $(DMG_NAME)..."
 	@rm -rf "$(DIST_DIR)" && mkdir -p "$(DIST_DIR)"
-	@scripts/make-dmg.sh "$(GLIMMER_APP_SRC)" "$(DIST_DIR)/$(DMG_NAME)" "Glimmer $(MARKETING_VERSION)"
+	@scripts/make-dmg.sh "$(GLIMMER_APP_SRC)" "$(DIST_DIR)/$(DMG_NAME)" "Shimmer $(MARKETING_VERSION)"
 	@echo "  ✓ $(DIST_DIR)/$(DMG_NAME)"
 	@shasum -a 256 "$(DIST_DIR)/$(DMG_NAME)"
 
@@ -536,7 +536,7 @@ sparkle-keys:
 release-publish: dist
 	@scripts/publish-release.sh \
 		"$(MARKETING_VERSION)" "$(BUILD_NUMBER)" \
-		"$(DERIVED)/Build/Products/Release/Glimmer.app" \
+		"$(DERIVED)/Build/Products/Release/Shimmer.app" \
 		"$(DIST_DIR)" "$(RELEASES_REPO)"
 	@scripts/homebrew-bump.sh "$(MARKETING_VERSION)" || { \
 		echo "" >&2; \
@@ -568,12 +568,12 @@ brew-bump:
 # + a minute of gameplay), 120s for the Logging template (signposts need more
 # wall-clock to accumulate meaningful per-frame samples at 60Hz).
 profile: install
-	@echo "▶ Launching Glimmer under Instruments (Time Profiler)..."
+	@echo "▶ Launching Shimmer under Instruments (Time Profiler)..."
 	@mkdir -p "$(INSTRUMENTS_DIR)"
 	xcrun xctrace record \
 	    --template "Time Profiler" \
 	    --launch "$(GLIMMER_APP_DST)" \
-	    --output "$(INSTRUMENTS_DIR)/$(shell date +%Y%m%d-%H%M%S)-Glimmer.trace" \
+	    --output "$(INSTRUMENTS_DIR)/$(shell date +%Y%m%d-%H%M%S)-Shimmer.trace" \
 	    --time-limit 60s
 
 # Profile under Instruments → Logging template, which surfaces OSSignposts as
@@ -588,12 +588,12 @@ profile: install
 #
 # See docs/PROFILING.md for the full playbook.
 profile-signposts: install
-	@echo "▶ Launching Glimmer under Instruments (Logging - OSSignposts)..."
+	@echo "▶ Launching Shimmer under Instruments (Logging - OSSignposts)..."
 	@mkdir -p "$(INSTRUMENTS_DIR)"
 	xcrun xctrace record \
 	    --template "Logging" \
 	    --launch "$(GLIMMER_APP_DST)" \
-	    --output "$(INSTRUMENTS_DIR)/$(shell date +%Y%m%d-%H%M%S)-Glimmer-signposts.trace" \
+	    --output "$(INSTRUMENTS_DIR)/$(shell date +%Y%m%d-%H%M%S)-Shimmer-signposts.trace" \
 	    --time-limit 120s
 
 # Toggle the app's opt-in telemetry exporter. The remote-sink setup
@@ -601,10 +601,10 @@ profile-signposts: install
 # own if you run a Prometheus/Loki rig; these targets no-op it when it's absent.
 enable-telem:
 	@[ -x scripts/telem-client.sh ] && scripts/telem-client.sh enable || echo "  • no scripts/telem-client.sh (optional local rig setup) - skipping"
-	@defaults write io.ugfugl.Glimmer telemetryEnabled -bool YES
-	@echo "  ✓ app telemetry exporter ON - relaunch Glimmer to pick it up"
+	@defaults write com.kevinbpatel.shimmer telemetryEnabled -bool YES
+	@echo "  ✓ app telemetry exporter ON - relaunch Shimmer to pick it up"
 
 disable-telem:
 	@[ -x scripts/telem-client.sh ] && scripts/telem-client.sh disable || true
-	@defaults write io.ugfugl.Glimmer telemetryEnabled -bool NO
-	@echo "  ✓ app telemetry exporter OFF - relaunch Glimmer to pick it up"
+	@defaults write com.kevinbpatel.shimmer telemetryEnabled -bool NO
+	@echo "  ✓ app telemetry exporter OFF - relaunch Shimmer to pick it up"
