@@ -142,8 +142,14 @@ final class AppModel {
         didSet {
             guard !isRestoringDefaults else { return }
             UserDefaults.standard.set(bitrateAuto, forKey: "bitrateAuto")
-            if !bitrateAuto, UserDefaults.standard.object(forKey: "manualBitrateMbps") == nil {
-                manualBitrateMbps = effectiveBitrateKbps / 1000
+            // Turning automatic OFF adopts what the disabled slider was already
+            // showing, snapped to its nearest stop, so the readout and the
+            // thumb agree and neither jumps as the switch flips. Seeding only
+            // when the key had never been written (the first cut) meant a stale
+            // manual number from months ago snapped back instead.
+            if !bitrateAuto {
+                manualBitrateMbps = BitrateScale.stepsMbps[
+                    BitrateScale.nearestIndex(toMbps: recommendedBitrateMbpsNow)]
             }
             persistQualitySettings()
         }
@@ -631,6 +637,17 @@ final class AppModel {
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
         audioLayout = Self.persistedRawValue("audioLayout", AudioLayout.self) ?? audioLayout
+        // One-shot: HDR was hard-coded ON for the panel presets and only asked
+        // under Custom, so an install that turned it off under Custom and then
+        // went back to a panel preset was still being sent HDR. It applies
+        // everywhere now, which would silently DROP HDR for exactly those
+        // users - carry them forward on what they were actually seeing.
+        if !UserDefaults.standard.bool(forKey: "didWidenHDRToAllPresets") {
+            UserDefaults.standard.set(true, forKey: "didWidenHDRToAllPresets")
+            if qualityPreset != .custom, Self.persistedBool("customHDR") == false {
+                UserDefaults.standard.set(true, forKey: "customHDR")
+            }
+        }
         customHDR = Self.persistedBool("customHDR") ?? customHDR
         captureSysKeys = Self.persistedBool("captureSysKeys") ?? captureSysKeys
         streamCoversNotch = Self.persistedBool("streamCoversNotch") ?? streamCoversNotch

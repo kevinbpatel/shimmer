@@ -26,29 +26,15 @@ struct StreamPane: View {
     private var resolutionSelection: Binding<ResolutionChoice> {
         Binding(
             get: {
+                // The one row the model can't infer: "Custom…" picked while the
+                // typed numbers happen to equal a standard size still has to
+                // read as Custom, or the fields would vanish under the user.
                 if customResolutionEntry, model.qualityPreset == .custom { return .custom }
-                return ResolutionChoice.from(
-                    preset: model.qualityPreset, customWidth: model.customWidth, customHeight: model.customHeight)
+                return model.resolutionChoice
             },
             set: { choice in
-                switch choice {
-                case .matchDisplay:
-                    customResolutionEntry = false
-                    model.qualityPreset = .matchDisplay
-                case .hidpi:
-                    customResolutionEntry = false
-                    model.qualityPreset = .hidpi
-                case .standard(let size):
-                    customResolutionEntry = false
-                    // Preset first: leaving a panel preset prefills the Custom
-                    // numbers (its willSet), which the pick then overrides.
-                    model.qualityPreset = .custom
-                    model.customWidth = size.width
-                    model.customHeight = size.height
-                case .custom:
-                    customResolutionEntry = true
-                    model.qualityPreset = .custom
-                }
+                customResolutionEntry = (choice == .custom)
+                model.apply(choice)
             })
     }
 
@@ -56,21 +42,11 @@ struct StreamPane: View {
         Binding(
             get: {
                 if customFrameRateEntry, !model.frameRateMatchesDisplay { return .custom }
-                return FrameRateChoice.from(matchesDisplay: model.frameRateMatchesDisplay, customFPS: model.customFPS)
+                return model.frameRateChoice
             },
             set: { choice in
-                switch choice {
-                case .matchDisplay:
-                    customFrameRateEntry = false
-                    model.frameRateMatchesDisplay = true
-                case .fixed(let hz):
-                    customFrameRateEntry = false
-                    model.customFPS = hz
-                    model.frameRateMatchesDisplay = false
-                case .custom:
-                    customFrameRateEntry = true
-                    model.frameRateMatchesDisplay = false
-                }
+                customFrameRateEntry = (choice == .custom)
+                model.apply(choice)
             })
     }
 

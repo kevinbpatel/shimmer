@@ -88,6 +88,29 @@ raw mouse).
 Login items, default action on connect, the Wi-Fi helper (moved from
 Quality).
 
+## Fork divergences (expect these to conflict on the next upstream merge)
+
+- `StreamDisplayMode.effective(chosen:preset:)` is now the identity: upstream
+  forces `.fullScreen` unless the preset is `.custom`, on the reasoning that
+  the panel-native presets *are* full screen. Here the preset only decides the
+  size, so Window is honoured under all three. `GlimmerTests/
+  StreamDisplayModeTests.swift`'s `windowOnlyAppliesUnderCustom` was inverted
+  to match (`theChoiceAppliesUnderEveryPreset`). The `preset` parameter is
+  kept, unused, so upstream's call sites still compile.
+- `persistQualitySettings()` / `effectiveValuesForPreset(_:)` no longer
+  hard-code `hdr = true` for the panel presets, and read frame rate and
+  bitrate from the new properties instead of the preset. Upstream's version is
+  a `switch` over the preset that resolves all four values.
+- `QualityPane` is gone, split into `StreamPane` / `VideoPane` / `AudioPane`
+  (new files) with the Wi-Fi section moved to `AppPane` (the renamed
+  `GeneralPane`, still in `SettingsGeneralStreamingPanes.swift`).
+- `AppModel.isRestoringDefaults`: upstream's `init()` comment asserts property
+  observers are suppressed there. They are not - `@Observable` rewrites the
+  stored properties into computed ones - and upstream's `qualityPreset`
+  willSet prefill overwrites a saved Custom resolution at every launch because
+  of it. Any upstream change to `init()` or to those observers needs this
+  latch preserved.
+
 ## Out of scope
 
 Per-host settings profiles (mme has them; glimmer keys only the codec per

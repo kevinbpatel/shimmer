@@ -352,9 +352,12 @@ extension AppModel {
             size = (hd.width, hd.height)
         case .custom: size = (customWidth, customHeight)
         }
+        // `effectiveDisplayMode`, not the raw choice: the fps cap belongs to
+        // the mode the SESSION will actually take (StreamConfig reads the same
+        // property), so the two can never disagree if the mode is ever re-gated.
         let fps = QualityResolution.frameRate(
             matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
-            displayHz: display.fps, windowed: streamDisplayMode == .window)
+            displayHz: display.fps, windowed: effectiveDisplayMode == .window)
         let recommended: Int
         switch preset {
         case .matchDisplay, .hidpi:
@@ -367,6 +370,61 @@ extension AppModel {
         return PresetSnapshot(width: size.width, height: size.height, fps: fps, bitrateKbps: kbps)
     }
 
+    // MARK: - The Stream pane's picker choices
+    //
+    // The pickers bind to VIEWS of the persisted model (ResolutionChoice /
+    // FrameRateChoice in Models/StreamChoices.swift). The write half lives
+    // here rather than in the view: it is the half the "it forgets my
+    // resolution" bug lived in, and it is round-tripped against a real
+    // AppModel in GlimmerTests/StreamChoicesTests.swift.
+
+    /// The row the Resolution picker shows selected.
+    var resolutionChoice: ResolutionChoice {
+        ResolutionChoice.from(preset: qualityPreset, customWidth: customWidth, customHeight: customHeight)
+    }
+
+    /// The row the Frame rate picker shows selected.
+    var frameRateChoice: FrameRateChoice {
+        FrameRateChoice.from(matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS)
+    }
+
+    /// Adopt a resolution choice.
+    ///
+    /// Order matters for `.standard`: the preset moves FIRST so that
+    /// `qualityPreset`'s prefill - which seeds the Custom fields from the
+    /// preset being left - runs before the picked size overwrites width and
+    /// height, rather than after.
+    func apply(_ choice: ResolutionChoice) {
+        switch choice {
+        case .matchDisplay:
+            qualityPreset = .matchDisplay
+        case .hidpi:
+            qualityPreset = .hidpi
+        case .standard(let size):
+            qualityPreset = .custom
+            customWidth = size.width
+            customHeight = size.height
+        case .custom:
+            // Keeps whatever numbers are on record - the prefill supplies them
+            // when arriving from a panel preset. The fields are the UI now.
+            qualityPreset = .custom
+        }
+    }
+
+    /// Adopt a frame-rate choice. `.custom` reveals the field and keeps the
+    /// number already stored, so picking it never changes the rate by itself.
+    func apply(_ choice: FrameRateChoice) {
+        switch choice {
+        case .matchDisplay:
+            frameRateMatchesDisplay = true
+        case .fixed(let hz):
+            customFPS = hz
+            frameRateMatchesDisplay = false
+        case .custom:
+            frameRateMatchesDisplay = false
+        }
+    }
+
     /// The bitrate the automatic setting would pick right now, in Mbps - what
     /// the slider rests on while it is disabled, and the value a manual
     /// bitrate starts from.
@@ -374,7 +432,7 @@ extension AppModel {
         let display = smartDefaultsForCurrentDisplay()
         let fps = QualityResolution.frameRate(
             matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
-            displayHz: display.fps, windowed: streamDisplayMode == .window)
+            displayHz: display.fps, windowed: effectiveDisplayMode == .window)
         switch qualityPreset {
         case .matchDisplay:
             return bitrateKbps(width: display.width, height: display.height, fps: fps, preset: .matchDisplay) / 1000

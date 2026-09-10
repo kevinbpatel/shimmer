@@ -89,6 +89,7 @@ struct QualityRestoreTests {
     private static let keys = [
         "qualityPreset", "customWidth", "customHeight", "customFPS",
         "frameRateMatchesDisplay", "bitrateAuto", "manualBitrateMbps",
+        "customHDR", "didWidenHDRToAllPresets",
     ]
 
     /// Run `body` with the quality keys set to `seed`, restoring whatever the
@@ -138,6 +139,72 @@ struct QualityRestoreTests {
             #expect(model.bitrateAuto == false)
             #expect(model.manualBitrateMbps == 45)
             #expect(UserDefaults.standard.integer(forKey: "manualBitrateMbps") == 45)
+        }
+    }
+
+    /// The write half of the resolution picker, which is the half the bug
+    /// lived in: picking a row must read back as that row, and still read back
+    /// as that row after a relaunch. `.custom` is excluded because it is
+    /// deliberately ambiguous (typed numbers equal to a standard size read as
+    /// that size; the pane holds the "user asked for Custom" bit).
+    @MainActor
+    @Test func everyResolutionChoiceRoundTripsAndSurvivesRelaunch() {
+        withSeededDefaults(["qualityPreset": "matchDisplay"]) {
+            let model = AppModel()
+            for choice in ResolutionChoice.all where choice != .custom {
+                model.apply(choice)
+                #expect(model.resolutionChoice == choice)
+                #expect(AppModel().resolutionChoice == choice)
+            }
+            // Custom keeps the numbers on record rather than re-deriving them.
+            model.apply(.standard(.qhd1440))
+            // Spelled out: both choice enums have a `.custom`.
+            model.apply(ResolutionChoice.custom)
+            #expect(model.qualityPreset == .custom)
+            #expect(model.customWidth == 2560)
+            #expect(AppModel().customWidth == 2560)
+        }
+    }
+
+    /// Same for the frame-rate picker.
+    @MainActor
+    @Test func everyFrameRateChoiceRoundTripsAndSurvivesRelaunch() {
+        withSeededDefaults(["qualityPreset": "matchDisplay"]) {
+            let model = AppModel()
+            for choice in FrameRateChoice.all where choice != .custom {
+                model.apply(choice)
+                #expect(model.frameRateChoice == choice)
+                #expect(AppModel().frameRateChoice == choice)
+            }
+        }
+    }
+
+    /// Changing the resolution must not disturb a frame rate the user picked.
+    @MainActor
+    @Test func pickingAResolutionLeavesTheChosenFrameRateAlone() {
+        withSeededDefaults(["qualityPreset": "matchDisplay"]) {
+            let model = AppModel()
+            model.apply(.fixed(60))
+            model.apply(.standard(.uhd4K))
+            #expect(model.customFPS == 60)
+            #expect(model.frameRateMatchesDisplay == false)
+            #expect(model.customWidth == 3840)
+        }
+    }
+
+    /// HDR used to be forced on under the panel presets and only asked under
+    /// Custom. Widening it to every preset must not silently drop HDR for an
+    /// install that had turned it off under Custom and gone back.
+    @MainActor
+    @Test func widenedHDRCarriesPanelPresetUsersForward() {
+        withSeededDefaults(["qualityPreset": "matchDisplay", "customHDR": false]) {
+            UserDefaults.standard.removeObject(forKey: "didWidenHDRToAllPresets")
+            #expect(AppModel().customHDR == true)
+        }
+        // Someone actually streaming Custom without HDR keeps it off.
+        withSeededDefaults(["qualityPreset": "custom", "customHDR": false]) {
+            UserDefaults.standard.removeObject(forKey: "didWidenHDRToAllPresets")
+            #expect(AppModel().customHDR == false)
         }
     }
 
