@@ -285,38 +285,10 @@ extension AppModel {
     /// invalidating views when nothing changed.
     @discardableResult
     func persistQualitySettings() -> Bool {
-        let display = smartDefaultsForCurrentDisplay()
-
-        let width: Int, height: Int, fps: Int, bitrate: Int, hdr: Bool
-        switch qualityPreset {
-        case .matchDisplay:
-            width = display.width
-            height = display.height
-            fps = display.fps
-            bitrate = bitrateKbps(width: width, height: height, fps: fps, preset: .matchDisplay)
-            hdr = true
-        case .hidpi:
-            let hd = hidpiDefaultsForCurrentDisplay()
-            width = hd.width
-            height = hd.height
-            fps = hd.fps
-            bitrate = bitrateKbps(width: width, height: height, fps: fps, preset: .hidpi)
-            hdr = true
-        case .custom:
-            width = customWidth
-            height = customHeight
-            // Shown in a window, Custom's Hz is capped at the panel's current
-            // refresh (the request is what the host encodes; the window can't
-            // present more). Full screen keeps it verbatim, as before.
-            fps = streamDisplayMode == .window
-                ? StreamDisplayMode.windowedRefresh(customFPS: customFPS, displayMaxHz: display.fps)
-                : customFPS
-            // Derived, never asked: the measured-anchor recommendation for
-            // this mode. It reads `fps` (the capped value above), so a
-            // windowed 60 Hz stream does not carry a 120 Hz budget.
-            bitrate = recommendedBitrateMbps(width: width, height: height, fps: fps) * 1000
-            hdr = customHDR
-        }
+        let snapshot = effectiveValuesForPreset(qualityPreset)
+        let width = snapshot.width, height = snapshot.height, fps = snapshot.fps
+        let bitrate = snapshot.bitrateKbps
+        let hdr = customHDR
         // Idempotent writes: assign each @Observable property only when it
         // actually moves. A spurious didChangeScreenParameters notification (the
         // launcher gets these on EDR / brightness / refresh changes that don't
@@ -363,19 +335,54 @@ extension AppModel {
     }
 
     /// What (width, height, fps, bitrate) a preset would resolve to right now.
+    ///
+    /// The preset decides the SIZE. Refresh and bitrate are the Stream pane's
+    /// own choices and apply under every preset: the panel's Hz or the picked
+    /// one (capped to the panel in a window - the request is what the host
+    /// encodes, and a window can't present more), and the recommendation for
+    /// that size and rate (the Moonlight table for the two panel presets, the
+    /// measured anchors for Custom, as before) or the user's Mbps.
     func effectiveValuesForPreset(_ preset: QualityPreset) -> PresetSnapshot {
         let display = smartDefaultsForCurrentDisplay()
+        let size: (width: Int, height: Int)
         switch preset {
-        case .matchDisplay:
-            let kbps = bitrateKbps(width: display.width, height: display.height, fps: display.fps, preset: .matchDisplay)
-            return PresetSnapshot(width: display.width, height: display.height, fps: display.fps, bitrateKbps: kbps)
+        case .matchDisplay: size = (display.width, display.height)
         case .hidpi:
             let hd = hidpiDefaultsForCurrentDisplay()
-            let kbps = bitrateKbps(width: hd.width, height: hd.height, fps: hd.fps, preset: .hidpi)
-            return PresetSnapshot(width: hd.width, height: hd.height, fps: hd.fps, bitrateKbps: kbps)
+            size = (hd.width, hd.height)
+        case .custom: size = (customWidth, customHeight)
+        }
+        let fps = QualityResolution.frameRate(
+            matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
+            displayHz: display.fps, windowed: streamDisplayMode == .window)
+        let recommended: Int
+        switch preset {
+        case .matchDisplay, .hidpi:
+            recommended = bitrateKbps(width: size.width, height: size.height, fps: fps, preset: preset)
         case .custom:
-            let kbps = recommendedBitrateMbps(width: customWidth, height: customHeight, fps: customFPS) * 1000
-            return PresetSnapshot(width: customWidth, height: customHeight, fps: customFPS, bitrateKbps: kbps)
+            recommended = recommendedBitrateMbps(width: size.width, height: size.height, fps: fps) * 1000
+        }
+        let kbps = QualityResolution.bitrateKbps(
+            auto: bitrateAuto, manualMbps: manualBitrateMbps, recommendedKbps: recommended)
+        return PresetSnapshot(width: size.width, height: size.height, fps: fps, bitrateKbps: kbps)
+    }
+
+    /// The bitrate the automatic setting would pick right now, in Mbps - what
+    /// the slider rests on while it is disabled, and the value a manual
+    /// bitrate starts from.
+    var recommendedBitrateMbpsNow: Int {
+        let display = smartDefaultsForCurrentDisplay()
+        let fps = QualityResolution.frameRate(
+            matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
+            displayHz: display.fps, windowed: streamDisplayMode == .window)
+        switch qualityPreset {
+        case .matchDisplay:
+            return bitrateKbps(width: display.width, height: display.height, fps: fps, preset: .matchDisplay) / 1000
+        case .hidpi:
+            let hd = hidpiDefaultsForCurrentDisplay()
+            return bitrateKbps(width: hd.width, height: hd.height, fps: fps, preset: .hidpi) / 1000
+        case .custom:
+            return recommendedBitrateMbps(width: customWidth, height: customHeight, fps: fps)
         }
     }
 

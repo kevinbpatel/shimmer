@@ -49,9 +49,11 @@ extension AppModel {
 
     /// The H.264-anchored quality dial (`effectiveBitrateKbps`) scaled by the
     /// negotiated codec's efficiency. The spec UI and `nativeStreamConfig` both read
-    /// this so the shown bitrate can't drift from what's sent. Custom is verbatim.
+    /// this so the shown bitrate can't drift from what's sent. Custom is verbatim,
+    /// and so is a bitrate the user set by hand - they asked for that number.
     func wireBitrateKbps(forFormats formats: VideoFormats) -> Int {
         if case .custom = qualityPreset { return effectiveBitrateKbps }
+        if !bitrateAuto { return effectiveBitrateKbps }
         let mult = Self.codecBudgetMultiplier(for: formats)
         return max(5_000, Int((Double(effectiveBitrateKbps) * mult).rounded()))
     }
@@ -141,6 +143,7 @@ extension AppModel {
         var cfg = StreamConfig(width: effectiveWidth, height: effectiveHeight,
                                fps: effectiveFPS, bitrateKbps: effectiveBitrateKbps)
         cfg.hdr = effectiveHDR
+        cfg.audio = audioLayout.streamAudioConfig
         cfg.captureSysKeys = captureSysKeys
         // The notch choice only means something on a notched panel; elsewhere
         // the session always takes the borderless cover (see

@@ -6,40 +6,34 @@ import SwiftUI
 // MARK: - Settings Root
 
 enum SettingsPane: String, CaseIterable, Identifiable {
-    // `.diagnostics` is the merged home for what used to be two panes:
-    // the always-visible troubleshooting surface (controller input test + logs)
-    // plus the option-click-revealed telemetry/tuning wires. The old
-    // `.troubleshooting` case folded into it.
-    case general, streaming, pcs, shortcuts, diagnostics, about
+    // Organised the way moonlight-macos-enhanced lays Settings out - what the
+    // stream asks for, how it's encoded, sound, input - then the PCs and the
+    // app itself. Diagnostics keeps the always-visible troubleshooting surface
+    // plus the option-click-revealed telemetry wires. Selection is session-only
+    // @State; the raw values are free to change with the panes.
+    case stream, video, audio, input, pcs, app, diagnostics, about
 
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .general: return "General"
-        // Titled "Quality" - the pane is about how the stream looks and
-        // feels, not the act of streaming. The case name (and rawValue
-        // "streaming") stays put: selection is session-only @State today,
-        // but keeping the raw value stable means nothing breaks if it is
-        // ever persisted or deep-linked.
-        case .streaming: return "Quality"
+        case .stream: return "Stream"
+        case .video: return "Video"
+        case .audio: return "Audio"
+        case .input: return "Input"
         case .pcs: return "PCs"
-        // Titled "Input" - it now holds every input control (shortcuts, macOS
-        // keys, controller raw-HID + quit chord, mouse). Case/rawValue
-        // "shortcuts" stays put so nothing persisted/deep-linked breaks.
-        case .shortcuts: return "Input"
+        case .app: return "App"
         case .diagnostics: return "Diagnostics"
         case .about: return "About"
         }
     }
     var systemImage: String {
         switch self {
-        case .general: return "gearshape.fill"
-        // A quality dial, not a play button - the pane tunes how the
-        // stream looks, it doesn't start one. `dial.high.fill` has shipped
-        // since SF Symbols 3, so no missing-glyph risk on macOS 26.
-        case .streaming: return "dial.high.fill"
+        case .stream: return "airplayvideo"
+        case .video: return "video.fill"
+        case .audio: return "speaker.wave.2.fill"
+        case .input: return "keyboard.fill"
         case .pcs: return "display"
-        case .shortcuts: return "keyboard.fill"
+        case .app: return "gearshape.fill"
         case .diagnostics: return "stethoscope"
         // System Settings' About uses `info.circle.fill` - the bare "info"
         // symbol doesn't ship in SF Symbols 6 and falls back to a missing
@@ -50,11 +44,13 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     // System Settings-style colored chip behind each sidebar SF Symbol.
     var chipColor: Color {
         switch self {
-        case .general: return .gray
-        case .streaming: return .red
-        case .pcs: return .orange
-        case .shortcuts: return .indigo
-        case .diagnostics: return .teal
+        case .stream: return .blue
+        case .video: return .orange
+        case .audio: return .teal
+        case .input: return .indigo
+        case .pcs: return .green
+        case .app: return .gray
+        case .diagnostics: return .pink
         case .about: return .gray
         }
     }
@@ -62,7 +58,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
 
 struct SettingsRoot: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: SettingsPane = .general
+    @State private var selection: SettingsPane = .stream
 
     /// Panes shown in the sidebar. All are always present now: Diagnostics holds
     /// the always-visible troubleshooting surface (controller input test + logs),
@@ -117,10 +113,12 @@ struct SettingsRoot: View {
         } detail: {
             Group {
                 switch selection {
-                case .general: GeneralPane()
-                case .streaming: QualityPane()
+                case .stream: StreamPane()
+                case .video: VideoPane()
+                case .audio: AudioPane()
+                case .input: ShortcutsPane()
                 case .pcs: PCsPane()
-                case .shortcuts: ShortcutsPane()
+                case .app: AppPane()
                 case .diagnostics: DiagnosticsPane()
                 case .about: AboutPane()
                 }
@@ -134,5 +132,15 @@ struct SettingsRoot: View {
             .navigationTitle(selection.title)
         }
         .navigationSplitViewStyle(.balanced)
+        .onAppear { adoptRequestedPane() }
+        .onChange(of: model.requestedSettingsPane) { _, _ in adoptRequestedPane() }
+    }
+
+    /// Jump to a pane something else asked for (the debug automation's
+    /// screenshot loop; a future deep link). One-shot: consumed on read.
+    private func adoptRequestedPane() {
+        guard let pane = model.requestedSettingsPane else { return }
+        selection = pane
+        model.requestedSettingsPane = nil
     }
 }

@@ -20,6 +20,9 @@
 		A10000003 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000013 /* AppModel.swift */; };
 		A10000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000014 /* Assets.xcassets */; };
 		A10000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* SettingsView.swift */; };
+		A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE832000000000000000 /* SettingsAudioPane.swift */; };
+		A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE822000000000000000 /* SettingsVideoPane.swift */; };
+		A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE812000000000000000 /* SettingsStreamPane.swift */; };
 		A1000009A /* PairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000009B /* PairSheet.swift */; };
 		A100030A /* ContainerMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100030B /* ContainerMigration.swift */; };
 		A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE001120000000000000 /* BundleIDMigration.swift */; };
@@ -219,6 +222,7 @@
 		D1000BD3 /* VideoDecoder+GovernorRepaint.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000BD4 /* VideoDecoder+GovernorRepaint.swift */; };
 		D1000C01 /* StreamWindow+Cursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000C02 /* StreamWindow+Cursor.swift */; };
 		DEC0DE840000000000000001 /* StreamDisplayMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000002 /* StreamDisplayMode.swift */; };
+		A1C0DE781000000000000000 /* StreamChoices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE782000000000000000 /* StreamChoices.swift */; };
 		DEC0DE840000000000000003 /* StreamWindowGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000004 /* StreamWindowGeometry.swift */; };
 		DEC0DE840000000000000005 /* StreamWindow+Windowed.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000006 /* StreamWindow+Windowed.swift */; };
 		DEC0DE840000000000000007 /* InputForwarder+WindowPointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000008 /* InputForwarder+WindowPointer.swift */; };
@@ -260,6 +264,7 @@
 		D2000091 /* ContainerMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000090 /* ContainerMigrationTests.swift */; };
 		D2000095 /* QualityPresetMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000094 /* QualityPresetMigrationTests.swift */; };
 		DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */; };
+		A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE792000000000000000 /* StreamChoicesTests.swift */; };
 		DEC0DE840000000000000013 /* TerminationGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000014 /* TerminationGateTests.swift */; };
 		DEC0DE84000000000000001B /* WindowPointerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE84000000000000001C /* WindowPointerTests.swift */; };
 		DEC0DE2026083000000000A2 /* IOReportSamplerLifetimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */; };
@@ -325,6 +330,9 @@
 		A10000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000016 /* Glimmer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Glimmer.entitlements; sourceTree = "<group>"; };
 		A10000017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1C0DE832000000000000000 /* SettingsAudioPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsAudioPane.swift"; sourceTree = "<group>"; };
+		A1C0DE822000000000000000 /* SettingsVideoPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsVideoPane.swift"; sourceTree = "<group>"; };
+		A1C0DE812000000000000000 /* SettingsStreamPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStreamPane.swift"; sourceTree = "<group>"; };
 		A1000009B /* PairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairSheet.swift; sourceTree = "<group>"; };
 		A100030B /* ContainerMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerMigration.swift; sourceTree = "<group>"; };
 		A1C0DE001120000000000000 /* BundleIDMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BundleIDMigration.swift"; sourceTree = "<group>"; };
@@ -522,6 +530,7 @@
 		D1000BD4 /* VideoDecoder+GovernorRepaint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/VideoDecoder+GovernorRepaint.swift"; sourceTree = "<group>"; };
 		D1000C02 /* StreamWindow+Cursor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamWindow+Cursor.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000002 /* StreamDisplayMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamDisplayMode.swift; sourceTree = "<group>"; };
+		A1C0DE782000000000000000 /* StreamChoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamChoices.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000004 /* StreamWindowGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stream/StreamWindowGeometry.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000006 /* StreamWindow+Windowed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/StreamWindow+Windowed.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000008 /* InputForwarder+WindowPointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/InputForwarder+WindowPointer.swift"; sourceTree = "<group>"; };
@@ -564,6 +573,7 @@
 		D2000090 /* ContainerMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerMigrationTests.swift; sourceTree = "<group>"; };
 		D2000094 /* QualityPresetMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityPresetMigrationTests.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamDisplayModeTests.swift; sourceTree = "<group>"; };
+		A1C0DE792000000000000000 /* StreamChoicesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamChoicesTests.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000014 /* TerminationGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminationGateTests.swift; sourceTree = "<group>"; };
 		DEC0DE84000000000000001C /* WindowPointerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPointerTests.swift; sourceTree = "<group>"; };
 		DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportSamplerLifetimeTests.swift; sourceTree = "<group>"; };
@@ -625,6 +635,7 @@
 				9158C8506080330EC17875A9 /* Host.swift */,
 				A1B2C3D4E5F6000100000C01 /* HostCodecPreference.swift */,
 				DEC0DE840000000000000002 /* StreamDisplayMode.swift */,
+				A1C0DE782000000000000000 /* StreamChoices.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -659,6 +670,9 @@
 				A1009002 /* UpdaterController.swift */,
 				A10000012 /* ContentView.swift */,
 				A10000017 /* SettingsView.swift */,
+				A1C0DE832000000000000000 /* SettingsAudioPane.swift */,
+				A1C0DE822000000000000000 /* SettingsVideoPane.swift */,
+				A1C0DE812000000000000000 /* SettingsStreamPane.swift */,
 				A1000009B /* PairSheet.swift */,
 				A100030B /* ContainerMigration.swift */,
 				A1C0DE001120000000000000 /* BundleIDMigration.swift */,
@@ -924,6 +938,7 @@
 				D2000090 /* ContainerMigrationTests.swift */,
 				D2000094 /* QualityPresetMigrationTests.swift */,
 				DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */,
+				A1C0DE792000000000000000 /* StreamChoicesTests.swift */,
 				DEC0DE840000000000000014 /* TerminationGateTests.swift */,
 				DEC0DE84000000000000001C /* WindowPointerTests.swift */,
 				DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */,
@@ -1070,6 +1085,9 @@
 				A1009001 /* UpdaterController.swift in Sources */,
 				A10000002 /* ContentView.swift in Sources */,
 				A10000005 /* SettingsView.swift in Sources */,
+				A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */,
+				A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */,
+				A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */,
 				A1000009A /* PairSheet.swift in Sources */,
 				A100030A /* ContainerMigration.swift in Sources */,
 				A1C0DE001110000000000000 /* BundleIDMigration.swift in Sources */,
@@ -1140,6 +1158,7 @@
 				D100006E /* StreamWindow+Show.swift in Sources */,
 				D1000C01 /* StreamWindow+Cursor.swift in Sources */,
 				DEC0DE840000000000000001 /* StreamDisplayMode.swift in Sources */,
+				A1C0DE781000000000000000 /* StreamChoices.swift in Sources */,
 				DEC0DE840000000000000003 /* StreamWindowGeometry.swift in Sources */,
 				DEC0DE840000000000000005 /* StreamWindow+Windowed.swift in Sources */,
 				DEC0DE840000000000000007 /* InputForwarder+WindowPointer.swift in Sources */,
@@ -1323,6 +1342,7 @@
 				D2000091 /* ContainerMigrationTests.swift in Sources */,
 				D2000095 /* QualityPresetMigrationTests.swift in Sources */,
 				DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */,
+				A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */,
 				DEC0DE840000000000000013 /* TerminationGateTests.swift in Sources */,
 				DEC0DE84000000000000001B /* WindowPointerTests.swift in Sources */,
 				DEC0DE2026083000000000A2 /* IOReportSamplerLifetimeTests.swift in Sources */,

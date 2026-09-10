@@ -19,7 +19,7 @@ is a nod to the moonlight → sunshine → glimmer lineage it sits in.
 ## What shimmer adds
 
 - **Picture in Picture.** Press **⌃⌥P** during a stream (rebindable in
-  Settings › Shortcuts) and the game moves into the same floating,
+  Settings › Input) and the game moves into the same floating,
   corner-snapping window macOS uses for movies - on top of your other apps.
   It's fed by the very layer the fullscreen window paints into, so there is no
   second decode path and no extra latency; the frame pacer just rides the
@@ -30,10 +30,19 @@ is a nod to the moonlight → sunshine → glimmer lineage it sits in.
   Streaming, on by default). Close the PiP window and the stream simply waits
   in the background like a Cmd-Tab-away; the return button, the Dock icon, or
   the menu bar brings it back full screen.
+- **Mouse over the PiP window drives the host pointer** 1:1 (a plain click on
+  the picture clicks there; dragging the window never reaches the host).
 - **Works around two macOS AVKit bugs** in sample-buffer PiP that would
   otherwise show only the bottom-left corner of the picture with a black box on
   top (Apple FB22411168). Design notes and the manual test plan live under
   [`docs/superpowers/specs/`](docs/superpowers/specs/).
+- **Settings organised as Stream · Video · Audio · Input · PCs · App**, the
+  way [moonlight-macos-enhanced](https://github.com/skyhua0224/moonlight-macos-enhanced)
+  lays them out: a single resolution picker (Match display, HiDPI, 720p-4K,
+  Custom) that remembers your choice, a frame-rate picker, and a bitrate slider
+  that's always visible with an automatic mode - upstream derives the bitrate
+  and hides it; shimmer shows it and lets you override it. HDR and the
+  full-screen / window choice apply to every resolution.
 
 ## What you get
 
@@ -75,7 +84,7 @@ Your host needs Sunshine and a display that can present the exact mode you ask
 for: a virtual display driver on Windows, a current Sunshine on Linux.
 [docs/HOST_SETUP.md](docs/HOST_SETUP.md).
 
-The Wi-Fi helper lives in Settings > Quality > Wi-Fi; macOS asks for one
+The Wi-Fi helper lives in Settings › App › Wi-Fi; macOS asks for one
 approval under Login Items & Extensions. If it reports `rejected by BTM`, run
 `sudo sfltool resetbtm` once.
 

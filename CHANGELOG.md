@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+Settings are reorganised into Stream, Video, Audio, Input, PCs, App,
+Diagnostics, and About - the layout moonlight-macos-enhanced uses, on top of
+glimmer's preset model.
+
+The Stream pane now asks the three questions directly. **Resolution** is one
+picker: Match display (with the panel's pixel size in the label), HiDPI, the
+standard 720p / 1080p / 1440p / 4K sizes, or Custom with typed numbers - and
+the choice is kept until you change it, so a 1080p pick no longer reads as
+"went back to native" after a relaunch. **Frame rate** is its own picker
+(Match display, 30-240 Hz, or a typed value) and applies under every
+resolution, not only Custom. **Bitrate** is back: an always-visible stepped
+slider (5-300 Mbps) with a "Set automatically" switch; automatic keeps
+glimmer's derived recommendation (the slider rests on it, so turning it off
+starts from a sensible value), and a manual number goes to the host verbatim.
+HDR and the Full screen / Window choice apply under every resolution too. The
+Video pane holds the per-PC codec (the same setting as the launcher's
+right-click menu), HDR, and the stats overlay; Audio holds the channel layout
+(follow this Mac's output, or force stereo / 5.1 / 7.1) and the mute switch;
+App holds login items, the default action, and the Wi-Fi helper.
+
+While the stream is popped out, the Mac pointer over the Picture in Picture
+window now drives the host pointer 1:1 (a plain click on the picture clicks
+there; dragging the window or its controls never reaches the host). Settings ›
+Stream › Picture in Picture, on by default.
+
+Fix: in Window mode the Picture in Picture picture came up letterboxed inside
+the panel; the mirror source is now sized by its content rect, and the
+window's aspect lock, minimum size, and frame autosave are suspended while it
+serves as the source (so the tiny PiP-sized frame is never saved as your
+window).
+
 The app is now Shimmer. It installs as `Shimmer.app`, identifies itself as
 `com.kevinbpatel.shimmer` (login helper `com.kevinbpatel.shimmer.LoginHelper`),
 and keeps its data under `Application Support/Shimmer` and `Logs/Shimmer`. An
@@ -21,7 +52,7 @@ shows and stays filled as you resize PiP. Verified against a live stream.
 
 Pop the stream out into macOS's Picture in Picture window.
 
-Press ⌃⌥P during a stream (rebindable in Settings › Shortcuts) and the game
+Press ⌃⌥P during a stream (rebindable in Settings › Input) and the game
 moves into the same floating, corner-snapping window macOS gives movies — on
 top of your other apps while you work. It's fed by the very layer the
 fullscreen window paints into, so there's no second decode path and no extra
