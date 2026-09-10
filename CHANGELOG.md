@@ -33,6 +33,45 @@ Streaming, on by default); close the PiP window and the stream simply waits in
 the background like a Cmd-Tab-away; click the return button or the Dock icon to
 go back to fullscreen.
 
+## 2026.9.0 - 2026-09-10
+
+You can now stream in a window, and two full-screen dead ends are gone.
+
+Pick the Custom preset in Settings, Quality and set "Show the stream" to Window.
+The stream opens as a normal Mac window at your Custom resolution, pixel-mapped
+on Retina panels, that you can drag, resize (the picture scales, it never
+letterboxes) and send full screen with the green button, with the menu bar and
+Dock left alone. Refresh is capped at what your display can actually show, and
+the window remembers where you left it. Native Retina and HiDPI are panel-native
+by definition, so they stay full screen and are untouched.
+
+Moving the pointer onto the window hands your mouse to the game, cursor and all,
+the way it works in anything that plays. Holding Esc for a moment takes it back
+and the cursor reappears exactly where it left off, while a tap of Esc still
+reaches the game's own menu. Switching apps hands it back too, and moving onto
+the window again takes it, so there is nothing to click and nothing to remember.
+Control-Option-R does either without moving the mouse, and closing the window
+ends the stream.
+
+Custom no longer asks you to set a bitrate. The toggle and the slider are gone,
+and the figure now comes from the same measured recommendation the pane used to
+print underneath them, following your resolution and refresh, and in a window
+the refresh your display can actually show. On a 14-inch MacBook Pro at 120 Hz
+that is about 85 Mbps where the old automatic setting asked for 100, so the
+honest number is also the smaller one. What it landed on is still there to read
+under Your next stream. The size shortcut beside the resolution fields is now a
+labelled Presets button rather than a bare glyph, and it runs 720p upward.
+
+Fill the notch now only appears on Macs that have a notch. Turning it off
+quietly switched full screen into a macOS full-screen space, and on a Mac mini
+that meant leaving the space through Mission Control left the picture nowhere
+while the stream kept running. Leaving that space now lands you in a window
+instead.
+
+Quitting Glimmer mid-stream now waits, briefly, for the PC to be told the
+session is over, so Sunshine never keeps a phantom session that blocks your next
+launch.
+
 ## 2026.8.18 - 2026-09-02
 
 Glimmer no longer polls your PC while the Mac is going to sleep.

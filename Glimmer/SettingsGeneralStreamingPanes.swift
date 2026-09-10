@@ -138,7 +138,7 @@ struct GeneralPane: View {
 /// the user can still type any value they like; this is just a
 /// no-typo shortcut for the 95% case (1080p / 1440p / 2160p).
 enum CommonResolution: CaseIterable {
-    case hd1080, qhd1440, uhd4K, hd720
+    case hd720, hd1080, qhd1440, uhd4K
 
     var width: Int {
         switch self {
@@ -194,17 +194,17 @@ struct QualityPane: View {
     /// keystroke), so the clamp can't fight a transient mid-edit value.
     /// Bounds mirror the init()-time heal in AppModel.
     private func clampCustomResolution() {
-        if model.customWidth < 640 { model.customWidth = 640 }
-        if model.customWidth > 7680 { model.customWidth = 7680 }
-        if model.customHeight < 480 { model.customHeight = 480 }
-        if model.customHeight > 4320 { model.customHeight = 4320 }
+        let width = StreamSizeBounds.clampWidth(model.customWidth)
+        if width != model.customWidth { model.customWidth = width }
+        let height = StreamSizeBounds.clampHeight(model.customHeight)
+        if height != model.customHeight { model.customHeight = height }
     }
     /// FPS clamp: 30..240. Sunshine + GFE both refuse anything outside
     /// this band; clamping at the UI saves a confused stream-failure
     /// trip. Same every-commit .onChange wiring as the resolution clamp.
     private func clampCustomFPS() {
-        if model.customFPS < 30 { model.customFPS = 30 }
-        if model.customFPS > 240 { model.customFPS = 240 }
+        let fps = StreamSizeBounds.clampFPS(model.customFPS)
+        if fps != model.customFPS { model.customFPS = fps }
     }
 
     var body: some View {
@@ -227,32 +227,56 @@ struct QualityPane: View {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+                // Nothing else lives in this card: a switch or a picker under
+                // the radio rows read as extra preset rows (owner's screenshot).
+            }
 
-                // Notch coverage as a compact pill right under the resolution
-                // choice - it shapes the same picture. DEFAULT ON: full-panel
-                // coverage is the product stance on notched MacBooks. Only
-                // meaningful on built-in notched panels; elsewhere the safe-area
-                // inset is zero and the toggle is a no-op. Snapshotted at session
-                // start, so the next-stream caveat lives in the description.
-                Toggle("Fill the notch", isOn: $model.streamCoversNotch)
-                    .toggleStyle(.switch)
-                    .help("Covers the whole panel on notched MacBooks; a sliver of the image hides behind the camera notch.")
-                Text("Fills the whole panel on notched MacBooks - a thin strip of the picture "
-                    + "hides behind the notch. Off keeps it clear. Applies next stream.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            // Notch coverage in its own compact card. DEFAULT ON: full-panel
+            // coverage is the product stance on notched MacBooks. Shown ONLY on
+            // a notched panel and only for a full-screen stream: elsewhere the
+            // toggle used to silently switch the fullscreen mechanism to a
+            // macOS Space (issue #84), so notchless Macs now always take the
+            // cover and never see the switch. Snapshotted at session start, so
+            // the next-stream caveat lives in the footer; the .help() carries
+            // the detail.
+            if model.currentDisplayHasNotch, model.effectiveDisplayMode == .fullScreen {
+                Section {
+                    Toggle("Fill the notch", isOn: $model.streamCoversNotch)
+                        .toggleStyle(.switch)
+                        .help("Covers the whole panel, camera notch included, so a panel-native stream renders 1:1. "
+                            + "Off keeps the picture below the notch by using a macOS full-screen space.")
+                } footer: {
+                    Text("A thin strip of the picture hides behind the notch. Off keeps it clear, "
+                        + "using a macOS full-screen space. Applies next stream.")
+                }
+            }
+
+            Section {
                 Toggle("Pop out to Picture in Picture when you switch away", isOn: $model.autoPictureInPicture)
                     .toggleStyle(.switch)
                     .help("Cmd-Tab away and the stream keeps playing in macOS's floating Picture in Picture window.")
+            } footer: {
                 Text("When you switch to another app, the stream keeps playing in a small floating window "
                     + "you can drag to any corner - controllers keep working. Off just hides the stream "
                     + "until you come back. \(model.pipHotkey.displayString) pops it out on demand either way.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
 
             if model.qualityPreset == .custom {
-                Section("Custom overrides") {
+                // "Custom" alone: the section owns the window choice now, not
+                // just overrides of the preset numbers.
+                Section {
+                    // Window is a Custom thing - the panel-native presets are
+                    // full screen by definition - so the choice leads the
+                    // section, segmented (reads instantly; a two-value chevron
+                    // looked cheap next to the radio rows). Persisted as the
+                    // display mode; snapshotted at session start.
+                    Picker("Show the stream", selection: $model.streamDisplayMode) {
+                        ForEach(StreamDisplayMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .help("Window opens the stream as a normal window at the size below; drag it to any size.")
                     HStack {
                         Text("Resolution")
                         Spacer()
@@ -268,11 +292,9 @@ struct QualityPane: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: "rectangle.on.rectangle")
-                                .symbolRenderingMode(.hierarchical)
+                            Text("Presets")
                         }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
+                        .menuStyle(.button)
                         .help("Common resolutions")
                         .fixedSize()
                         TextField("", value: $model.customWidth, format: .number)
@@ -297,24 +319,11 @@ struct QualityPane: View {
                             .onChange(of: model.customFPS) { _, _ in clampCustomFPS() }
                         Text("Hz").foregroundStyle(.secondary)
                     }
-                    Toggle("Keep bitrate matched automatically (follows resolution and refresh)",
-                           isOn: $model.customBitrateAuto)
-                        .help("Recomputes the bitrate whenever resolution or refresh changes. Turn off to set your own.")
-                    HStack {
-                        Text("Bitrate")
-                        Spacer()
-                        Slider(value: Binding(
-                            get: { Double(model.customBitrateMbps) },
-                            set: { model.customBitrateMbps = Int($0) }
-                        ), in: 5...200, step: 1)
-                        .frame(width: 200)
-                        .disabled(model.customBitrateAuto)
-                        Text("\(model.customBitrateMbps) Mbps")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .frame(width: 80, alignment: .trailing)
-                    }
-                    bitrateGuidance
+                    // No bitrate row. Asking someone to pick a wire budget -
+                    // and then to decide whether we should pick it for them -
+                    // is two questions we can answer better ourselves from the
+                    // measured anchors (AppModel.measuredBitrateAnchors). The
+                    // resulting figure is in the next-stream summary below.
                     Toggle("Brighter highlights, deeper color (needs HDR on host and display)",
                            isOn: $model.customHDR)
                         .help("HDR - sends a 10-bit high-dynamic-range stream when the host and this display both support it.")
@@ -327,6 +336,16 @@ struct QualityPane: View {
                             model.snapCustomToDisplay()
                         }
                         .buttonStyle(.borderless)
+                    }
+                } header: {
+                    Text("Custom")
+                } footer: {
+                    // The one non-obvious thing about a window: the mouse
+                    // disappears into the game the moment it is over the
+                    // picture, so say up front how to get it back.
+                    if model.streamDisplayMode == .window {
+                        Text("The game takes your mouse while the pointer is over the window - "
+                            + "hold Esc or switch apps to get it back.")
                     }
                 }
             }
@@ -417,25 +436,6 @@ struct QualityPane: View {
         }
         .formStyle(.grouped)
         .onAppear { awdl.refresh() }
-    }
-
-    /// Bitrate guidance under the slider: the baked-in measured recommendation
-    /// (harness + 20% headroom - provenance on `AppModel.measuredBitrateAnchors`)
-    /// plus the wire-budget footnote. (Learned Tier-2 sentence retired - see QualityCalculator.)
-    private var bitrateGuidance: some View {
-        let width = model.customWidth
-        let height = model.customHeight
-        let fps = model.customFPS
-        let mode = "\(AppModel.resolutionLabel(width: width, height: height))·\(fps)"
-        let recommended = model.recommendedBitrateMbps(width: width, height: height, fps: fps)
-        return VStack(alignment: .leading, spacing: 4) {
-            Text("Recommended for \(mode): ~\(recommended) Mbps")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Text("The bitrate is a wire budget: the encoder gets 80%, forward-error-correction takes 20%.")
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
-        }
     }
 
     /// Per-preset hint string. Kept inline alongside the picker so the

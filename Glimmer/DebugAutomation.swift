@@ -13,18 +13,39 @@
 //    GLIMMER_DEBUG_PIP_AFTER=<sec>   once streaming, wait <sec> then ⌃⌥P.
 //    GLIMMER_DEBUG_QUIT_AFTER=<sec>  quit the app <sec> after streaming starts.
 //
+//  The same knobs are accepted as command-line arguments
+//  (`--debug-stream=<substr> --debug-pip-after=<sec> ...`) because a GUI app
+//  launched through LaunchServices (`open -n App.app --args ...`) lives in the
+//  gui/<uid> launchd domain and never sees a shell's environment - not even
+//  one exported with `launchctl setenv`, which lands in user/<uid> when the
+//  shell is an SSH session. Launching via `open` matters: it's what gets the
+//  Local Network privacy grant attributed to the app rather than sshd.
+//
 
 import AppKit
 import Foundation
 
 extension AppModel {
 
-    func runDebugAutomationIfRequested() {
+    /// `GLIMMER_DEBUG_<NAME>` from the environment, else `--debug-<name>=value`
+    /// from the command line. Only used to decide whether automation is armed;
+    /// nothing here runs on a normal launch.
+    private static func debugKnob(_ name: String) -> String? {
         let env = ProcessInfo.processInfo.environment
-        guard let hostMatch = env["GLIMMER_DEBUG_STREAM"], !hostMatch.isEmpty else { return }
-        let pipAfter = env["GLIMMER_DEBUG_PIP_AFTER"].flatMap(Double.init)
-        let quitAfter = env["GLIMMER_DEBUG_QUIT_AFTER"].flatMap(Double.init)
-        let returnAfter = env["GLIMMER_DEBUG_RETURN_AFTER"].flatMap(Double.init)
+        if let v = env["GLIMMER_DEBUG_\(name.uppercased().replacingOccurrences(of: "-", with: "_"))"],
+           !v.isEmpty { return v }
+        let prefix = "--debug-\(name)="
+        return ProcessInfo.processInfo.arguments
+            .first { $0.hasPrefix(prefix) }
+            .map { String($0.dropFirst(prefix.count)) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    func runDebugAutomationIfRequested() {
+        guard let hostMatch = Self.debugKnob("stream") else { return }
+        let pipAfter = Self.debugKnob("pip-after").flatMap(Double.init)
+        let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init)
+        let returnAfter = Self.debugKnob("return-after").flatMap(Double.init)
         log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .public) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
 
         // Give discovery/host-load a beat, then select + stream.

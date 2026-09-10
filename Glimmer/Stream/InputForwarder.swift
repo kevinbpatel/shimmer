@@ -175,6 +175,50 @@ public final class InputForwarder {
     /// a closure rather than a stored chord value.
     public var bookmarkHotkeyProvider: (@MainActor () -> HotkeyChord) = { .defaultBookmark }
 
+    /// Provider for the Window-mode pointer chord. Same live-read closure
+    /// shape as the quit/stats chords. Only consulted while `isWindowMode` is
+    /// on, where it TOGGLES capture.
+    public var releasePointerHotkeyProvider: (@MainActor () -> HotkeyChord) = { .defaultReleasePointer }
+
+    /// Window mode: relative capture is grabbed by the pointer being over the
+    /// picture and left with a held Esc, the pointer chord, or switching apps.
+    /// Outside capture the pointer is a normal Mac pointer mirrored onto the
+    /// host as absolute positions. Full screen keeps the always-on capture
+    /// that follows key status. Set by the session at attach; flipped live by
+    /// a Space exit (`setWindowMode`). What it gates lives in
+    /// InputForwarder+WindowPointer.swift and +HoverCapture.swift.
+    var isWindowMode: Bool = false
+
+    /// The stream's pixel dimensions, the reference frame absolute pointer
+    /// positions are measured in. Set by the session at start and re-set on a
+    /// reconnect that changes resolution; `.zero` (full screen, or before the
+    /// session sets it) makes the absolute path a no-op rather than sending a
+    /// position against a frame that does not exist.
+    var streamPixelSize: CGSize = .zero
+
+    /// In-flight "hold Esc to free the pointer" dwell (window mode, captured
+    /// only). Stored here because extensions can't add stored properties; the
+    /// decision table and the timer live in InputForwarder+EscapeHold.swift.
+    var escapeHoldTask: Task<Void, Never>?
+
+    /// Window mode: block the hover grab until the pointer LEAVES the stream
+    /// view or the window loses key status.
+    ///
+    /// Armed by every explicit release (a held Esc, the pointer chord), which
+    /// all happen with the pointer still physically over the picture - without
+    /// this the grab-on-hover rule would take the pointer straight back and
+    /// there would be no way out of capture at all. Stored here because
+    /// extensions can't add stored properties; the transitions are a pure
+    /// table in InputForwarder+HoverCapture.swift and this is its only writer.
+    var isHoverCaptureSuppressed = false
+
+    /// Fired on every capture edge (true = engaged) while `isWindowMode` is
+    /// on. StreamWindow hides and shows the cursor off it - visibility stays
+    /// the window's, this only reports the edge. NEVER fired in full screen,
+    /// where the window's own show / resign / becomeKey path owns the cursor
+    /// exactly as before.
+    var onPointerCaptureChanged: (@MainActor (Bool) -> Void)?
+
     /// Controller-side quit chord. The ControllerForwarder extension
     /// consults this on every gamepad update and fires `onQuitHotkey`
     /// when all chord buttons are held simultaneously. Closure so live

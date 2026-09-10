@@ -200,6 +200,15 @@ public struct HotkeyChord: Codable, Equatable, Sendable {
     /// free of the other client-side chords (Q / S / B).
     public static let defaultPiP = HotkeyChord(ctrl: true, alt: true, shift: false, cmd: false, keyChar: "p")
 
+    /// Default Window-mode pointer chord: ⌃⌥R, a toggle (capture, release).
+    /// Same ⌃⌥ family as quit (Q) and stats (S) so the three read as one set,
+    /// "R" for Relative aim, and no `.command` so it fires whether or not ⌘
+    /// shortcuts are forwarded. Collides with none of the other defaults
+    /// (⌃⌥Q, ⌃⌥S, ⌃B). Only intercepted while the stream is in a window - in
+    /// full screen capture follows key status and there is nothing to toggle,
+    /// so ⌃⌥R reaches the host.
+    public static let defaultReleasePointer = HotkeyChord(ctrl: true, alt: true, shift: false, cmd: false, keyChar: "r")
+
     var displayString: String {
         var parts: [String] = []
         if ctrl { parts.append("⌃") }

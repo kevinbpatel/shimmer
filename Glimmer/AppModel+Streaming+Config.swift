@@ -142,7 +142,11 @@ extension AppModel {
                                fps: effectiveFPS, bitrateKbps: effectiveBitrateKbps)
         cfg.hdr = effectiveHDR
         cfg.captureSysKeys = captureSysKeys
-        cfg.coversNotch = streamCoversNotch
+        // The notch choice only means something on a notched panel; elsewhere
+        // the session always takes the borderless cover (see
+        // effectiveStreamCoversNotch for the issue this closes).
+        cfg.coversNotch = effectiveStreamCoversNotch
+        cfg.displayMode = effectiveDisplayMode
         let codecPref = HostCodecPreference.load(for: host.id)
         cfg.videoFormats = codecPref.apply(to: .probedSupported)
         // Codec-aware wire budget (see wireBitrateKbps): the H.264-anchored dial
@@ -150,6 +154,14 @@ extension AppModel {
         // path so what's shown matches what's sent.
         cfg.bitrateKbps = wireBitrateKbps(forFormats: cfg.videoFormats)
         return cfg
+    }
+
+    /// Title for the Window-mode stream window: the PC's name, then the app
+    /// when one is known - "Tower - Desktop". Static and pure so the shape is
+    /// trivially checkable.
+    static func streamWindowTitle(hostName: String, appName: String) -> String {
+        let app = appName.trimmingCharacters(in: .whitespaces)
+        return app.isEmpty ? hostName : "\(hostName) - \(app)"
     }
 
     /// Convert a paired Host into the engine's ServerInfo. The

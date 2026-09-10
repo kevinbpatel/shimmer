@@ -118,6 +118,14 @@ extension StreamWindow {
             pictureInPicture.stop()
         }
         publishPresentSuppression()
+        // Window mode: the cursor follows pointer capture (the pointer being
+        // over the window), and the level and presentation options are AppKit's.
+        // Only the backgrounded signal applies - the "Back to stream" /
+        // Dock-click return after a miniaturize lands here.
+        if displayMode == .window {
+            onBackgroundedChanged?(false)
+            return
+        }
         // Cursor: re-hide. Idempotent + latch-balanced via the single owner -
         // hides iff currently shown, capping the count at 1.
         setCursorHidden(true)

@@ -64,7 +64,6 @@ final class AppModel {
                 customWidth = snapshot.width
                 customHeight = snapshot.height
                 customFPS = snapshot.fps
-                customBitrateMbps = max(5, snapshot.bitrateKbps / 1000)
             }
         }
         didSet {
@@ -86,36 +85,27 @@ final class AppModel {
     var customWidth: Int = 1920 {
         didSet {
             UserDefaults.standard.set(customWidth, forKey: "customWidth")
-            autoUpdateCustomBitrate()
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
     var customHeight: Int = 1080 {
         didSet {
             UserDefaults.standard.set(customHeight, forKey: "customHeight")
-            autoUpdateCustomBitrate()
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
     var customFPS: Int = 60 {
         didSet {
             UserDefaults.standard.set(customFPS, forKey: "customFPS")
-            autoUpdateCustomBitrate()
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
-    var customBitrateAuto: Bool = true {
-        didSet {
-            UserDefaults.standard.set(customBitrateAuto, forKey: "customBitrateAuto")
-            if customBitrateAuto { autoUpdateCustomBitrate() }
-        }
-    }
-    var customBitrateMbps: Int = 50 {
-        didSet {
-            UserDefaults.standard.set(customBitrateMbps, forKey: "customBitrateMbps")
-            if qualityPreset == .custom { persistQualitySettings() }
-        }
-    }
+    // No bitrate knob, by design. A bitrate is a wire budget the app can
+    // derive better than a person can guess: `recommendedBitrateMbps` rescales
+    // the Moonlight formula onto anchors MEASURED on real hardware, so the
+    // number follows resolution and refresh (and, in a window, the capped
+    // refresh) on its own. Nothing to persist and nothing to ask - the result
+    // is visible in the next-stream summary. See QualityCalculator.
     var customHDR: Bool = true {
         didSet {
             UserDefaults.standard.set(customHDR, forKey: "customHDR")
@@ -319,6 +309,31 @@ final class AppModel {
     var streamCoversNotch: Bool = true {
         didSet { UserDefaults.standard.set(streamCoversNotch, forKey: "streamCoversNotch") }
     }
+    /// The Custom preset's "Show the stream in a window" choice: full screen
+    /// (the default) or a normal titled window at Custom's own resolution,
+    /// refresh, bitrate and HDR. Only in force under Custom (see
+    /// `effectiveDisplayMode`); snapshotted into the StreamConfig at session
+    /// start, like `streamCoversNotch`. A windowed stream caps the refresh at
+    /// the display, so a flip recomputes the "Your next stream" summary.
+    var streamDisplayMode: StreamDisplayMode = StreamDisplayMode.defaultMode {
+        didSet {
+            UserDefaults.standard.set(streamDisplayMode.rawValue, forKey: StreamDisplayMode.defaultsKey)
+            if qualityPreset == .custom { persistQualitySettings() }
+        }
+    }
+    /// Window-mode pointer chord (default ⌃⌥R): a TOGGLE - hands the mouse to
+    /// the game for mouselook, and takes it back. The pointer is normally
+    /// grabbed by being over the window and freed by a held Esc; this is how
+    /// you re-grab without moving the mouse off and back, and how you release
+    /// without reaching for Esc. Read live via a provider, like the quit/stats
+    /// chords. The persisted key keeps its original name.
+    var releasePointerHotkey: HotkeyChord = .defaultReleasePointer {
+        didSet {
+            if let data = try? JSONEncoder().encode(releasePointerHotkey) {
+                UserDefaults.standard.set(data, forKey: "releasePointerHotkey")
+            }
+        }
+    }
     /// Controller-side quit chord - fires the same path as `quitHotkey`
     /// from the keyboard, but driven by a multi-button hold on the
     /// gamepad. Defaults to L3 + R3 (click both sticks): native on every pad (no
@@ -366,15 +381,6 @@ final class AppModel {
         }
     }
 
-    /// Shared up-front explanation shown before macOS's Input Monitoring prompt
-    /// (both the auto-offer on DualSense connect and the Settings toggle).
-    static let rawHIDExplanation =
-        "Shimmer will read your DualSense's raw input to access the Options, "
-        + "Create/Share, and Mute buttons.\n\nmacOS will then ask for "
-        + "\u{201C}Input Monitoring\u{201D} permission. Its dialog says "
-        + "\u{201C}keystrokes\u{201D} because that's the same system permission "
-        + "- but Shimmer only reads the controller, never your keyboard."
-
     /// Reveals the Settings ▸ Diagnostics pane (the single hideable home for the
     /// debug/tuning wires: the Telemetry toggle, the bookmark chord, and the
     /// log/telemetry status line). HIDDEN by default - a normal user never sees it. It's
@@ -411,42 +417,8 @@ final class AppModel {
         }
     }
 
-    /// Offer the raw-HID feature if a DualSense is connected and the user
-    /// hasn't enabled it or been asked. Never interrupts a live stream.
-    func maybeOfferRawHID() {
-        guard !rawHIDControllerEnabled, !rawHIDPromptAnswered, !isStreaming, !showRawHIDPrompt else { return }
-        let hasDualSense = GCController.controllers().contains { $0.productCategory == GCProductCategoryDualSense }
-        if hasDualSense { showRawHIDPrompt = true }
-    }
-
-    /// "Enable" from the auto-offer: turn it on and mark answered. We do NOT
-    /// request the Input Monitoring permission or open System Settings here:
-    ///   * `IOHIDRequestAccess` is SYNCHRONOUS and blocks the main thread for
-    ///     ~2s while presenting/resolving the TCC prompt; on a live stream that
-    ///     stalls the present path and trips the present-stall watchdog (which
-    ///     disables the pacer). See DualSenseHID.start()'s note.
-    ///   * `NSWorkspace.open(Privacy_ListenEvent)` flashes a System Settings
-    ///     window - jarring mid-game.
-    /// Both belong only behind an explicit user action in Settings (the
-    /// Troubleshooting "Open Settings" button, `RawHIDControl.registerAndOpen`),
-    /// off the main thread. Flipping the flag is enough: if the permission is
-    /// already granted the raw-HID reader attaches silently via
-    /// `ControllerForwarder` (mid-stream) / the input test; if it isn't, the
-    /// Troubleshooting pane's permission card guides the user there on their own
-    /// schedule. The proactive offer itself is `!isStreaming`-gated
-    /// (`maybeOfferRawHID`), so this only runs from the launcher anyway - but we
-    /// keep it side-effect-free so it can never block or pop a window.
-    func enableRawHIDFromPrompt() {
-        rawHIDControllerEnabled = true
-        rawHIDPromptAnswered = true
-        showRawHIDPrompt = false
-    }
-
-    /// "Cancel" from the auto-offer: don't ask again proactively.
-    func declineRawHIDPrompt() {
-        rawHIDPromptAnswered = true
-        showRawHIDPrompt = false
-    }
+    // The raw-HID offer's entry points (maybeOfferRawHID / enableRawHIDFromPrompt /
+    // declineRawHIDPrompt) and its explanation copy live in AppModel+RawHID.swift.
 
     // Pairing
     var pairingInFlight = false
@@ -576,11 +548,14 @@ final class AppModel {
         customWidth = min(max(Self.persistedPositiveInt("customWidth") ?? customWidth, 640), 7680)
         customHeight = min(max(Self.persistedPositiveInt("customHeight") ?? customHeight, 480), 4320)
         customFPS = min(max(Self.persistedPositiveInt("customFPS") ?? customFPS, 30), 240)
-        customBitrateMbps = Self.persistedPositiveInt("customBitrateMbps") ?? customBitrateMbps
         customHDR = Self.persistedBool("customHDR") ?? customHDR
-        customBitrateAuto = Self.persistedBool("customBitrateAuto") ?? customBitrateAuto
         captureSysKeys = Self.persistedBool("captureSysKeys") ?? captureSysKeys
         streamCoversNotch = Self.persistedBool("streamCoversNotch") ?? streamCoversNotch
+        // Registered default (GlimmerApp) answers the absent-key case; an
+        // unrecognised raw value lands on the default rather than guessing.
+        streamDisplayMode = StreamDisplayMode.persisted(
+            rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
+        releasePointerHotkey = Self.persistedDecoded("releasePointerHotkey", HotkeyChord.self) ?? releasePointerHotkey
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
         streamStatsCorner = Self.persistedRawValue("streamStatsCorner", StatsOverlayCorner.self) ?? streamStatsCorner
         // Stats overlay preset. Key-absence means the user never touched
