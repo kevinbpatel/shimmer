@@ -474,9 +474,13 @@ public final class StreamWindow {
         view.layer = fresh
         view.wantsLayer = true
         self.displayLayer = fresh
-        // PiP is fed by the layer, not the view: re-target it (restarts the
-        // PiP window on the fresh layer if it was up).
-        pictureInPicture.retarget(layer: fresh)
+        // PiP is fed by the layer, not the view: re-target it onto the fresh
+        // layer. If PiP was up when the renderer hard-failed, don't try to
+        // relaunch it into the slot the dismissing old window still holds -
+        // exit PiP cleanly and surface the recovering stream fullscreen.
+        if pictureInPicture.retarget(layer: fresh) || pictureInPicturePending {
+            handleLayerRebuildDuringPiP()
+        }
         log.notice("Rebuilt AVSampleBufferDisplayLayer (present-path self-heal)")
         return fresh
     }

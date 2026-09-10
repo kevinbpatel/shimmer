@@ -66,12 +66,27 @@ extension StreamWindow {
             return
         }
         pictureInPicturePending = true
+        // Rebind the pacer to a screen link NOW, before AVKit brings the PiP
+        // window up (~100-300ms). The view-bound link stopped firing the
+        // instant the window was ordered out, and a screen link is correct
+        // whether or not PiP is up yet - so binding it here keeps frames
+        // releasing across the startup gap instead of stalling the pacer FIFO
+        // (which, with suppression held off by `pictureInPicturePending`,
+        // would otherwise pile up and could trip a resync IDR). Verified: a
+        // screen link built while the window is ordered out ticks at panel
+        // rate (scratchpad/pipspike --attach-after-orderout).
+        onPictureInPictureChanged?(true)
         pictureInPicture.start()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.pictureInPicturePending else { return }
                 self.log.error("Picture in Picture start never resolved - clearing pending state")
                 self.pictureInPicturePending = false
+                // Undo the optimistic request-time detach + UI flip, same as
+                // the failure path: the window stays hidden (suppression
+                // engages below), the pacer goes back on the view link, and the
+                // menu bar stops showing PiP as active.
+                self.onPictureInPictureChanged?(false)
                 self.publishPresentSuppression()
             }
         }
@@ -85,21 +100,28 @@ extension StreamWindow {
             self.pictureInPicturePending = false
             self.setPictureInPictureActive(true)
             // Came back to the window while PiP was still starting - the
-            // window wins; collapse the PiP that just appeared.
+            // window wins; collapse the PiP that just appeared. The pacer is
+            // still screen-bound here (reengageForeground doesn't rebind it;
+            // the view rebind lands in onDidStop below), which is harmless -
+            // a screen link ticks whether the window is visible or not.
             if !self.isBackgrounded {
                 self.log.info("Picture in Picture started after the window returned - stopping it")
                 self.pictureInPicture.stop()
                 return
             }
             self.enableBackgroundControllerEvents()
-            self.onPictureInPictureChanged?(true)
             self.publishPresentSuppression()
         }
         pictureInPicture.onFailedToStart = { [weak self] _ in
             guard let self, !self.didClose else { return }
             self.pictureInPicturePending = false
-            // The window is already hidden; the plain hidden-window behaviour
-            // (suppression + decode gate) engages through the edge below.
+            // We optimistically rebound the pacer to a screen link at request
+            // time; PiP didn't come up, so put it back on the view link. The
+            // window stays hidden, so the plain hidden-window behaviour
+            // (suppression + decode gate) engages through the edge below - the
+            // dead view link doesn't matter while decode is gated, and it's the
+            // correct binding for the eventual return to the window.
+            self.onPictureInPictureChanged?(false)
             self.publishPresentSuppression()
         }
         pictureInPicture.onRestoreRequested = { [weak self] in
@@ -134,6 +156,22 @@ extension StreamWindow {
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         reengageForeground()
+    }
+
+    /// The renderer hard-fail self-heal rebuilt the display layer while PiP was
+    /// up (or starting). `retarget` already collapsed the old PiP window and
+    /// deliberately did not relaunch (its slot is still held by the dismissing
+    /// window). Clear our PiP state, put the pacer back on the view link, and
+    /// bring the recovering stream back to the foreground so the user is never
+    /// stranded on a hidden window with no PiP.
+    func handleLayerRebuildDuringPiP() {
+        log.notice("Display layer rebuilt during Picture in Picture - exiting PiP and returning to the stream window")
+        pictureInPicturePending = false
+        setPictureInPictureActive(false)
+        pictureInPicturePaused = false
+        restoreBackgroundControllerEvents()
+        onPictureInPictureChanged?(false)
+        returnFromPictureInPicture()
     }
 
     /// PiP teardown for `close()`: drop the controller silently and put the

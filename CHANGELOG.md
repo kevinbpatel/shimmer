@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+Pop the stream out into macOS's Picture in Picture window.
+
+Press ⌃⌥P during a stream (rebindable in Settings › Shortcuts) and the game
+moves into the same floating, corner-snapping window macOS gives movies — on
+top of your other apps while you work. It's fed by the very layer the
+fullscreen window paints into, so there's no second decode path and no extra
+latency; the frame pacer just rides the display's own refresh instead of the
+(now-hidden) window's. Controllers keep driving the game from the corner
+(keyboard and mouse stay with whatever app is frontmost, the way any PiP video
+behaves). Switch away from the stream and it pops out automatically (Settings ›
+Streaming, on by default); close the PiP window and the stream simply waits in
+the background like a Cmd-Tab-away; click the return button or the Dock icon to
+go back to fullscreen.
+
 ## 2026.8.18 - 2026-09-02
 
 Glimmer no longer polls your PC while the Mac is going to sleep.

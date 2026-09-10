@@ -79,11 +79,17 @@ public final class StreamPictureInPicture: NSObject {
             && (controller?.isPictureInPicturePossible ?? false)
     }
 
-    /// Point the controller at a fresh layer (the renderer hard-fail
-    /// self-heal rebuilds the display layer). If PiP was up it is restarted on
-    /// the new layer - the old controller's window collapses with its layer.
-    public func retarget(layer newLayer: AVSampleBufferDisplayLayer) {
-        guard newLayer !== layer else { return }
+    /// Point the controller at a fresh layer (the renderer hard-fail self-heal
+    /// rebuilds the display layer). The old controller's PiP window collapses
+    /// with its old layer. Returns whether PiP was active, so the owner can
+    /// reconcile its own state - this deliberately does NOT auto-restart PiP:
+    /// the system's single PiP slot is still held by the dismissing old window,
+    /// so an immediate `start()` would silently fail the `isPossible` guard and
+    /// strand the owner's `isPictureInPictureActive` flag true forever (no
+    /// callback ever comes because `build` nils the old delegate).
+    @discardableResult
+    public func retarget(layer newLayer: AVSampleBufferDisplayLayer) -> Bool {
+        guard newLayer !== layer else { return false }
         let wasActive = isActive
         if wasActive {
             stoppingProgrammatically = true
@@ -93,7 +99,7 @@ public final class StreamPictureInPicture: NSObject {
             isStopping = false
         }
         build(on: newLayer)
-        if wasActive { start() }
+        return wasActive
     }
 
     public func start() {
