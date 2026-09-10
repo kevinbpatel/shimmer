@@ -57,6 +57,7 @@ extension AppModel {
         persistQualitySettings()
         startLiveRefresh()
         restartHostStatusPolling()
+        runDebugAutomationIfRequested()
     }
 
     func startLiveRefresh() {

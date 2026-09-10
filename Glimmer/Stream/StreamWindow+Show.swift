@@ -301,6 +301,10 @@ extension StreamWindow {
         ) { [weak self] _ in
           MainActor.assumeIsolated {
             guard let self, !self.didClose else { return }
+            // While the window is the alpha-0 PiP mirror source, its key/resign
+            // transitions are meaningless (it's intentionally invisible); the
+            // return-from-PiP paths (PiP button / Dock / menu) drive foreground.
+            guard !self.pipSourceMode else { return }
             // DEBOUNCE the resign. A genuine Cmd-Tab-away / app deactivation
             // resigns the stream window AND keeps it resigned. A transient
             // key flutter - most importantly a DualSense/HID controller
@@ -416,6 +420,10 @@ extension StreamWindow {
         ) { [weak self] _ in
           MainActor.assumeIsolated {
             guard let self, !self.didClose else { return }
+            // Ignore key changes while acting as the alpha-0 PiP mirror source
+            // (see the resign observer). Return-from-PiP goes through the
+            // explicit paths, which call reengageForeground directly.
+            guard !self.pipSourceMode else { return }
             // Cancel any pending resign teardown: a becomeKey that lands
             // inside the resign debounce window means the resign was a
             // transient key blip (e.g. a DualSense connecting over Bluetooth
@@ -465,7 +473,7 @@ extension StreamWindow {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, !self.didClose, !self.awaitingFirstFrameFadeIn,
-                      self.window.isKeyWindow else { return }
+                      !self.pipSourceMode, self.window.isKeyWindow else { return }
                 // Foreground again with the stream window key - any pending
                 // resign teardown is stale (same role as didBecomeKey's bump).
                 self.resignGeneration &+= 1
@@ -486,29 +494,44 @@ extension StreamWindow {
     /// never uncovered for a frame. didBecomeKey's reengageForeground() reverses
     /// all of this on the way back in.
     func backgroundStreamWindow() {
-        hideStreamWindow()
         // Pop out to Picture in Picture instead of just vanishing, when the
-        // user wants that (Settings › Streaming). The PiP window is fed by the
-        // same layer, so it comes up showing the frame the fullscreen window
-        // was on. If PiP can't start (another app owns the system's single PiP
-        // slot) the plain hidden-window behaviour above is what remains.
-        if autoPictureInPictureProvider() {
+        // user wants that (Settings › Streaming) and it can start. The PiP path
+        // keeps the window on screen (alpha 0) as the 1:1 mirror source; the
+        // plain path orders it out.
+        let usePiP = autoPictureInPictureProvider() && pictureInPicture.isPossible
+        hideStreamWindow(forPictureInPicture: usePiP)
+        if usePiP {
             startPictureInPictureNow()
         }
         publishPresentSuppression()
     }
 
-    /// The window-hiding half of a switch-away: cursor back, orderOut, the
-    /// host's presentation options restored, launcher told. Shared by the
-    /// confirmed-background path above and the explicit PiP entry (hotkey /
-    /// menu bar), which hides the window on purpose and then pops out.
-    func hideStreamWindow() {
+    /// The window-hiding half of a switch-away: cursor back, presentation
+    /// options restored, launcher told. Shared by the confirmed-background path
+    /// and the explicit PiP entry (hotkey / menu bar).
+    ///
+    /// `forPictureInPicture`: when true the window is NOT ordered out - macOS
+    /// sample-buffer PiP mirrors the source layer 1:1 and needs it on screen -
+    /// it is instead made invisible (alpha 0, click-through) and, on PiP
+    /// didStart, shrunk to the PiP window's size. When false the window is
+    /// ordered out as before (plain Cmd-Tab-away with no pop-out).
+    func hideStreamWindow(forPictureInPicture: Bool = false) {
         guard !isBackgrounded else { return }
         isBackgrounded = true
         // Cursor: restore so the user can interact with whatever app they
         // Cmd-Tabbed to. Idempotent + latch-balanced via the single owner -
         // shows iff currently hidden, bringing the count to 0.
         setCursorHidden(false)
+        if forPictureInPicture {
+            // Hide the fullscreen content instantly but keep the window on
+            // screen as the PiP mirror source. It's resized to the PiP window
+            // on didStart (matchSourceWindowToPiPPanel).
+            enterPiPSourceMode()
+            if let saved = previousPresentationOptions { NSApp.presentationOptions = saved }
+            onBackgroundedChanged?(true)
+            log.info("Stream window hidden for Picture in Picture (kept on screen at alpha 0 as mirror source)")
+            return
+        }
         // Window level: in the borderless-covering path we parked the window
         // above the menu-bar level so it covers the notch. That also keeps it
         // painted ON TOP of any other app the user Cmd-Tabs to, which makes

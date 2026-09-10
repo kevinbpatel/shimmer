@@ -195,6 +195,21 @@ public final class StreamWindow {
     /// `GCController.shouldMonitorBackgroundEvents` before we flipped it on
     /// for PiP; restored on PiP stop / close. nil = we never touched it.
     var savedControllerBackgroundFlag: Bool?
+    /// True while the stream window is acting as the alpha-0, PiP-window-sized
+    /// MIRROR SOURCE for the system Picture in Picture window. macOS's
+    /// sample-buffer PiP copies the source layer's pixels 1:1 with no scaling
+    /// (a documented AVKit bug - see StreamWindow+PictureInPicture.swift), so
+    /// the source window must stay ON SCREEN and be sized to the PiP window, or
+    /// PiP shows only the bottom-left crop. While this is true the window's
+    /// own key/resign observers are gated off (it's intentionally invisible;
+    /// returns come through the explicit PiP/Dock/menu paths).
+    var pipSourceMode = false
+    /// The fullscreen frame to restore when PiP ends (saved on entering source
+    /// mode). nil when not in source mode.
+    var savedFrameBeforePiP: NSRect?
+    /// Observer on the PiP panel's content view frame, so the mirror source
+    /// window tracks PiP window resizes and keeps filling it 1:1.
+    var pipPanelFrameObserver: NSObjectProtocol?
     /// Read at the confirmed switch-away edge: should the stream pop out to
     /// Picture in Picture instead of just hiding? Wired to the user's
     /// Settings toggle by the session owner.

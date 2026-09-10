@@ -50,7 +50,7 @@ extension StreamWindow {
         // Any resign-debounce teardown in flight is superseded by this
         // explicit hide (same token discipline as the becomeKey observer).
         resignGeneration &+= 1
-        hideStreamWindow()
+        hideStreamWindow(forPictureInPicture: true)
         startPictureInPictureNow()
         publishPresentSuppression()
     }
@@ -67,14 +67,11 @@ extension StreamWindow {
         }
         pictureInPicturePending = true
         // Rebind the pacer to a screen link NOW, before AVKit brings the PiP
-        // window up (~100-300ms). The view-bound link stopped firing the
-        // instant the window was ordered out, and a screen link is correct
-        // whether or not PiP is up yet - so binding it here keeps frames
-        // releasing across the startup gap instead of stalling the pacer FIFO
-        // (which, with suppression held off by `pictureInPicturePending`,
-        // would otherwise pile up and could trip a resync IDR). Verified: a
-        // screen link built while the window is ordered out ticks at panel
-        // rate (scratchpad/pipspike --attach-after-orderout).
+        // window up (~100-300ms). Binding it here keeps frames releasing across
+        // the startup gap instead of stalling the pacer FIFO (which, with
+        // suppression held off by `pictureInPicturePending`, would otherwise
+        // pile up and could trip a resync IDR). A screen link ticks regardless
+        // of the source window's size/visibility.
         onPictureInPictureChanged?(true)
         pictureInPicture.start()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
@@ -82,10 +79,11 @@ extension StreamWindow {
                 guard let self, self.pictureInPicturePending else { return }
                 self.log.error("Picture in Picture start never resolved - clearing pending state")
                 self.pictureInPicturePending = false
-                // Undo the optimistic request-time detach + UI flip, same as
-                // the failure path: the window stays hidden (suppression
-                // engages below), the pacer goes back on the view link, and the
-                // menu bar stops showing PiP as active.
+                // Fall back to a clean hidden state, same as the failure path.
+                if self.pipSourceMode {
+                    self.exitPiPSourceMode()
+                    self.window.orderOut(nil)
+                }
                 self.onPictureInPictureChanged?(false)
                 self.publishPresentSuppression()
             }
@@ -110,17 +108,23 @@ extension StreamWindow {
                 return
             }
             self.enableBackgroundControllerEvents()
+            // Size the (alpha-0, on-screen) source window to the PiP window so
+            // AVKit's 1:1 pixel mirror shows the WHOLE frame, not the bottom-
+            // left crop. This is the fix for the documented macOS sample-buffer
+            // PiP scaling bug (see matchSourceWindowToPiPPanel).
+            self.matchSourceWindowToPiPPanel()
             self.publishPresentSuppression()
         }
         pictureInPicture.onFailedToStart = { [weak self] _ in
             guard let self, !self.didClose else { return }
             self.pictureInPicturePending = false
-            // We optimistically rebound the pacer to a screen link at request
-            // time; PiP didn't come up, so put it back on the view link. The
-            // window stays hidden, so the plain hidden-window behaviour
-            // (suppression + decode gate) engages through the edge below - the
-            // dead view link doesn't matter while decode is gated, and it's the
-            // correct binding for the eventual return to the window.
+            // PiP didn't come up. Fall back to the plain hidden-window state:
+            // leave mirror-source mode (restore the fullscreen frame) and order
+            // the window out. Put the pacer back on the view link.
+            if self.pipSourceMode {
+                self.exitPiPSourceMode()
+                self.window.orderOut(nil)
+            }
             self.onPictureInPictureChanged?(false)
             self.publishPresentSuppression()
         }
@@ -136,9 +140,17 @@ extension StreamWindow {
             self.pictureInPicturePaused = false
             self.restoreBackgroundControllerEvents()
             self.onPictureInPictureChanged?(false)
-            // × close: the window stays hidden and this edge engages the normal
-            // hidden-window suppression. Return: reengageForeground() already
-            // ran and this is a no-op on an unchanged value.
+            // × close (not the return button): the window is still the alpha-0
+            // shrunk mirror source and stays hidden. Restore its fullscreen
+            // frame and order it out cleanly so "Back to stream" resumes it
+            // full size. (On the return path reengageForeground already left
+            // source mode and isBackgrounded is false, so this is skipped.)
+            if self.isBackgrounded {
+                self.exitPiPSourceMode()
+                self.window.orderOut(nil)
+            }
+            // × close engages the normal hidden-window suppression; return is a
+            // no-op on an unchanged value.
             self.publishPresentSuppression()
         }
         pictureInPicture.onPauseChanged = { [weak self] paused in
@@ -181,6 +193,96 @@ extension StreamWindow {
         pictureInPicture.invalidate()
         setPictureInPictureActive(false)
         restoreBackgroundControllerEvents()
+        exitPiPSourceMode()
+    }
+
+    // MARK: - PiP mirror-source window (the macOS 1:1-crop workaround)
+    //
+    // macOS's sample-buffer Picture in Picture (unlike iOS, and unlike
+    // AVPlayerLayer PiP) mirrors the source AVSampleBufferDisplayLayer into the
+    // PiP window at 1:1 PIXELS with no scaling transform - so a fullscreen
+    // source layer shows only its bottom-left corner in the PiP window
+    // (Apple bug, FB22411168; reproduced and confirmed on macOS 26). The
+    // working fix: keep the source window ON SCREEN (PiP can't mirror an
+    // ordered-out window) but invisible (alpha 0, click-through), and size it
+    // to the PiP window's content so 1:1 == the whole frame. Track PiP resizes
+    // to stay matched.
+
+    /// Enter mirror-source mode: hide the fullscreen content (alpha 0) but keep
+    /// the window on screen and pass-through. Called from the PiP hide path
+    /// BEFORE PiP starts; the exact size is applied on didStart once the PiP
+    /// window exists.
+    func enterPiPSourceMode() {
+        guard !pipSourceMode else { return }
+        pipSourceMode = true
+        savedFrameBeforePiP = window.frame
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        // Pre-shrink to a typical PiP size so the first ~200ms (before
+        // matchSourceWindowToPiPPanel runs on didStart) don't mirror the
+        // fullscreen source 1:1 - which would flash the bottom-left crop. The
+        // exact size is applied the moment the PiP window exists.
+        let approx = NSSize(width: 480, height: 270)
+        window.setFrame(NSRect(origin: window.frame.origin, size: approx), display: false)
+    }
+
+    /// Size the alpha-0 source window to the system PiP window's content, and
+    /// keep it matched as the user resizes PiP. Falls back to a sensible small
+    /// size if the private PiP panel can't be located (a future macOS could
+    /// rename it) - the fallback shows the whole frame at a fixed size rather
+    /// than reverting to the bottom-left crop.
+    func matchSourceWindowToPiPPanel() {
+        guard pipSourceMode, !didClose else { return }
+        // A short delay lets AVKit finish creating the PiP panel.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.pipSourceMode, !self.didClose else { return }
+                guard let panel = NSApp.windows.first(where: {
+                    String(describing: type(of: $0)).contains("PIPPanel")
+                }), let content = panel.contentView else {
+                    self.log.error("PiP: could not locate the PIPPanel window - using a fallback source size (frame will still be whole, size approximate)")
+                    self.window.setFrame(
+                        NSRect(x: self.window.frame.origin.x, y: self.window.frame.origin.y, width: 640, height: 360),
+                        display: true)
+                    return
+                }
+                let apply: @MainActor () -> Void = { [weak self] in
+                    guard let self, self.pipSourceMode, !self.didClose else { return }
+                    let size = content.bounds.size
+                    guard size.width > 1, size.height > 1 else { return }
+                    let origin = panel.frame.origin
+                    self.window.setFrame(
+                        NSRect(x: origin.x, y: origin.y, width: size.width, height: size.height),
+                        display: true)
+                }
+                apply()
+                content.postsFrameChangedNotifications = true
+                self.pipPanelFrameObserver = NotificationCenter.default.addObserver(
+                    forName: NSView.frameDidChangeNotification, object: content, queue: .main
+                ) { _ in MainActor.assumeIsolated(apply) }
+                self.log.info("PiP: source window matched to PiP panel content \(Int(content.bounds.width))x\(Int(content.bounds.height))")
+            }
+        }
+    }
+
+    /// Leave mirror-source mode: stop tracking, restore the fullscreen frame,
+    /// alpha, and event handling. Idempotent. Does NOT decide visibility - the
+    /// caller orders the window front (return) or out (× close). The frame is
+    /// restored with display:false so a hide path never flashes the fullscreen
+    /// content before ordering out.
+    func exitPiPSourceMode() {
+        guard pipSourceMode else { return }
+        pipSourceMode = false
+        if let obs = pipPanelFrameObserver {
+            NotificationCenter.default.removeObserver(obs)
+            pipPanelFrameObserver = nil
+        }
+        window.ignoresMouseEvents = false
+        if let saved = savedFrameBeforePiP {
+            window.setFrame(saved, display: false)
+            savedFrameBeforePiP = nil
+        }
+        window.alphaValue = 1
     }
 
     // MARK: - Present suppression

@@ -105,6 +105,10 @@ extension StreamWindow {
     func reengageForeground() {
         guard !didClose else { return }
         isBackgrounded = false
+        // Leave PiP mirror-source mode first: restore the fullscreen frame,
+        // alpha, and event handling before we re-elevate and show. Idempotent
+        // and a no-op when PiP wasn't the reason we were hidden.
+        exitPiPSourceMode()
         // Picture in Picture and the fullscreen window show the same layer, so
         // coming back to the window means the PiP window has to go. Stop it
         // AFTER the window is on screen (callers order front first) so the

@@ -134,6 +134,7 @@
 		D100005A /* Identity+Loading.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000059 /* Identity+Loading.swift */; };
 		D100005C /* Identity+Crypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005B /* Identity+Crypto.swift */; };
 		D100005E /* AppModel+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005D /* AppModel+Lifecycle.swift */; };
+		A1C0DE000910000000000000 /* DebugAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000920000000000000 /* DebugAutomation.swift */; };
 		D2000097 /* AppModel+Defaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000096 /* AppModel+Defaults.swift */; };
 		D1000060 /* AppModel+Streaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005F /* AppModel+Streaming.swift */; };
 		D1000062 /* AppModel+Pairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000061 /* AppModel+Pairing.swift */; };
@@ -421,6 +422,7 @@
 		D1000059 /* Identity+Loading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/Identity+Loading.swift"; sourceTree = "<group>"; };
 		D100005B /* Identity+Crypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stream/Identity+Crypto.swift"; sourceTree = "<group>"; };
 		D100005D /* AppModel+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Lifecycle.swift"; sourceTree = "<group>"; };
+		A1C0DE000920000000000000 /* DebugAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugAutomation.swift"; sourceTree = "<group>"; };
 		D2000096 /* AppModel+Defaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Defaults.swift"; sourceTree = "<group>"; };
 		D100005F /* AppModel+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Streaming.swift"; sourceTree = "<group>"; };
 		D1000061 /* AppModel+Pairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Pairing.swift"; sourceTree = "<group>"; };
@@ -707,6 +709,7 @@
 				D1A00001 /* AppModel+HostRoute.swift */,
 				D1A00003 /* AppModel+SessionReceipt.swift */,
 				D100005D /* AppModel+Lifecycle.swift */,
+				A1C0DE000920000000000000 /* DebugAutomation.swift */,
 				D2000096 /* AppModel+Defaults.swift */,
 				D100005B /* Identity+Crypto.swift */,
 				D1000059 /* Identity+Loading.swift */,
@@ -1104,6 +1107,7 @@
 				D1A00002 /* AppModel+HostRoute.swift in Sources */,
 				D1A00004 /* AppModel+SessionReceipt.swift in Sources */,
 				D100005E /* AppModel+Lifecycle.swift in Sources */,
+				A1C0DE000910000000000000 /* DebugAutomation.swift in Sources */,
 				D2000097 /* AppModel+Defaults.swift in Sources */,
 				D100005C /* Identity+Crypto.swift in Sources */,
 				D100005A /* Identity+Loading.swift in Sources */,

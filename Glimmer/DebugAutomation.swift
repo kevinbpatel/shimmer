@@ -1,0 +1,85 @@
+//
+//  DebugAutomation.swift
+//
+//  Env-var-gated automation for headless iteration during development. INERT
+//  unless the GLIMMER_DEBUG_* variables are set, so it never affects a normal
+//  launch. Lets a script drive: pick a host, start a stream, enter Picture in
+//  Picture after N seconds, and quit after M seconds - so a capture/inspect/fix
+//  loop needs no GUI clicking.
+//
+//    GLIMMER_DEBUG_STREAM=<substr>   select the first host whose name/address
+//                                    contains <substr> (case-insensitive) and
+//                                    stream its default app.
+//    GLIMMER_DEBUG_PIP_AFTER=<sec>   once streaming, wait <sec> then ⌃⌥P.
+//    GLIMMER_DEBUG_QUIT_AFTER=<sec>  quit the app <sec> after streaming starts.
+//
+
+import AppKit
+import Foundation
+
+extension AppModel {
+
+    func runDebugAutomationIfRequested() {
+        let env = ProcessInfo.processInfo.environment
+        guard let hostMatch = env["GLIMMER_DEBUG_STREAM"], !hostMatch.isEmpty else { return }
+        let pipAfter = env["GLIMMER_DEBUG_PIP_AFTER"].flatMap(Double.init)
+        let quitAfter = env["GLIMMER_DEBUG_QUIT_AFTER"].flatMap(Double.init)
+        let returnAfter = env["GLIMMER_DEBUG_RETURN_AFTER"].flatMap(Double.init)
+        log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .public) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
+
+        // Give discovery/host-load a beat, then select + stream.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            guard let host = self.hosts.first(where: {
+                $0.name.localizedCaseInsensitiveContains(hostMatch)
+                    || ($0.customName?.localizedCaseInsensitiveContains(hostMatch) ?? false)
+                    || ($0.localAddress?.localizedCaseInsensitiveContains(hostMatch) ?? false)
+                    || ($0.manualAddress?.localizedCaseInsensitiveContains(hostMatch) ?? false)
+            }) else {
+                self.log.error("DEBUG automation: no host matching '\(hostMatch, privacy: .public)' among \(self.hosts.map(\.name), privacy: .public)")
+                return
+            }
+            self.log.notice("DEBUG automation: selecting \(host.name, privacy: .public) (\(host.apps.count) apps) and streaming default")
+            self.selectHost(host)
+            self.streamDefaultApp()
+            self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, quitAfter: quitAfter)
+        }
+    }
+
+    /// Poll for the stream to go live, then schedule the PiP + return + quit
+    /// actions relative to that moment (connect time is variable).
+    private func armDebugPiPAndQuit(pipAfter: Double?, returnAfter: Double?, quitAfter: Double?) {
+        var fired = false
+        let start = Date()
+        let poll = Timer(timeInterval: 0.25, repeats: true) { [weak self] t in
+            guard let self else { t.invalidate(); return }
+            // Give up after 30s of not reaching streaming.
+            if Date().timeIntervalSince(start) > 30 {
+                self.log.error("DEBUG automation: stream never reached .streaming within 30s (phase=\(String(describing: self.streamPhase), privacy: .public))")
+                t.invalidate(); return
+            }
+            guard self.streamPhase == .streaming, !fired else { return }
+            fired = true
+            t.invalidate()
+            self.log.notice("DEBUG automation: stream is live")
+            if let pipAfter {
+                DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter) { [weak self] in
+                    self?.log.notice("DEBUG automation: entering Picture in Picture")
+                    self?.enterPictureInPicture()
+                }
+                if let returnAfter {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + returnAfter) { [weak self] in
+                        self?.log.notice("DEBUG automation: returning from Picture in Picture")
+                        self?.resumeStreamWindow()
+                    }
+                }
+            }
+            if let quitAfter {
+                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) {
+                    NSApp.terminate(nil)
+                }
+            }
+        }
+        RunLoop.main.add(poll, forMode: .common)
+    }
+}
