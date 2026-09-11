@@ -185,7 +185,7 @@ extension AppModel {
                     onPictureInPictureChanged: { [weak self] active in
                         self?.nativeStreamPictureInPicture = active
                     },
-                    pipPointerProvider: { [weak self] in self?.pipPointerMirror ?? true }
+                    pipPointerProvider: { true }
                 )
                 for await event in events {
                     // Pass the SESSION's host, not selectedHost: ⌘1-⌘9 / the

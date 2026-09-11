@@ -227,6 +227,38 @@ extension NetworkClient {
         }
     }
 
+    // MARK: - Endpoint: /appasset (box art)
+
+    /// The host's cover art for one app, as image data.
+    ///
+    /// `AssetType=2` is box art and `AssetIdx=0` is the first asset of that
+    /// type - the literals every moonlight client sends, verbatim from
+    /// moonlight's `newAppAssetRequestWithAppId:`. (`AssetIdx`, NOT
+    /// `AssetIdType`: Sunshine ignores an unknown parameter and answers anyway,
+    /// so the wrong spelling looks fine until someone points it at GFE.) The
+    /// `uniqueid` moonlight also sends is added by `rawData` for every request.
+    /// GFE answers with a PNG; Sunshine answers with whatever the user
+    /// configured as that app's image and falls back to its own default.
+    /// 600x800 in practice - 3:4 portrait.
+    ///
+    /// Deliberately NOT run through `verifyStatus`: the body is an image, not
+    /// the `<root status_code=…>` envelope. A host with no art for the app
+    /// answers 200 with an empty body, which is reported as a miss so the
+    /// caller can draw its placeholder instead of retrying.
+    public func appAsset(appID: Int) async throws -> Data {
+        let data = try await rawData(path: "appasset",
+                                     query: ["appid": String(appID),
+                                             "AssetType": "2",
+                                             "AssetIdx": "0"],
+                                     extraQuery: nil,
+                                     usePaired: true,
+                                     timeout: Self.controlTimeout)
+        guard !data.isEmpty else {
+            throw StreamError.launchFailed("No box art for app \(appID)")
+        }
+        return data
+    }
+
     // MARK: - Endpoint: /applist
 
     public func appList() async throws -> [HostApp] {

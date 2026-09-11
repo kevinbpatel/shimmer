@@ -229,16 +229,22 @@ extension StreamPictureInPicture: AVPictureInPictureControllerDelegate {
 // MARK: - AVPictureInPictureSampleBufferPlaybackDelegate
 
 extension StreamPictureInPicture: AVPictureInPictureSampleBufferPlaybackDelegate {
+    /// Pause is REFUSED. macOS draws the PiP transport in its own agent
+    /// process - it is not in our view tree, so the button cannot be hidden -
+    /// but a live game has nothing to pause: the host keeps playing, so
+    /// "pausing" only freezes the mirror and then jumps on resume. Instead of
+    /// honouring it we stay playing and immediately tell AVKit so, which snaps
+    /// the button back. Verified by probing the panel: NSApp.windows holds
+    /// only `PIPPanel`, whose tree is the display layer and nothing else.
     public nonisolated func pictureInPictureController(
         _ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool
     ) {
-        let changed = pausedState.withLock { paused -> Bool in
-            let newPaused = !playing
-            defer { paused = newPaused }
-            return paused != newPaused
+        guard !playing else { return }
+        pausedState.withLock { $0 = false }
+        onMain { [self] in
+            self.controller?.invalidatePlaybackState()
+            self.log.notice("Picture in Picture pause ignored - a live stream has nothing to pause")
         }
-        guard changed else { return }
-        onMain { [self] in onPauseChanged?(!playing) }
     }
 
     public nonisolated func pictureInPictureControllerTimeRangeForPlayback(

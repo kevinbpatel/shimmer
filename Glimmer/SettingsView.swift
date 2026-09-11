@@ -1,138 +1,72 @@
+//
+//  SettingsView.swift
+//
+//  The whole app in one window, shaped like Tailscale's: a centred row of icon
+//  tabs at the top, and everything else below it.
+//
+//    Computers - the PCs sidebar and the selected PC's cover grid, with the
+//                add/remove actions along the bottom (Tailscale's Accounts tab)
+//    Settings  - one long page of flat gutter rows (Tailscale's Settings tab)
+//    About     - the centred identity page
+//
+//  There is deliberately no `Settings` scene and no second window: a SwiftUI
+//  Settings scene IS a separate window, which is the thing being removed here.
+//  ⌘, and the App-menu item just select the Settings tab (see GlimmerApp).
+//
+
 import AppKit
-import os
-import ServiceManagement
 import SwiftUI
 
-// MARK: - Settings Root
+struct AppShell: View {
+    @Environment(AppModel.self) private var model
 
-enum SettingsPane: String, CaseIterable, Identifiable {
-    // `.diagnostics` is the merged home for what used to be two panes:
-    // the always-visible troubleshooting surface (controller input test + logs)
-    // plus the option-click-revealed telemetry/tuning wires. The old
-    // `.troubleshooting` case folded into it.
-    case general, streaming, pcs, shortcuts, diagnostics, about
-
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .general: return "General"
-        // Titled "Quality" - the pane is about how the stream looks and
-        // feels, not the act of streaming. The case name (and rawValue
-        // "streaming") stays put: selection is session-only @State today,
-        // but keeping the raw value stable means nothing breaks if it is
-        // ever persisted or deep-linked.
-        case .streaming: return "Quality"
-        case .pcs: return "PCs"
-        // Titled "Input" - it now holds every input control (shortcuts, macOS
-        // keys, controller raw-HID + quit chord, mouse). Case/rawValue
-        // "shortcuts" stays put so nothing persisted/deep-linked breaks.
-        case .shortcuts: return "Input"
-        case .diagnostics: return "Diagnostics"
-        case .about: return "About"
+    var body: some View {
+        @Bindable var model = model
+        VStack(spacing: 0) {
+            // The title bar area: the system title is hidden (see
+            // WindowChromeTweak) so it can be centred here, clear of the
+            // traffic lights, exactly as the reference app has it.
+            Text("Shimmer")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+            SettingsTabBar(selection: $model.settingsTab)
+            Divider()
+            switch model.settingsTab {
+            case .computers: ComputersTab()
+            case .settings: SettingsTabPage()
+            case .about: AboutPane()
+            }
         }
-    }
-    var systemImage: String {
-        switch self {
-        case .general: return "gearshape.fill"
-        // A quality dial, not a play button - the pane tunes how the
-        // stream looks, it doesn't start one. `dial.high.fill` has shipped
-        // since SF Symbols 3, so no missing-glyph risk on macOS 26.
-        case .streaming: return "dial.high.fill"
-        case .pcs: return "display"
-        case .shortcuts: return "keyboard.fill"
-        case .diagnostics: return "stethoscope"
-        // System Settings' About uses `info.circle.fill` - the bare "info"
-        // symbol doesn't ship in SF Symbols 6 and falls back to a missing
-        // glyph on macOS 26.
-        case .about: return "info.circle.fill"
-        }
-    }
-    // System Settings-style colored chip behind each sidebar SF Symbol.
-    var chipColor: Color {
-        switch self {
-        case .general: return .gray
-        case .streaming: return .red
-        case .pcs: return .orange
-        case .shortcuts: return .indigo
-        case .diagnostics: return .teal
-        case .about: return .gray
-        }
+        // Waived on the WHOLE stack, not just the title row. Waiving it on the
+        // title alone drew that row beside the traffic lights but still let the
+        // layout reserve the title bar's 32pt for everything below, so the tab
+        // strip began ~40pt lower than the reference app's - all of it empty.
+        .ignoresSafeArea(.container, edges: .top)
+        // Fixed, not resizable - the window follows the tab.
+        .frame(width: SettingsMetrics.windowWidth,
+               height: model.settingsTab.windowHeight,
+               alignment: .top)
     }
 }
 
-struct SettingsRoot: View {
-    @Environment(AppModel.self) private var model
-    @State private var selection: SettingsPane = .general
-
-    /// Panes shown in the sidebar. All are always present now: Diagnostics holds
-    /// the always-visible troubleshooting surface (controller input test + logs),
-    /// and its debug/tuning sections stay hidden INSIDE the pane until the
-    /// option-click gesture on the About version line flips `showDiagnostics`.
-    private var visiblePanes: [SettingsPane] { SettingsPane.allCases }
-
+/// Every setting, on one scrolling page. Tailscale keeps one Settings tab
+/// rather than a pane per topic, and the gutter labels ("Resolution:",
+/// "Bitrate:") do the grouping that a sidebar would otherwise do; rules
+/// separate the broader areas.
+private struct SettingsTabPage: View {
     var body: some View {
-        // NavigationSplitView's master column auto-adopts Liquid Glass
-        // sidebar material on macOS 26 (same chrome System Settings uses).
-        // We pair it with `.scrollContentBackground(.hidden)` on the List
-        // so the sidebar's own opaque list background doesn't paint over
-        // the translucent window material the Settings scene provides.
-        NavigationSplitView(columnVisibility: .constant(.all)) {
-            List(visiblePanes, selection: $selection) { pane in
-                HStack(spacing: 8) {
-                    Image(systemName: pane.systemImage)
-                        .font(.system(size: 11, weight: .bold))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(
-                            // Subtle top-edge highlight on the colored chip
-                            // - matches Tahoe's System Settings chips for
-                            // Bluetooth/Network/etc. The gradient lightens
-                            // the top ~40% of the chip and falls off to the
-                            // base color, giving the glossy "lit from above"
-                            // feel without an additional stroke.
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(pane.chipColor)
-                                .overlay(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(0.30),
-                                            Color.white.opacity(0.0)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .center
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                    .blendMode(.plusLighter)
-                                    .allowsHitTesting(false)
-                                )
-                        )
-                    Text(pane.title)
-                }
-                .tag(pane)
-            }
-            .scrollContentBackground(.hidden)
-            .navigationSplitViewColumnWidth(min: 170, ideal: 190)
-            .toolbar(removing: .sidebarToggle)
-        } detail: {
-            Group {
-                switch selection {
-                case .general: GeneralPane()
-                case .streaming: QualityPane()
-                case .pcs: PCsPane()
-                case .shortcuts: ShortcutsPane()
-                case .diagnostics: DiagnosticsPane()
-                case .about: AboutPane()
-                }
-            }
-            // Hide the detail pane's scroll/form opaque background so the
-            // Settings window's `.thinMaterial` chrome shows through. On
-            // macOS 26 grouped Forms auto-upgrade their Section backgrounds
-            // to the Tahoe inset-rounded glass material once nothing is
-            // painting over the container.
-            .scrollContentBackground(.hidden)
-            .navigationTitle(selection.title)
+        SettingsPageBody {
+            StreamPane()
+            SettingsRule()
+            VideoPane()
+            SettingsRule()
+            AudioPane()
+            SettingsRule()
+            ShortcutsPane()
+            SettingsRule()
+            AppPane()
         }
-        .navigationSplitViewStyle(.balanced)
     }
 }

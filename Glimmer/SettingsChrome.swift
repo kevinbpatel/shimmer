@@ -1,0 +1,231 @@
+//
+//  SettingsChrome.swift
+//
+//  The settings vocabulary, modelled on Tailscale for macOS: a centred row of
+//  icon tabs at the top of the SAME window, then flat two-column rows - the
+//  label right-aligned in a fixed gutter, its controls left-aligned beside it,
+//  explanatory copy underneath in grey. No sidebar, no grouped cards, no
+//  separate Settings window.
+//
+//  Why this shape rather than SwiftUI's `Form(.grouped)`: grouped Form puts
+//  every Section in its own rounded card, so a pane made of one- and two-row
+//  sections reads as a stack of disconnected plates. Tailscale's gutter does
+//  the grouping instead - the label names a group and its rows sit together
+//  without any box - which is why a dense pane still scans.
+//
+
+import SwiftUI
+
+// MARK: - Tabs
+
+/// The pages the settings view can show. Raw values are persisted as the
+/// remembered tab, so leave them alone when renaming a title.
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case computers, settings, about
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .computers: return "Computers"
+        case .settings: return "Settings"
+        case .about: return "About"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .computers: return "display"
+        case .settings: return "slider.horizontal.3"
+        case .about: return "info.circle"
+        }
+    }
+
+    /// Window height for this tab, matching the reference app's behaviour of
+    /// resizing itself to the page rather than being dragged.
+    /// CONTENT height for this tab. The reference app's windows are 528 / 588
+    /// / 540; macOS adds its 32pt title bar on top of whatever the content
+    /// asks for, even with `.fullSizeContentView`, so subtract it here.
+    var windowHeight: CGFloat {
+        switch self {
+        case .computers: return 528 - 32
+        case .settings: return 588 - 32
+        case .about: return 540 - 32
+        }
+    }
+}
+
+/// The centred icon-over-label tab strip. Tailscale draws the selected tab as
+/// a rounded tinted plate with an accent-coloured glyph and label, and the
+/// rest monochrome - no underline, no segmented control.
+struct SettingsTabBar: View {
+    @Binding var selection: SettingsTab
+    /// macOS desaturates window chrome when the window is not frontmost, and
+    /// the reference app's tabs do exactly that. Without this the selected tab
+    /// stayed vivid blue on an inactive window, which is what made the two
+    /// headers look so different side by side.
+    @Environment(\.controlActiveState) private var activeState
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Spacer(minLength: 0)
+            ForEach(SettingsTab.allCases) { tab in
+                Button {
+                    selection = tab
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: tab.symbol)
+                            .font(.system(size: 18, weight: .regular))
+                            .frame(height: 20)
+                        Text(tab.title)
+                            .font(.system(size: 11))
+                    }
+                    .foregroundStyle(tint(for: tab))
+                    // No minimum width: each tab is as wide as its own label
+                    // plus 7pt, which is what puts them 56-63pt apart like the
+                    // reference app instead of a uniform 78.
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 7)
+                    .background {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(selection == tab ? plateFill : .clear)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(selection == tab
+                                                  ? Color.primary.opacity(0.13) : .clear,
+                                                  lineWidth: 1))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(tab.title)
+                .accessibilityAddTraits(selection == tab ? [.isButton, .isSelected] : .isButton)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+        .padding(.bottom, 6)
+        .padding(.horizontal, 12)
+    }
+
+    private var isActive: Bool { activeState != .inactive }
+
+    private func tint(for tab: SettingsTab) -> Color {
+        guard selection == tab else { return isActive ? .primary : .secondary }
+        return isActive ? Color.accentColor : .secondary
+    }
+
+    private var plateFill: Color {
+        isActive ? Color.accentColor.opacity(0.10) : Color.primary.opacity(0.08)
+    }
+}
+
+// MARK: - Rows
+
+/// The gutter every label is right-aligned into. One constant so each pane
+/// lines up with the others as the user flips tabs - a per-pane width makes
+/// the labels visibly jump.
+enum SettingsMetrics {
+    /// Measured off Tailscale's own Settings window (600x588 points, captured
+    /// and sampled pixel by pixel):
+    ///   * gutter labels right-align at x=168, controls start at x=180 (gap 12)
+    ///   * the checkbox is 18pt; its label starts 7pt after it, at x=204
+    ///   * checkbox rows sit on a 25pt rhythm (18pt control + 7pt)
+    ///   * trailing buttons right-align 41pt from the window edge
+    static let labelGutter: CGFloat = 168
+    static let labelGap: CGFloat = 12
+    static let rowSpacing: CGFloat = 18
+    static let contentSpacing: CGFloat = 6
+    /// The settings column is a FIXED width, centred in whatever the window
+    /// is: 168 + 12 + 380. Tailscale's window is only 600pt wide so its two
+    /// columns fill it; letting ours stretch across a library-sized window
+    /// left the gutter stranded with an acre of dead space to the right.
+    static let columnWidth: CGFloat = 560
+    /// The reference window's exact width, and its per-tab heights. It is not
+    /// resizable - the zoom and minimise buttons are disabled - and the height
+    /// changes with the tab rather than the user dragging it.
+    static let windowWidth: CGFloat = 600
+    /// The box every popup / slider / segmented control is laid out in. ONE
+    /// width for the whole app: the panes used to mix 200 and 260, so the Video
+    /// pane's own rows didn't line up with each other, never mind with Stream's.
+    static let controlWidth: CGFloat = 260
+    /// The box for controls that need more room than a popup - hotkey
+    /// recorders, the stats row editor, the DualSense panel.
+    static let wideControlWidth: CGFloat = 460
+}
+
+extension View {
+    /// Lay a control out in the settings column's control box, flush with its
+    /// LEFT edge.
+    ///
+    /// Load-bearing `alignment:`. A bare `.frame(width:)` proposes that width to
+    /// the control but does NOT make it take it: AppKit-backed controls that
+    /// size to their content - a menu `Picker` (as wide as its longest item), a
+    /// `.segmented` picker - stay at their natural width and SwiftUI then
+    /// CENTRES them in the box. That is what put every popup on the Stream pane
+    /// at a different x: measured on the 600pt window, Resolution started at
+    /// 211, Frame rate at 231, the Show-the-stream segmented at 236, the Codec
+    /// popup at 203, while the checkboxes and the slider (which does stretch)
+    /// sat at 192. `.leading` pins them all to 192; widths stay ragged on the
+    /// right, the way macOS's own settings panes look.
+    func settingsControl(width: CGFloat = SettingsMetrics.controlWidth) -> some View {
+        frame(width: width, alignment: .leading)
+    }
+
+    /// The same flush-left rule for a control that should grow to a ceiling
+    /// rather than sit in a fixed box.
+    func settingsControl(maxWidth: CGFloat) -> some View {
+        frame(maxWidth: maxWidth, alignment: .leading)
+    }
+}
+
+/// One labelled group: the label sits in the right-aligned gutter, everything
+/// in `content` stacks to its right. Pass `nil` to continue the previous
+/// group's column without repeating its label (Tailscale's "General:" owns
+/// three checkboxes this way).
+struct SettingsField<Content: View>: View {
+    private let label: String?
+    private let content: Content
+
+    init(_ label: String? = nil, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SettingsMetrics.labelGap) {
+            Text(label.map { $0.hasSuffix(":") ? $0 : "\($0):" } ?? "")
+                .frame(width: SettingsMetrics.labelGutter, alignment: .trailing)
+                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: SettingsMetrics.contentSpacing) {
+                content
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// A settings page: the scroll container with the padding every pane shares.
+struct SettingsPageBody<Content: View>: View {
+    private let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+                content
+            }
+            .frame(width: SettingsMetrics.columnWidth, alignment: .leading)
+            .padding(.top, 20)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+/// A hairline rule between groups, as Tailscale uses above its update block.
+struct SettingsRule: View {
+    var body: some View {
+        Divider().padding(.vertical, 4)
+    }
+}

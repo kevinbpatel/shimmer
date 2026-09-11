@@ -48,7 +48,12 @@ public enum StreamDisplayMode: String, CaseIterable, Identifiable, Sendable {
     /// while a panel-native preset is selected, so switching back to Custom
     /// finds the window toggle where it was.
     static func effective(chosen: StreamDisplayMode, preset: QualityPreset) -> StreamDisplayMode {
-        preset == .custom ? chosen : .fullScreen
+        // shimmer: the choice applies under every preset. Upstream tied Window
+        // to Custom because the panel-native presets were "full screen by
+        // definition"; with the Stream pane's picker the preset only decides
+        // the size, and a native-size stream in a window simply scales.
+        _ = preset
+        return chosen
     }
 
     /// The refresh a WINDOWED stream asks for: Custom's Hz capped at the

@@ -40,9 +40,28 @@ final class AppModel {
     @ObservationIgnored let log = Logger(
         subsystem: "io.ugfugl.Glimmer", category: "AppModel")
 
+    /// True only while `init()` restores persisted settings.
+    ///
+    /// Load-bearing, and not for the reason Swift's rules suggest: `@Observable`
+    /// rewrites the stored properties below into COMPUTED ones, so their
+    /// `willSet` / `didSet` bodies DO run inside `init`. ("Property observers
+    /// are not called in an initializer" holds only for genuinely stored
+    /// properties.) Without this latch, restoring `qualityPreset = .custom`
+    /// fired the prefill in its `willSet`, which wrote the OLD preset's
+    /// panel-native numbers into `customWidth` / `customHeight` / `customFPS` -
+    /// through their own didSets, so they were PERSISTED over the user's saved
+    /// resolution a few lines before `init` got round to loading it. The
+    /// symptom was the reported one: pick a resolution, relaunch, and it is the
+    /// display's native size again.
+    @ObservationIgnored private var isRestoringDefaults = false
+
     // Hosts
     var hosts: [Host] = []
     var selectedHost: Host?
+
+    /// Box art for the launcher's app tiles, fetched from the host and cached
+    /// on disk. Owned here so one store serves every view.
+    let artwork = AppArtworkStore()
 
     // Stream lifecycle
     var isStreaming = false
@@ -56,6 +75,10 @@ final class AppModel {
     // back (with the legacy-preset remap) in init().
     var qualityPreset: QualityPreset = QualityPreset.defaultPreset {
         willSet {
+            // Restoring the saved preset is not a user switching presets - see
+            // `isRestoringDefaults`, without which this prefill overwrote the
+            // saved Custom resolution during launch.
+            guard !isRestoringDefaults else { return }
             // When the user switches from a preset to Custom, prefill the custom
             // values with the preset's effective numbers so they're not surprised
             // by a sudden 1920x1080 reset.
@@ -67,15 +90,18 @@ final class AppModel {
             }
         }
         didSet {
+            guard !isRestoringDefaults else { return }
             // The preset's OWN persistence lives here, not in
             // persistQualitySettings(). That recompute runs on paths the user
             // never touched - launch bootstrap, every display-parameter change -
             // and its unconditional write re-stamped the key with whatever the
             // load had decoded, so a raw value the decoder didn't recognise was
             // overwritten before it could ever be migrated (see
-            // `QualityPreset.migrated(fromPersistedRawValue:)`). A didSet is
-            // suppressed during init(), so only a real change - which is only
-            // ever the Settings picker - reaches UserDefaults now.
+            // `QualityPreset.migrated(fromPersistedRawValue:)`). The
+            // `isRestoringDefaults` guard above is what makes that true: under
+            // @Observable a didSet is NOT suppressed during init(), so only a
+            // real change - which is only ever the Settings picker - reaches
+            // UserDefaults now.
             UserDefaults.standard.set(qualityPreset.rawValue, forKey: "qualityPreset")
             persistQualitySettings()
         }
@@ -94,29 +120,62 @@ final class AppModel {
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
+    /// The refresh a stream asks for when `frameRateMatchesDisplay` is off.
+    /// Applies under every preset (the Stream pane's frame-rate picker), not
+    /// just Custom - the preset only decides the SIZE now.
     var customFPS: Int = 60 {
         didSet {
             UserDefaults.standard.set(customFPS, forKey: "customFPS")
-            if qualityPreset == .custom { persistQualitySettings() }
+            persistQualitySettings()
         }
     }
-    // No bitrate knob, by design. A bitrate is a wire budget the app can
-    // derive better than a person can guess: `recommendedBitrateMbps` rescales
-    // the Moonlight formula onto anchors MEASURED on real hardware, so the
-    // number follows resolution and refresh (and, in a window, the capped
-    // refresh) on its own. Nothing to persist and nothing to ask - the result
-    // is visible in the next-stream summary. See QualityCalculator.
+    /// Frame rate follows the panel's refresh (the old preset behaviour) or
+    /// the picked `customFPS`. Loaded with a migration: absent → true unless
+    /// the user was already on Custom, whose typed Hz must survive.
+    var frameRateMatchesDisplay: Bool = true {
+        didSet {
+            UserDefaults.standard.set(frameRateMatchesDisplay, forKey: "frameRateMatchesDisplay")
+            persistQualitySettings()
+        }
+    }
+    /// Bitrate: derived (the measured-anchor / Moonlight-table recommendation
+    /// that follows resolution and refresh on its own) or the user's number.
+    /// The recommendation is still what the slider shows while automatic, so
+    /// switching it off starts from a sensible value.
+    var bitrateAuto: Bool = true {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(bitrateAuto, forKey: "bitrateAuto")
+            // Turning automatic OFF adopts what the disabled slider was already
+            // showing, snapped to its nearest stop, so the readout and the
+            // thumb agree and neither jumps as the switch flips. Seeding only
+            // when the key had never been written (the first cut) meant a stale
+            // manual number from months ago snapped back instead.
+            if !bitrateAuto {
+                manualBitrateMbps = BitrateScale.stepsMbps[
+                    BitrateScale.nearestIndex(toMbps: recommendedBitrateMbpsNow)]
+            }
+            persistQualitySettings()
+        }
+    }
+    /// The bitrate sent when `bitrateAuto` is off, in Mbps. Verbatim on the
+    /// wire (no codec discount - the user asked for this number).
+    var manualBitrateMbps: Int = 20 {
+        didSet {
+            UserDefaults.standard.set(manualBitrateMbps, forKey: "manualBitrateMbps")
+            persistQualitySettings()
+        }
+    }
+    /// HDR for every preset (the key keeps its Custom-era name so existing
+    /// installs carry their choice forward).
     var customHDR: Bool = true {
         didSet {
             UserDefaults.standard.set(customHDR, forKey: "customHDR")
-            if qualityPreset == .custom { persistQualitySettings() }
+            persistQualitySettings()
         }
     }
 
     // Defaults
-    var defaultLaunchApp: String = "Desktop" {
-        didSet { UserDefaults.standard.set(defaultLaunchApp, forKey: "defaultLaunchApp") }
-    }
     var muteMacWhileStreaming: Bool = false {
         didSet {
             UserDefaults.standard.set(muteMacWhileStreaming, forKey: "muteMacWhileStreaming")
@@ -290,12 +349,6 @@ final class AppModel {
     var autoPictureInPicture: Bool = true {
         didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
     }
-    /// While the stream is in Picture in Picture, the Mac pointer over the PiP
-    /// window is mirrored onto the host as an absolute position (and a plain
-    /// click on the picture goes through). Read when the PiP panel appears.
-    var pipPointerMirror: Bool = true {
-        didSet { UserDefaults.standard.set(pipPointerMirror, forKey: "pipPointerMirror") }
-    }
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
@@ -312,9 +365,10 @@ final class AppModel {
     var captureSysKeys: Bool = false {
         didSet { UserDefaults.standard.set(captureSysKeys, forKey: "captureSysKeys") }
     }
-    var streamCoversNotch: Bool = true {
-        didSet { UserDefaults.standard.set(streamCoversNotch, forKey: "streamCoversNotch") }
-    }
+    /// Full-screen streams always cover the whole panel, notch included, so a
+    /// panel-native stream renders 1:1. This was a switch; it is a constant now
+    /// because the answer was always yes - which is why it defaulted on.
+    let streamCoversNotch = true
     /// The Custom preset's "Show the stream in a window" choice: full screen
     /// (the default) or a normal titled window at Custom's own resolution,
     /// refresh, bitrate and HDR. Only in force under Custom (see
@@ -519,6 +573,11 @@ final class AppModel {
     /// force any view watching `currentDisplayDescription` to recompute.
     var displayInfoRevision: Int = 0
 
+    /// Settings is a page inside the main window (Tailscale's shape), not a
+    /// separate Settings scene - so which page is showing is app state.
+    var settingsTab: SettingsTab = .computers
+
+
     isolated deinit {
         for token in workspaceTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }
         // Drain NotificationCenter observer tokens we registered with the
@@ -536,16 +595,25 @@ final class AppModel {
     }
 
     init() {
-        // Every line below is a DIRECT property write inside the initializer, so
-        // the properties' `didSet`/`willSet` observers do NOT fire (Swift
-        // suppresses observers during init) - this logic stays in `init` for
-        // exactly that reason. The `?? <currentValue>` form keeps the property's
+        // Every line below is a direct property write inside the initializer.
+        // NOTE, and this is the trap: those writes DO run the properties'
+        // `willSet`/`didSet` bodies. Swift suppresses observers in an
+        // initializer only for genuinely STORED properties, and the
+        // `@Observable` macro has rewritten every one of these into a computed
+        // property backed by the observation registrar. `isRestoringDefaults`
+        // is what actually makes this block inert - see its declaration for the
+        // resolution-loss bug that ran here for real. The `?? <currentValue>` form keeps the property's
         // declared default whenever the persisted key is absent / out of range /
         // undecodable, which is identical to the prior inline `if let` /
         // `if x > 0` checks but without a branch per key (so the initializer
         // stays under the complexity bar). The persisted-key set is unchanged.
+        isRestoringDefaults = true
+        defer { isRestoringDefaults = false }
+        // The artwork store builds its own paired clients; hand it the same
+        // Host → ServerInfo bridge the stream path uses (authoritative cert
+        // pin included), rather than letting it reach into AppModel.
+        artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
         muteMacWhileStreaming = UserDefaults.standard.bool(forKey: "muteMacWhileStreaming")
-        defaultLaunchApp = UserDefaults.standard.string(forKey: "defaultLaunchApp") ?? defaultLaunchApp
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
@@ -554,9 +622,26 @@ final class AppModel {
         customWidth = min(max(Self.persistedPositiveInt("customWidth") ?? customWidth, 640), 7680)
         customHeight = min(max(Self.persistedPositiveInt("customHeight") ?? customHeight, 480), 4320)
         customFPS = min(max(Self.persistedPositiveInt("customFPS") ?? customFPS, 30), 240)
+        // Migration for installs from before the frame-rate picker applied to
+        // every preset: a Custom user keeps their typed Hz, everyone else keeps
+        // the panel's refresh - exactly what each was getting.
+        frameRateMatchesDisplay = Self.persistedBool("frameRateMatchesDisplay") ?? (qualityPreset != .custom)
+        bitrateAuto = Self.persistedBool("bitrateAuto") ?? bitrateAuto
+        manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
+            Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
+        // One-shot: HDR was hard-coded ON for the panel presets and only asked
+        // under Custom, so an install that turned it off under Custom and then
+        // went back to a panel preset was still being sent HDR. It applies
+        // everywhere now, which would silently DROP HDR for exactly those
+        // users - carry them forward on what they were actually seeing.
+        if !UserDefaults.standard.bool(forKey: "didWidenHDRToAllPresets") {
+            UserDefaults.standard.set(true, forKey: "didWidenHDRToAllPresets")
+            if qualityPreset != .custom, Self.persistedBool("customHDR") == false {
+                UserDefaults.standard.set(true, forKey: "customHDR")
+            }
+        }
         customHDR = Self.persistedBool("customHDR") ?? customHDR
         captureSysKeys = Self.persistedBool("captureSysKeys") ?? captureSysKeys
-        streamCoversNotch = Self.persistedBool("streamCoversNotch") ?? streamCoversNotch
         // Registered default (GlimmerApp) answers the absent-key case; an
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
@@ -583,7 +668,6 @@ final class AppModel {
         statsHotkey = Self.persistedDecoded("statsHotkey", HotkeyChord.self) ?? statsHotkey
         pipHotkey = Self.persistedDecoded("pipHotkey", HotkeyChord.self) ?? pipHotkey
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
-        pipPointerMirror = Self.persistedBool("pipPointerMirror") ?? pipPointerMirror
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 

@@ -33,13 +33,14 @@ struct StreamDisplayModeTests {
 
     // MARK: Which preset the choice applies to
 
-    @Test func windowOnlyAppliesUnderCustom() {
+    @Test func theChoiceAppliesUnderEveryPreset() {
         #expect(StreamDisplayMode.effective(chosen: .window, preset: .custom) == .window)
         #expect(StreamDisplayMode.effective(chosen: .fullScreen, preset: .custom) == .fullScreen)
-        // The panel-native presets are full screen by definition, whatever
-        // the persisted choice says - and the choice itself is left alone.
-        #expect(StreamDisplayMode.effective(chosen: .window, preset: .matchDisplay) == .fullScreen)
-        #expect(StreamDisplayMode.effective(chosen: .window, preset: .hidpi) == .fullScreen)
+        // shimmer: the preset only decides the size; a panel-native stream in
+        // a window just scales, so Window is honoured there too.
+        #expect(StreamDisplayMode.effective(chosen: .window, preset: .matchDisplay) == .window)
+        #expect(StreamDisplayMode.effective(chosen: .window, preset: .hidpi) == .window)
+        #expect(StreamDisplayMode.effective(chosen: .fullScreen, preset: .hidpi) == .fullScreen)
     }
 
     // MARK: Windowed refresh

@@ -1,12 +1,13 @@
 //
 //  SettingsGeneralStreamingPanes.swift
 //
-//  The General and Quality settings panes (+ their resolution/stats helpers),
-//  split out of SettingsView.swift. SettingsRoot composes them across files, so
-//  the pane types are internal. (Filename keeps the pane's pre-rename
-//  "Streaming" spelling - renaming the file means touching the pbxproj for
-//  zero behavioural gain.) `LoginItemManager`, the registration plumbing behind
-//  the General pane's launch toggles, lives in
+//  The App settings pane (login items, default action, the Wi-Fi helper) and
+//  the stats-overlay custom-rows picker the Video pane embeds. SettingsRoot
+//  composes panes across files, so the types are internal. (Filename keeps
+//  its pre-redesign name - renaming means touching the pbxproj for zero
+//  behavioural gain; the Stream / Video / Audio panes that replaced the old
+//  Quality pane live in their own files.) `LoginItemManager`, the registration
+//  plumbing behind the launch toggles, lives in
 //  SettingsGeneralStreamingPanes+LoginItem.swift.
 //
 
@@ -15,22 +16,24 @@ import os
 import ServiceManagement
 import SwiftUI
 
-// MARK: - General
+// MARK: - App
 
-struct GeneralPane: View {
+struct AppPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("launchMinimized") private var launchMinimized: Bool = false
 
-    /// True when macOS has the login item but it's pending the user's approval
-    /// in System Settings ▸ Login Items - surfaced inline so the user isn't left
-    /// with a toggle that silently does nothing at the next reboot.
+    /// True when macOS has the login item but it is pending the user's approval
+    /// in System Settings > Login Items - surfaced inline so the user is not
+    /// left with a toggle that silently does nothing at the next reboot.
     @State private var loginItemNeedsApproval = false
+
+    /// The privileged AWDL network helper (parks awdl0 during streams).
+    @ObservedObject private var awdl = AWDLHelperManager.shared
 
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
-    /// dismissed the Settings window. The @AppStorage write still happens
-    /// synchronously; only the side-effect hops to the next main-queue tick.
+    /// dismissed the window.
     private func scheduleLoginItemRegistration(launchAtLogin: Bool, minimized: Bool) {
         DispatchQueue.main.async {
             let status = LoginItemManager.apply(launchAtLogin: launchAtLogin, minimized: minimized)
@@ -38,424 +41,82 @@ struct GeneralPane: View {
         }
     }
 
-    /// Default-launch app options - host applist with "Desktop" pinned first.
-    private var launchAppOptions: [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for name in ["Desktop"] + (model.selectedHost?.apps.map(\.name) ?? [])
-        where seen.insert(name).inserted {
-            out.append(name)
-        }
-        let current = model.defaultLaunchApp
-        if !current.isEmpty, seen.insert(current).inserted {
-            out.append(current)
-        }
-        return out
-    }
-
-    /// Display label for a launch option: a stored app that isn't on the selected
-    /// host (set on another PC) is annotated so the picker doesn't imply it'll
-    /// launch here. Display-only - the tag stays the raw name, so scoping is unchanged.
-    private func launchOptionLabel(_ name: String) -> String {
-        guard name != "Desktop",
-              let host = model.selectedHost,
-              !host.apps.contains(where: { $0.name == name }) else { return name }
-        return "\(name) (not on \(host.displayName))"
-    }
-
-    var body: some View {
-        // @Bindable shim - surfaces $model.x bindings from an @Observable
-        // environment value (the macro replaces ObservableObject; @Environment
-        // alone exposes the value but not per-property Bindings).
-        @Bindable var model = model
-        Form {
-            Section {
-                // Outcome-first labels: what the user feels, with the
-                // tradeoff in the parenthetical. The mechanism (login items,
-                // SMAppService) stays in code comments and help text.
-                Toggle("Be ready at login (starts automatically with your Mac)", isOn: $launchAtLogin)
-                    .help("Registers Shimmer as a macOS login item.")
-                    .onChange(of: launchAtLogin) { _, on in
-                        scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
-                    }
-                Toggle("Stay hidden at login (menu bar only until you ask)", isOn: $launchMinimized)
-                    .onChange(of: launchMinimized) { _, on in
-                        scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
-                    }
-                    .disabled(!launchAtLogin)
-                Text("When on, Shimmer launches into the menu bar at login without showing the "
-                    + "main window. Toggle it off to have the launcher open at login like a normal "
-                    + "app. Manual launches via Spotlight, Finder, or the Dock always open the window.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if loginItemNeedsApproval {
-                    HStack(spacing: 8) {
-                        Label("macOS needs you to approve Shimmer in Login Items, "
-                            + "or it won't start at the next reboot.",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
-                        Spacer()
-                        Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
-                    }
-                }
-                Toggle("Mute this Mac while streaming", isOn: $model.muteMacWhileStreaming)
-                Text("Keeps game audio on the gaming PC's output only; this Mac stays silent "
-                    + "for the length of the stream.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Section("Default action") {
-                // Picker sourced from the selected host's announced app
-                // list (Sunshine's `applist`). "Desktop" is always
-                // present as a baseline; a stored choice missing from
-                // the host's live applist (host offline at config time)
-                // is preserved in the list so we don't silently lose it.
-                Picker("On connect, launch", selection: $model.defaultLaunchApp) {
-                    ForEach(launchAppOptions, id: \.self) { name in
-                        Text(launchOptionLabel(name)).tag(name)
-                    }
-                }
-                Text("Right-click the Stream button to pick a different app per connection.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .onAppear {
-            guard launchAtLogin else { loginItemNeedsApproval = false; return }
-            let service = launchMinimized
-                ? SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
-                : SMAppService.mainApp
-            loginItemNeedsApproval = (service.status == .requiresApproval)
-        }
-    }
-}
-
-// MARK: - Quality
-
-/// Resolution presets surfaced from the "common resolutions" menu next
-/// to the custom resolution fields. Curated rather than exhaustive -
-/// the user can still type any value they like; this is just a
-/// no-typo shortcut for the 95% case (1080p / 1440p / 2160p).
-enum CommonResolution: CaseIterable {
-    case hd720, hd1080, qhd1440, uhd4K
-
-    var width: Int {
-        switch self {
-        case .hd720: return 1280
-        case .hd1080: return 1920
-        case .qhd1440: return 2560
-        case .uhd4K: return 3840
-        }
-    }
-    var height: Int {
-        switch self {
-        case .hd720: return 720
-        case .hd1080: return 1080
-        case .qhd1440: return 1440
-        case .uhd4K: return 2160
-        }
-    }
-    var shortLabel: String {
-        switch self {
-        case .hd720: return "720p"
-        case .hd1080: return "1080p"
-        case .qhd1440: return "1440p"
-        case .uhd4K: return "2160p"
-        }
-    }
-}
-
-struct QualityPane: View {
-    @Environment(AppModel.self) private var model
-
-    /// The privileged AWDL network helper (parks awdl0 during streams). Shared
-    /// singleton so this toggle and the stream lifecycle drive one instance.
-    /// Lives in Quality because parking AirDrop's radio is a stream-smoothness
-    /// lever, not a general app setting.
-    @ObservedObject private var awdl = AWDLHelperManager.shared
-
-    /// Defer the helper register/unregister off the SwiftUI transaction - an
-    /// inline XPC-backed SMAppService call mid-update dismisses the Settings
-    /// window.
     private func scheduleHelperToggle(_ enable: Bool) {
         Task { @MainActor in
             if enable { AWDLHelperManager.shared.enable() } else { AWDLHelperManager.shared.disable() }
         }
     }
 
-    /// Width clamp: 640..7680 (480p min, 8K max). Matches Moonlight's
-    /// upstream bounds. Wired to .onChange so it runs on EVERY commit:
-    /// TextField(value:format:) writes the binding whenever editing ends -
-    /// focus loss included - and the old Return-only .onSubmit clamp let a
-    /// click-away commit feed raw values (0, 99999) straight into the
-    /// stream config, the bitrate guidance, and the session-receipt mode
-    /// keys. The binding still only commits on editing end (never per
-    /// keystroke), so the clamp can't fight a transient mid-edit value.
-    /// Bounds mirror the init()-time heal in AppModel.
-    private func clampCustomResolution() {
-        let width = StreamSizeBounds.clampWidth(model.customWidth)
-        if width != model.customWidth { model.customWidth = width }
-        let height = StreamSizeBounds.clampHeight(model.customHeight)
-        if height != model.customHeight { model.customHeight = height }
-    }
-    /// FPS clamp: 30..240. Sunshine + GFE both refuse anything outside
-    /// this band; clamping at the UI saves a confused stream-failure
-    /// trip. Same every-commit .onChange wiring as the resolution clamp.
-    private func clampCustomFPS() {
-        let fps = StreamSizeBounds.clampFPS(model.customFPS)
-        if fps != model.customFPS { model.customFPS = fps }
-    }
-
     var body: some View {
-        // @Bindable shim - surfaces $model.x bindings from an @Observable
-        // environment value (the macro replaces ObservableObject; @Environment
-        // alone exposes the value but not per-property Bindings).
         @Bindable var model = model
-        Form {
-            // Header is "Preset" now that the pane itself is named Quality -
-            // "Quality" twice in a row read as a stutter.
-            Section("Preset") {
-                Picker("", selection: $model.qualityPreset) {
-                    ForEach(QualityPreset.allCases) { preset in
-                        VStack(alignment: .leading) {
-                            Text(preset.displayName).fontWeight(.medium)
-                            Text(preset.subtitle).font(.footnote).foregroundStyle(.secondary)
-                        }
-                        .tag(preset)
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
+            SettingsField("General") {
+                Toggle("Be ready at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, on in
+                        scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
                     }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-                // Nothing else lives in this card: a switch or a picker under
-                // the radio rows read as extra preset rows (owner's screenshot).
-            }
-
-            // Notch coverage in its own compact card. DEFAULT ON: full-panel
-            // coverage is the product stance on notched MacBooks. Shown ONLY on
-            // a notched panel and only for a full-screen stream: elsewhere the
-            // toggle used to silently switch the fullscreen mechanism to a
-            // macOS Space (issue #84), so notchless Macs now always take the
-            // cover and never see the switch. Snapshotted at session start, so
-            // the next-stream caveat lives in the footer; the .help() carries
-            // the detail.
-            if model.currentDisplayHasNotch, model.effectiveDisplayMode == .fullScreen {
-                Section {
-                    Toggle("Fill the notch", isOn: $model.streamCoversNotch)
-                        .toggleStyle(.switch)
-                        .help("Covers the whole panel, camera notch included, so a panel-native stream renders 1:1. "
-                            + "Off keeps the picture below the notch by using a macOS full-screen space.")
-                } footer: {
-                    Text("A thin strip of the picture hides behind the notch. Off keeps it clear, "
-                        + "using a macOS full-screen space. Applies next stream.")
-                }
-            }
-
-            Section {
-                Toggle("Pop out to Picture in Picture when you switch away", isOn: $model.autoPictureInPicture)
-                    .toggleStyle(.switch)
-                    .help("Cmd-Tab away and the stream keeps playing in macOS's floating Picture in Picture window.")
-                Toggle("Mouse over the PiP window moves the host pointer", isOn: $model.pipPointerMirror)
-                    .toggleStyle(.switch)
-                    .help("The host's pointer follows yours across the picture while it's popped out, and a click on the picture clicks there. Dragging the window or its controls never reaches the host.")
-            } footer: {
-                Text("When you switch to another app, the stream keeps playing in a small floating window "
-                    + "you can drag to any corner - controllers keep working. Off just hides the stream "
-                    + "until you come back. \(model.pipHotkey.displayString) pops it out on demand either way.")
-            }
-
-            if model.qualityPreset == .custom {
-                // "Custom" alone: the section owns the window choice now, not
-                // just overrides of the preset numbers.
-                Section {
-                    // Window is a Custom thing - the panel-native presets are
-                    // full screen by definition - so the choice leads the
-                    // section, segmented (reads instantly; a two-value chevron
-                    // looked cheap next to the radio rows). Persisted as the
-                    // display mode; snapshotted at session start.
-                    Picker("Show the stream", selection: $model.streamDisplayMode) {
-                        ForEach(StreamDisplayMode.allCases) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
+                Toggle("Stay hidden at login (menu bar only)", isOn: $launchMinimized)
+                    .onChange(of: launchMinimized) { _, on in
+                        scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
                     }
-                    .pickerStyle(.segmented)
-                    .help("Window opens the stream as a normal window at the size below; drag it to any size.")
-                    HStack {
-                        Text("Resolution")
-                        Spacer()
-                        // Common resolutions shortcut - one tap fills both
-                        // fields with a standard pair. Saves the user from
-                        // typing 3840×2160 every time and prevents typos
-                        // that would land them at 384×216.
-                        Menu {
-                            ForEach(CommonResolution.allCases, id: \.self) { res in
-                                Button("\(res.width) × \(res.height) · \(res.shortLabel)") {
-                                    model.customWidth = res.width
-                                    model.customHeight = res.height
-                                }
-                            }
-                        } label: {
-                            Text("Presets")
-                        }
-                        .menuStyle(.button)
-                        .help("Common resolutions")
-                        .fixedSize()
-                        TextField("", value: $model.customWidth, format: .number)
-                            .frame(width: 70)
-                            .multilineTextAlignment(.trailing)
-                            .monospacedDigit()
-                            .onChange(of: model.customWidth) { _, _ in clampCustomResolution() }
-                        Text("×").foregroundStyle(.secondary)
-                        TextField("", value: $model.customHeight, format: .number)
-                            .frame(width: 70)
-                            .multilineTextAlignment(.trailing)
-                            .monospacedDigit()
-                            .onChange(of: model.customHeight) { _, _ in clampCustomResolution() }
-                    }
-                    HStack {
-                        Text("Refresh rate")
-                        Spacer()
-                        TextField("", value: $model.customFPS, format: .number)
-                            .frame(width: 60)
-                            .multilineTextAlignment(.trailing)
-                            .monospacedDigit()
-                            .onChange(of: model.customFPS) { _, _ in clampCustomFPS() }
-                        Text("Hz").foregroundStyle(.secondary)
-                    }
-                    // No bitrate row. Asking someone to pick a wire budget -
-                    // and then to decide whether we should pick it for them -
-                    // is two questions we can answer better ourselves from the
-                    // measured anchors (AppModel.measuredBitrateAnchors). The
-                    // resulting figure is in the next-stream summary below.
-                    Toggle("Brighter highlights, deeper color (needs HDR on host and display)",
-                           isOn: $model.customHDR)
-                        .help("HDR - sends a 10-bit high-dynamic-range stream when the host and this display both support it.")
-                    HStack {
-                        Text("Currently driving: \(model.currentDisplayDescription)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Use native resolution") {
-                            model.snapCustomToDisplay()
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                } header: {
-                    Text("Custom")
-                } footer: {
-                    // The one non-obvious thing about a window: the mouse
-                    // disappears into the game the moment it is over the
-                    // picture, so say up front how to get it back.
-                    if model.streamDisplayMode == .window {
-                        Text("The game takes your mouse while the pointer is over the window - "
-                            + "hold Esc or switch apps to get it back.")
+                    .disabled(!launchAtLogin)
+                if loginItemNeedsApproval {
+                    HStack(spacing: 8) {
+                        Label("macOS needs you to approve Shimmer in Login Items.",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12)).foregroundStyle(.orange)
+                        Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }
             }
 
-            Section {
-                Toggle("Watch the stream's health while you play (small overlay over the picture)",
-                       isOn: $model.showStreamStats)
-                // Footnote tracks the actual configured chord so it stays
-                // accurate if the user rebinds the hotkey in Shortcuts.
-                Text("Ping, frame rate, decode time. Press \(model.statsHotkey.displayString) "
-                    + "(configurable in Input) while streaming to toggle the overlay.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                // Overlay position lives here (not a right-click menu - the
-                // InputForwarder claims mouse events mid-stream). Position +
-                // preset + custom rows stay editable even when the overlay is
-                // off, so it's gating display, not configuration.
-                Picker("Overlay position", selection: $model.streamStatsCorner) {
-                    ForEach(StatsOverlayCorner.allCases, id: \.self) { corner in
-                        Text(corner.displayName).tag(corner)
-                    }
-                }
+            SettingsRule()
 
-                Picker("Overlay detail", selection: $model.statsOverlayPreset) {
-                    ForEach(StatsOverlayPreset.allCases, id: \.self) { preset in
-                        VStack(alignment: .leading) {
-                            Text(preset.displayName).fontWeight(.medium)
-                            Text(presetSubtitle(preset))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        .tag(preset)
-                    }
-                }
-                .pickerStyle(.inline)
-
-                if model.statsOverlayPreset == .custom {
-                    StatsCustomRowsPicker()
-                }
-
-                // Outcome-named: this is what the thresholds DO, not what
-                // they are. The editor inside still says warn/critical.
-                DisclosureGroup("When numbers turn yellow or red") {
-                    StatsThresholdsEditor()
-                }
-            }
-
-            Section("Wi-Fi") {
-                Toggle(isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) })) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Smooth out Wi-Fi stutter while streaming").fontWeight(.medium)
-                        Text("Parks AirDrop's radio (AWDL) for the length of a stream so it can't "
-                            + "grab the Wi-Fi channel and cause multi-second freezes. Restored the "
-                            + "instant you stop. Installs a small helper that needs a one-time approval.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .help("Holds awdl0 down for the duration of each stream via a privileged helper.")
+            SettingsField("Wi-Fi") {
+                Toggle("Smooth out Wi-Fi stutter while streaming",
+                       isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
                 if case .requiresApproval = awdl.state {
                     HStack(spacing: 8) {
-                        Label("macOS needs you to approve the Shimmer network helper in Login Items.",
+                        Label("macOS needs you to approve the Shimmer network helper.",
                               systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
-                        Spacer()
+                            .font(.system(size: 12)).foregroundStyle(.orange)
                         Button("Open Login Items") { awdl.openSystemSettings() }
                     }
                 }
                 if case .unavailable(let why) = awdl.state {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Network helper unavailable: \(why)", systemImage: "xmark.octagon")
-                            .font(.footnote).foregroundStyle(.red)
+                            .font(.system(size: 12)).foregroundStyle(.red)
                         if let url = awdl.recoveryDocURL {
                             Link("How to manage login items (Apple Support)", destination: url)
-                                .font(.footnote)
+                                .font(.system(size: 12))
                         }
                     }
                 }
             }
 
-            Section("Your next stream") {
-                Text(model.streamSpecSummary)
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
+            if model.showDiagnostics {
+                SettingsRule()
+                SettingsField("Diagnostics") {
+                    Toggle("Performance telemetry", isOn: $model.telemetryEnabled)
+                    DisclosureGroup("Controller input test") {
+                        ControllerInputTest().settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
+                    }
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
+                    DisclosureGroup("Logs") {
+                        LogViewer().frame(maxWidth: 560, alignment: .leading)
+                    }
+                    .frame(maxWidth: 560, alignment: .leading)
+                }
             }
-
-            // No Experiments section yet. Don't emit an empty `Section { } header: { Label("Experiments", systemImage: "flask") }` — SwiftUI's grouped Form renders the Section header even over an EmptyView body, leaving a dangling flask card. Add the Section back together with the first real dial.
         }
-        .formStyle(.grouped)
-        .onAppear { awdl.refresh() }
-    }
-
-    /// Per-preset hint string. Kept inline alongside the picker so the
-    /// preset definitions and their UI copy live in the same file -
-    /// translating into Localizable.strings later means moving both
-    /// together.
-    private func presetSubtitle(_ preset: StatsOverlayPreset) -> String {
-        // Counts derive from the row-set constants so the copy can't
-        // drift when a preset gains a row - the hardcoded "6 metrics"
-        // survived microRows growing to 7 with zero signal.
-        switch preset {
-        case .minimal:
-            return "\(StatsOverlayDefaults.minimalRows.count) metrics - render FPS, latency, bitrate"
-        case .micro:
-            return "\(StatsOverlayDefaults.microRows.count) metrics - framerate, network, bitrate"
-        case .extended: return "All stream metrics (not audio or Mac vitals)"
-        case .custom:   return "Pick rows individually below"
+        .onAppear {
+            awdl.refresh()
+            guard launchAtLogin else { loginItemNeedsApproval = false; return }
+            let service = launchMinimized
+                ? SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
+                : SMAppService.mainApp
+            loginItemNeedsApproval = (service.status == .requiresApproval)
         }
     }
 }

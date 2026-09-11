@@ -1,9 +1,8 @@
 //
 //  AppModel+Streaming+Config.swift
 //
-//  The derived, read-only half of AppModel+Streaming.swift: the spec-surface
-//  accessors (chips, summary, codec-aware bitrate), the state-aware hero verb,
-//  and the Host → engine bridge (`nativeStreamConfig` / `nativeServerInfo` and
+//  The derived, read-only half of AppModel+Streaming.swift: the codec-aware
+//  wire bitrate, the state-aware hero verb, and the Host → engine bridge (`nativeStreamConfig` / `nativeServerInfo` and
 //  the authoritative TLS-pin resolution behind it). Split out of
 //  AppModel+Streaming.swift to keep each file under the length limit; the
 //  session lifecycle - stream(), its teardown, engine events, connect cancel -
@@ -11,64 +10,38 @@
 //
 
 import Foundation
+import AppKit
 import os.log
 
 extension AppModel {
 
-    // MARK: - Spec UI accessors
-
-    // Codec (AV1/HEVC/H.264) is deliberately omitted from every user-facing
-    // surface: it's an implementation detail the user never chose, and the codec
-    // actually negotiated can differ from what's requested (Intel Macs drop AV1
-    // → HEVC), so showing it risks displaying a value that's simply wrong. Users
-    // care that it looks good, not which encoder produced it.
-    var streamSpecSummary: String {
-        let mbps = displayBitrateKbps / 1000
-        let hdrTag = effectiveHDR ? " · HDR" : ""
-        return "\(effectiveWidth) × \(effectiveHeight) · \(effectiveFPS) Hz\(hdrTag) · \(mbps) Mbps"
-    }
-
-    var streamSpecChips: [String] {
-        let mbps = displayBitrateKbps / 1000
-        var chips = [Self.resolutionLabel(width: effectiveWidth, height: effectiveHeight),
-                     "\(effectiveFPS) Hz"]
-        if effectiveHDR { chips.append("HDR") }
-        chips.append("\(mbps) Mbps")
-        return chips
-    }
-
-    /// Codec-aware bitrate the spec surfaces show: what the engine actually sends
-    /// for the selected host (AV1/HEVC spend ~20% fewer bits), so the chip/summary
-    /// match the wire. Falls back to the H.264 dial when no host is selected.
-    var displayBitrateKbps: Int {
-        _ = displayInfoRevision  // codec override writes UserDefaults; bump re-evaluates the chip
-        guard let host = selectedHost else { return effectiveBitrateKbps }
-        let formats = HostCodecPreference.load(for: host.id).apply(to: .probedSupported)
-        return wireBitrateKbps(forFormats: formats)
-    }
-
     /// The H.264-anchored quality dial (`effectiveBitrateKbps`) scaled by the
-    /// negotiated codec's efficiency. The spec UI and `nativeStreamConfig` both read
-    /// this so the shown bitrate can't drift from what's sent. Custom is verbatim.
+    /// negotiated codec's efficiency - AV1 and HEVC spend ~20% fewer bits for
+    /// the same picture, so the budget is discounted to match. Custom is
+    /// verbatim, and so is a bitrate the user set by hand: they asked for that
+    /// number.
     func wireBitrateKbps(forFormats formats: VideoFormats) -> Int {
         if case .custom = qualityPreset { return effectiveBitrateKbps }
+        if !bitrateAuto { return effectiveBitrateKbps }
         let mult = Self.codecBudgetMultiplier(for: formats)
         return max(5_000, Int((Double(effectiveBitrateKbps) * mult).rounded()))
     }
 
     // MARK: Streaming
 
+    /// The fallback target when nothing better is known. There is no "default
+    /// app" setting any more: the library shows a button per app, so picking
+    /// one in Settings as well was a second answer to a question the user
+    /// answers by clicking. Desktop is the one entry every host publishes.
     var defaultAppName: String {
-        if let host = selectedHost,
-           host.apps.contains(where: { $0.name == defaultLaunchApp }) {
-            return defaultLaunchApp
-        }
-        return "Desktop"
+        guard let host = selectedHost else { return "Desktop" }
+        if host.apps.contains(where: { $0.name == "Desktop" }) { return "Desktop" }
+        return host.apps.first?.name ?? "Desktop"
     }
 
     func streamDefaultApp() {
         guard let host = selectedHost else { return }
-        let app = host.apps.first(where: { $0.name == defaultAppName })
+        let app = host.apps.first(where: { $0.name == heroTargetAppName })
             ?? host.apps.first(where: { $0.name == "Desktop" })
             ?? host.apps.first
         if let app { requestStream(app: app, on: host) }
@@ -82,6 +55,22 @@ extension AppModel {
     /// so the name stamps at START - see the write in `stream(app:on:)`.
     static func lastPlayedAppKey(for hostId: String) -> String {
         "glimmer.lastPlayedApp.\(hostId)"
+    }
+
+    /// The app the HOST says is running right now, if the reading is fresh.
+    ///
+    /// Deliberately narrower than `resumableAppName`: no last-played fallback.
+    /// This drives the badge on the app tile, and a badge that claims a game is
+    /// running because it ran yesterday is a lie, whereas the hero button
+    /// falling back to "the thing you last played" is a reasonable guess.
+    var runningAppName: String? {
+        guard let host = selectedHost,
+              let live = hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
+              case .streamingApp(let name) = live.state,
+              host.apps.contains(where: { $0.name == name })
+        else { return nil }
+        return name
     }
 
     /// The app the hero button can meaningfully resume on the selected host.
@@ -140,7 +129,19 @@ extension AppModel {
         persistQualitySettings()
         var cfg = StreamConfig(width: effectiveWidth, height: effectiveHeight,
                                fps: effectiveFPS, bitrateKbps: effectiveBitrateKbps)
-        cfg.hdr = effectiveHDR
+        // HDR only when the display can actually show it. Asking for it on an
+        // SDR panel cannot improve anything and actively hurts: the host
+        // switches to 10-bit and advertises BT.2020, and that wide-gamut tag on
+        // Rec.709 content is what over-saturates the picture (see
+        // derivedColorSpaceKey). NSScreen reports 1.0 of EDR headroom on a
+        // panel with no HDR at all.
+        let displayCanShowHDR = (NSScreen.main?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1.0) > 1.0
+        cfg.hdr = effectiveHDR && displayCanShowHDR
+        if effectiveHDR && !displayCanShowHDR {
+            Diag.info("HDR requested but this display has no headroom (EDR 1.0) - streaming SDR", "Stream")
+        }
+        // Always the richest layout this Mac's default output can take.
+        cfg.audio = .bestForCurrentOutput()
         cfg.captureSysKeys = captureSysKeys
         // The notch choice only means something on a notched panel; elsewhere
         // the session always takes the borderless cover (see
@@ -148,7 +149,17 @@ extension AppModel {
         cfg.coversNotch = effectiveStreamCoversNotch
         cfg.displayMode = effectiveDisplayMode
         let codecPref = HostCodecPreference.load(for: host.id)
-        cfg.videoFormats = codecPref.apply(to: .probedSupported)
+        var formats = codecPref.apply(to: .probedSupported)
+        // Don't advertise 10-bit profiles when we're not asking for HDR. The
+        // host picks the best format we offer, so offering Main10 got us a
+        // 10-bit stream tagged BT.2020 for SDR content - the over-saturation
+        // fixed in derivedColorSpaceKey. Not offering it removes the mis-tag at
+        // the source instead of compensating for it, and 10-bit buys nothing
+        // on an SDR pipeline. moonlight-qt masks the same way.
+        if !cfg.hdr {
+            formats = formats.subtracting([.hevcMain10, .av1Main10])
+        }
+        cfg.videoFormats = formats
         // Codec-aware wire budget (see wireBitrateKbps): the H.264-anchored dial
         // scaled by the negotiated codec's efficiency. The spec chip reads the same
         // path so what's shown matches what's sent.

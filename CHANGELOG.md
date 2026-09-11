@@ -2,6 +2,139 @@
 
 ## Unreleased
 
+Settings is labels and controls only - every explanatory paragraph under a
+control is gone, and so is the Appearance picker: the app follows the system
+the way a Mac app should.
+
+The "Your next stream" summary row is gone.
+
+10-bit profiles are no longer advertised when HDR is off, so an SDR stream now
+arrives as 8-bit with native Rec.709 tags rather than 10-bit tagged BT.2020.
+
+Fix: colours were over-saturated on an SDR display - contrast and vibrancy
+visibly pushed. Asking for HDR makes Sunshine encode 10-bit and advertise
+BT.2020 primaries, but the desktop it captures is still Rec.709, so the stream
+arrived tagged BT.2020 with an SDR transfer and macOS gamut-mapped 709 content
+as if it were 2020. A BT.2020 tag with a non-PQ transfer while the host reports
+HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
+longer requested at all on a display with no headroom, since it cannot help
+there and this is exactly how it hurts.
+
+The Picture in Picture pause button no longer does anything. macOS draws that
+transport in its own process, so it cannot be removed, but a live game has
+nothing to pause - it only froze the picture and then jumped.
+
+Two pickers are gone. Audio channels are always the richest layout this Mac's
+default output can take, and there is no "default app" setting: the library
+shows a button per app, so the menu-bar item, the launch after pairing, and
+wake-then-resume all target whatever you last played on that PC (or whatever
+the PC reports running right now), falling back to Desktop.
+
+Three switches became behaviour: raw mouse motion while streaming, the mouse
+over the Picture in Picture window moving the host pointer, and covering the
+notch in full screen. All three defaulted on, turning them off made things
+worse, and none of them earned a row in Settings.
+
+A PC's apps lead its page, as buttons with a native symbol: a Mac for either
+desktop, and Steam's own mark for Steam. The PC's
+name isn't repeated above them - the row selected in the list already says
+which machine you're looking at.
+
+Each PC's page is a field list - Address, Status (with a live dot), Last
+played - and its apps are plain macOS buttons with a system symbol, the way a
+Mac app states facts and offers actions. The round badge above the name is
+gone, the window background is opaque rather than a material that picked up
+the desktop behind it, and the tab strip greys out when the window isn't
+frontmost like every other piece of macOS chrome.
+
+App tiles are macOS icons, not cover cards. Each app gets an SF Symbol chosen
+from its name on a rounded-square plate tinted by a hue derived from that name
+- the way real app icons are told apart. Hosts do serve box art, but
+Sunshine's stock art is a generic plate with DESKTOP or STEAM printed on it,
+which reads as a cheap card; the artwork is still there behind Settings >
+"Show cover art from the PC" for a library that has real covers.
+
+The window is a fixed 600pt wide and cannot be dragged, and its height follows
+the tab - like the app it is modelled on.
+
+One window, three tabs - Computers, Settings, About - with the title centred
+above them. Computers mirrors the reference app's account tab: a 200pt list of
+PCs with a round glyph, a status dot and the address under the name, a
+full-height divider, and a bottom bar carrying "Add PC…" and "Remove PC…";
+the detail column leads with a centred badge, the PC's name and its address
+before the covers. The PC list and its cover grid are the Computers tab (a sidebar, a
+grid and an "Add PC…" button on the bottom edge); every setting is one
+scrolling page under Settings. The metrics are copied from Tailscale's own
+Settings window, measured off a screen capture of it: the label gutter, the
+18pt checkboxes, the note indent and wrap, the row rhythm, the tab strip and
+the accent-tinted selected tab.
+
+Settings live in the main window now, not a separate Settings window. A row of
+icon tabs across the top - Stream, Video, Audio, Input, PCs, App, About -
+switches pages, and every page is flat rows: the label right-aligned in a
+gutter, its controls beside it, the explanation underneath in grey. No
+sidebar, no stacked rounded cards. The shape is Tailscale's Settings window.
+⌘, still opens it; Esc or Done goes back to the library. The app's accent
+colour is the standard blue rather than glimmer's purple.
+
+The launcher is a library. PCs live in a sidebar, the selected PC's apps fill
+the window as a grid of cover art, and the toolbar carries the PC's name and
+address, add-PC, Settings, and a search field. Click a cover to stream it.
+The window resizes, so a bigger window shows more games.
+
+This replaces the fixed-size hero card - one PC, its name in 34pt, a row of
+small tiles and a Stream button - which could not grow and put the PC, rather
+than the games, at the centre of the screen. The shape is
+moonlight-macos-enhanced's, which is Moonlight's.
+
+Settings are legible again. The window was translucent (`.thinMaterial`) with
+the form's own background hidden, so whatever sat behind it showed through the
+CONTENT - park Settings over the launcher's purple card and every row became a
+low-contrast lavender smear. The content is opaque now, like System Settings;
+the sidebar keeps the translucency that is actually meant to be translucent.
+
+Settings > App > Appearance pins the app to Light or Dark instead of always
+following the system.
+
+The launcher shows your PC's real cover art. Each app tile is now the artwork
+the host serves for that app (`/appasset` — the same box art Moonlight shows,
+600×800), fetched once over the existing paired mutual-TLS connection and
+cached on disk under `~/Library/Caches/Shimmer/BoxArt`. Apps the host has no
+art for keep the old symbol treatment. Tiles are larger to suit, so the
+launcher window is a little taller. The app your PC is running right now wears
+a badge on its tile, and hovering a cover brings it forward.
+
+Settings are reorganised into Stream, Video, Audio, Input, PCs, App,
+Diagnostics, and About - the layout moonlight-macos-enhanced uses, on top of
+glimmer's preset model.
+
+The Stream pane now asks the three questions directly. **Resolution** is one
+picker: Match display (with the panel's pixel size in the label), HiDPI, the
+standard 720p / 1080p / 1440p / 4K sizes, or Custom with typed numbers - and
+the choice is kept until you change it, so a 1080p pick no longer reads as
+"went back to native" after a relaunch. **Frame rate** is its own picker
+(Match display, 30-240 Hz, or a typed value) and applies under every
+resolution, not only Custom. **Bitrate** is back: an always-visible stepped
+slider (5-300 Mbps) with a "Set automatically" switch; automatic keeps
+glimmer's derived recommendation (the slider rests on it, so turning it off
+starts from a sensible value), and a manual number goes to the host verbatim.
+HDR and the Full screen / Window choice apply under every resolution too. The
+Video pane holds the per-PC codec (the same setting as the launcher's
+right-click menu), HDR, and the stats overlay; Audio holds the channel layout
+(follow this Mac's output, or force stereo / 5.1 / 7.1) and the mute switch;
+App holds login items, the default action, and the Wi-Fi helper.
+
+While the stream is popped out, the Mac pointer over the Picture in Picture
+window now drives the host pointer 1:1 (a plain click on the picture clicks
+there; dragging the window or its controls never reaches the host). Settings ›
+Stream › Picture in Picture, on by default.
+
+Fix: in Window mode the Picture in Picture picture came up letterboxed inside
+the panel; the mirror source is now sized by its content rect, and the
+window's aspect lock, minimum size, and frame autosave are suspended while it
+serves as the source (so the tiny PiP-sized frame is never saved as your
+window).
+
 The app is now Shimmer. It installs as `Shimmer.app`, identifies itself as
 `com.kevinbpatel.shimmer` (login helper `com.kevinbpatel.shimmer.LoginHelper`),
 and keeps its data under `Application Support/Shimmer` and `Logs/Shimmer`. An
@@ -21,7 +154,7 @@ shows and stays filled as you resize PiP. Verified against a live stream.
 
 Pop the stream out into macOS's Picture in Picture window.
 
-Press ⌃⌥P during a stream (rebindable in Settings › Shortcuts) and the game
+Press ⌃⌥P during a stream (rebindable in Settings › Input) and the game
 moves into the same floating, corner-snapping window macOS gives movies — on
 top of your other apps while you work. It's fed by the very layer the
 fullscreen window paints into, so there's no second decode path and no extra

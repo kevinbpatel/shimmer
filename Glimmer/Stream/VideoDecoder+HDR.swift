@@ -268,6 +268,25 @@ extension VideoDecoder {
                 if transfer == (kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ as String) {
                     return "itur_2100_PQ"
                 }
+                // BT.2020 PRIMARIES with an SDR transfer, while the host says
+                // HDR is off, is a MIS-TAG, not a wide-gamut SDR stream.
+                // Sunshine advertises BT.2020 whenever it encodes Main10 - which
+                // it does the moment a client asks for HDR - but the desktop it
+                // is capturing is still Rec.709. Honouring the 2020 tag makes
+                // CoreVideo gamut-map 709 content as if it were 2020, which
+                // stretches every colour: the reported "contrast and vibrancy
+                // raised" look. Confirmed on a live stream: primaries=ITU_R_2020,
+                // transfer=ITU_R_709_2, hostHDR=false. moonlight-qt never hits
+                // this because it does the YUV matrix itself and hands the
+                // display untagged RGB, so nothing gamut-maps.
+                //
+                // A genuine BT.2020 SDR source would be mis-rendered by this,
+                // but no GameStream host produces one; a real wide-gamut stream
+                // arrives as PQ or HLG and is caught above.
+                if transfer == (kCVImageBufferTransferFunction_ITU_R_709_2 as String)
+                    || transfer.isEmpty {
+                    return "itur_709"
+                }
                 return "itur_2020"
             }
             // BT.709
@@ -283,8 +302,11 @@ extension VideoDecoder {
         // = 0) AND host hasn't engaged HDR. Use the negotiated stream format as
         // the last source of truth - same moonlight-qt fallback for
         // AVCOL_SPC_UNSPECIFIED + HDR off.
+        // Untagged 10-bit with the host in SDR: same reasoning as above - the
+        // stream is only 10-bit because HDR was requested, not because the
+        // content is wide-gamut.
         if is10Bit {
-            return "itur_2020"
+            return "itur_709"
         }
         // 8-bit untagged → Sunshine defaults to BT.709, prefer that.
         return "itur_709"
