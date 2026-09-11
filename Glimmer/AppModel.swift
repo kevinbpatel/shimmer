@@ -17,8 +17,6 @@
 
 import Foundation
 import AppKit
-import AudioToolbox
-import CoreAudio
 import GameController
 import SwiftUI
 import Observation
@@ -172,15 +170,6 @@ final class AppModel {
         didSet {
             UserDefaults.standard.set(customHDR, forKey: "customHDR")
             persistQualitySettings()
-        }
-    }
-
-    // Defaults
-    var muteMacWhileStreaming: Bool = false {
-        didSet {
-            UserDefaults.standard.set(muteMacWhileStreaming, forKey: "muteMacWhileStreaming")
-            // Mid-stream flips act immediately - doc on applyMutePreferenceMidStream().
-            applyMutePreferenceMidStream()
         }
     }
 
@@ -613,7 +602,6 @@ final class AppModel {
         // Host → ServerInfo bridge the stream path uses (authoritative cert
         // pin included), rather than letting it reach into AppModel.
         artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
-        muteMacWhileStreaming = UserDefaults.standard.bool(forKey: "muteMacWhileStreaming")
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
@@ -673,8 +661,4 @@ final class AppModel {
 
     // MARK: Mute/restore Mac audio
 
-    /// Pre-mute capture of the system output level. Non-nil doubles as the
-    /// did-mute LATCH: the stream-end restore keys off THIS, never the live
-    /// toggle - see AppModel+Audio.swift for the full contract.
-    @ObservationIgnored var prePausedMacVolume: Float?
 }

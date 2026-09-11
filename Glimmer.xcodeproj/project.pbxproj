@@ -23,7 +23,6 @@
 		A10000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000014 /* Assets.xcassets */; };
 		A10000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* SettingsView.swift */; };
 		A1C0DE921000000000000000 /* SettingsChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE922000000000000000 /* SettingsChrome.swift */; };
-		A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE832000000000000000 /* SettingsAudioPane.swift */; };
 		A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE822000000000000000 /* SettingsVideoPane.swift */; };
 		A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE812000000000000000 /* SettingsStreamPane.swift */; };
 		A1000009A /* PairSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000009B /* PairSheet.swift */; };
@@ -35,7 +34,6 @@
 		A100012A /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100012B /* LogStore.swift */; };
 		A100013A /* ControllerInputTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100013B /* ControllerInputTestView.swift */; };
 		A100014A /* LogViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100014B /* LogViewerView.swift */; };
-		A100015A /* AppModel+Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100015B /* AppModel+Audio.swift */; };
 		A100016A /* ContentViewSubviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100016B /* ContentViewSubviews.swift */; };
 		DEC0DE01000000000000000A /* ContentView+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE01000000000000000B /* ContentView+Menus.swift */; };
 		DEC0DE04000000000000000A /* ContentView+StreamButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE04000000000000000B /* ContentView+StreamButton.swift */; };
@@ -335,7 +333,6 @@
 		A10000016 /* Glimmer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Glimmer.entitlements; sourceTree = "<group>"; };
 		A10000017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1C0DE922000000000000000 /* SettingsChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsChrome.swift"; sourceTree = "<group>"; };
-		A1C0DE832000000000000000 /* SettingsAudioPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsAudioPane.swift"; sourceTree = "<group>"; };
 		A1C0DE822000000000000000 /* SettingsVideoPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsVideoPane.swift"; sourceTree = "<group>"; };
 		A1C0DE812000000000000000 /* SettingsStreamPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStreamPane.swift"; sourceTree = "<group>"; };
 		A1000009B /* PairSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairSheet.swift; sourceTree = "<group>"; };
@@ -347,7 +344,6 @@
 		A100012B /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogStore.swift; sourceTree = "<group>"; };
 		A100013B /* ControllerInputTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerInputTestView.swift; sourceTree = "<group>"; };
 		A100014B /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerView.swift; sourceTree = "<group>"; };
-		A100015B /* AppModel+Audio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Audio.swift"; sourceTree = "<group>"; };
 		A100016B /* ContentViewSubviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewSubviews.swift; sourceTree = "<group>"; };
 		DEC0DE01000000000000000B /* ContentView+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Menus.swift"; sourceTree = "<group>"; };
 		DEC0DE04000000000000000B /* ContentView+StreamButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+StreamButton.swift"; sourceTree = "<group>"; };
@@ -676,7 +672,6 @@
 				A1C0DE912000000000000000 /* LibraryWindow.swift */,
 				A10000017 /* SettingsView.swift */,
 				A1C0DE922000000000000000 /* SettingsChrome.swift */,
-				A1C0DE832000000000000000 /* SettingsAudioPane.swift */,
 				A1C0DE822000000000000000 /* SettingsVideoPane.swift */,
 				A1C0DE812000000000000000 /* SettingsStreamPane.swift */,
 				A1000009B /* PairSheet.swift */,
@@ -687,7 +682,6 @@
 				A100012B /* LogStore.swift */,
 				A100013B /* ControllerInputTestView.swift */,
 				A100014B /* LogViewerView.swift */,
-				A100015B /* AppModel+Audio.swift */,
 				A100016B /* ContentViewSubviews.swift */,
 				DEC0DE01000000000000000B /* ContentView+Menus.swift */,
 				DEC0DE04000000000000000B /* ContentView+StreamButton.swift */,
@@ -1093,7 +1087,6 @@
 				A1C0DE911000000000000000 /* LibraryWindow.swift in Sources */,
 				A10000005 /* SettingsView.swift in Sources */,
 				A1C0DE921000000000000000 /* SettingsChrome.swift in Sources */,
-				A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */,
 				A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */,
 				A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */,
 				A1000009A /* PairSheet.swift in Sources */,
@@ -1104,7 +1097,6 @@
 				A100012A /* LogStore.swift in Sources */,
 				A100013A /* ControllerInputTestView.swift in Sources */,
 				A100014A /* LogViewerView.swift in Sources */,
-				A100015A /* AppModel+Audio.swift in Sources */,
 				A100016A /* ContentViewSubviews.swift in Sources */,
 				DEC0DE01000000000000000A /* ContentView+Menus.swift in Sources */,
 				DEC0DE04000000000000000A /* ContentView+StreamButton.swift in Sources */,

@@ -6,8 +6,6 @@
 
 import Foundation
 import AppKit
-import AudioToolbox
-import CoreAudio
 import GameController
 import SwiftUI
 import Observation
@@ -15,24 +13,6 @@ import ServiceManagement
 import os.log
 
 extension AppModel {
-
-    // MARK: Stream lifecycle hooks
-
-    func beforeStreamStart() {
-        if muteMacWhileStreaming { muteMac() }
-    }
-
-    func afterStreamEnd() {
-        // Keyed off the did-mute latch inside restoreMac() (prePausedMacVolume
-        // non-nil), NOT the live muteMacWhileStreaming flag: the toggle can be
-        // flipped OFF mid-stream, and the old flag-gated restore then left the
-        // Mac stuck at volume 0 - with the saved level destroyed by the next
-        // muted stream's re-capture of that 0. Unconditional restore keeps
-        // teardown symmetric with whatever beforeStreamStart() / the live
-        // toggle (applyMutePreferenceMidStream) actually did, and is a no-op
-        // when nothing was muted.
-        restoreMac()
-    }
 
     /// String-typed read shim for UI code that hasn't migrated to
     /// switching on `pairingPhase`. Existing `.contains("✓")` checks keep

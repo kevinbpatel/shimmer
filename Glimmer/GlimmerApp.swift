@@ -95,7 +95,6 @@ struct GlimmerApp: App {
             // (it needs Input Monitoring), the auto-offer hasn't been answered,
             // and the Diagnostics pane and its telemetry stay hidden until a
             // power user reveals them from About.
-            "muteMacWhileStreaming": false,
             "rawHIDControllerEnabled": false,
             "rawHIDPromptAnswered": false,
             "showDiagnostics": false,

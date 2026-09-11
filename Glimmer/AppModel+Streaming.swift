@@ -102,10 +102,6 @@ extension AppModel {
         hostStatusTask?.cancel()
         hostStatusTask = nil
 
-        // Synchronous (not a Task): a fire-and-forget restore from the prior session
-        // could otherwise land after this mute and un-mute the new stream.
-        beforeStreamStart()
-
         var cfg = nativeStreamConfig(for: host)
         cfg.windowTitle = Self.streamWindowTitle(hostName: host.displayName, appName: app.name)
         // One line naming how the stream will be shown and what was asked for,
@@ -317,7 +313,6 @@ extension AppModel {
         }) {
             main.makeKeyAndOrderFront(nil)
         }
-        afterStreamEnd()
     }
 
     /// Map a start()-throw error to an honest user-facing banner. The
