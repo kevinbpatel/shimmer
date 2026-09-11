@@ -189,19 +189,20 @@ struct GlimmerApp: App {
             if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
                 Image(systemName: symbol)
             } else if let battery = model.menuBarControllerBattery {
-                // An HStack, NOT a `Label`: MenuBarExtra renders its label view
-                // into the status item and a Label arrives icon-only there - the
-                // title is silently dropped (measured, 2026-09-11: the same view
-                // as a Label drew the glyph and no percentage). Spelling out the
-                // Image + Text is what actually puts the number in the menu bar.
                 // The pad AND its charge, as one baked image - the status item
                 // button has a single image slot, so this cannot be composed
-                // here. See MenuBarBatteryGlyph for what was probed. A bar reads
-                // without being parsed and is the shape every other battery on
-                // this Mac uses; the exact percentage stays in the dropdown.
+                // here. See MenuBarBatteryGlyph for everything that was probed.
+                //
+                // The battery is drawn in STEAM's style, not Apple's, and
+                // upright: an Apple-shaped battery sitting a few points from the
+                // Mac's own menu-bar battery reads as a second system battery.
+                // Short, square-cornered and vertical is unmistakably a
+                // different object. The exact percentage stays in the dropdown.
                 //
                 // Only a PlayStation pad has this art. Anything else keeps the
-                // generic controller symbol and the number.
+                // generic controller symbol and the number - and that fallback
+                // is an HStack of a bare Image and a bare Text on purpose: those
+                // are the button's two slots, and a `Label` would drop its title.
                 if model.menuBarControllerGlyph == .playStation {
                     Image(MenuBarBatteryGlyph.assetName(
                         forPercent: battery.percent, charging: battery.charging))

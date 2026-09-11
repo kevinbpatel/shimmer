@@ -1,6 +1,6 @@
 #!/usr/bin/swift
 // Generates Assets.xcassets/ControllerBattery*.imageset - the menu-bar mark
-// showing the pad AND its charge, the way Steam's Big Picture bar does.
+// showing the pad AND its charge, in the style Steam's Big Picture bar uses.
 //
 // WHY THESE ARE ASSETS AND NOT TWO VIEWS. `MenuBarExtra(.menu)`'s label is
 // rendered into an NSStatusItem button, which has exactly ONE image and one
@@ -9,16 +9,29 @@
 // all, with or without .renderingMode/.resizable; and attaching an `.overlay`
 // to an Image makes even the Image disappear. So a pad beside a battery cannot
 // be composed at runtime - it has to arrive as a single image, which is what
-// this bakes.
+// this bakes. The upside is that the fill can be continuous rather than
+// quantised to the five levels SF Symbols ships.
 //
-// The battery is drawn here rather than taken from SF Symbols for two reasons:
-// the `battery.*` family is five fixed levels and we want the eleven the pad
-// actually reports, and rasterising an Apple symbol into a shipped asset to
-// draw inside it is a modification of SF Symbols art that its license does not
-// invite. A battery outline is a rounded rectangle with a nub - a universal
-// idiom, not Apple's drawing - so it's ours. The PROPORTIONS are matched to
-// Apple's, measured by diffing `battery.0` against `battery.100` at 256pt: the
-// fill occupies x 0.1517, y 0.2524, w 0.6000, h 0.4903 of the symbol's box.
+// THE BATTERY IS STEAM'S, NOT APPLE'S, AND THAT IS THE POINT. An Apple-shaped
+// battery sitting a few points from the Mac's OWN menu-bar battery reads as a
+// second system battery - the two are the same object at a glance. Steam's is a
+// different drawing entirely: short and fat where Apple's is long and thin
+// (body 22.29 x 16, aspect 1.39, against Apple's 2.18), a thick border, and
+// every corner SQUARE where Apple's is heavily rounded.
+//
+// Measured off Steam's own icon on a Linux install
+// (~/.local/share/Steam/steamui, chunk~2dcc5aaf7.js, viewBox 0 0 24 24):
+//     body   0,4      -> 22.2857,20     inner 1.714,6 -> 20.571,18
+//     nub    22.2857,9.333 -> 24,14.667
+//     fill   3.43,8   -> 18.86,16
+// Only the PROPORTIONS are taken - the drawing here is ours. Valve's client art
+// ships under no redistribution grant, and a rectangle with a nub is a universal
+// idiom rather than anyone's authorship.
+//
+// TURNED VERTICAL. Steam draws this horizontally; upright is the one change,
+// and it is what makes the mark unmistakable next to the system battery while
+// keeping everything that makes it look like Steam's. It is also narrower,
+// which is worth real estate on a notched display.
 //
 // Usage: swift scripts/generate-controller-battery.swift
 
@@ -34,22 +47,30 @@ let assetRoot = URL(fileURLWithPath: "Glimmer/Assets.xcassets")
 /// would throw away something real.
 let levels = Array(stride(from: 0, through: 100, by: 10))
 
-// Layout, in points. The whole mark is 44 x 14: pad, a gap, then the battery.
+// Layout, in points.
 let markHeight: CGFloat = 14
 let padWidth: CGFloat = 20
-let gap: CGFloat = 4
-let batteryWidth: CGFloat = 20
-let markWidth = padWidth + gap + batteryWidth
+let gap: CGFloat = 3
+/// The battery body's SHORT side (its width, upright). Everything else is
+/// derived from Steam's ratios below, so this is the only size knob.
+let batteryShortSide: CGFloat = 9
 
-// Battery geometry as fractions of its own box, from Apple's (see header).
-let bodyWidthFraction: CGFloat = 0.86      // body, before the nub
-let strokeFraction: CGFloat = 0.085        // of the battery box height
-let fillInsetFraction: CGFloat = 0.175     // of the box height, inside the body
-let nubHeightFraction: CGFloat = 0.34
+// Steam's ratios, normalised to the body's short side.
+let bodyLongRatio: CGFloat = 22.2857 / 16.0
+let borderRatio: CGFloat = 1.85 / 16.0
+let fillInsetRatio: CGFloat = 1.85 / 16.0
+let nubLongRatio: CGFloat = 1.7143 / 16.0
+let nubShortRatio: CGFloat = 5.3333 / 16.0
 
-/// macOS asset catalogs use 1x and 2x; 3x is an iOS scale and would be dead weight
-/// across 22 imagesets.
+/// macOS asset catalogs use 1x and 2x; 3x is an iOS scale and would be dead
+/// weight across 22 imagesets.
 let scales = [1, 2]
+
+let bodyLength = batteryShortSide * bodyLongRatio
+let nubLength = batteryShortSide * nubLongRatio
+let batteryWidth = batteryShortSide
+let batteryHeight = bodyLength + nubLength
+let markWidth = padWidth + gap + batteryWidth
 
 // MARK: - Pad artwork
 
@@ -71,9 +92,9 @@ func renderSVG(_ image: NSImage, size: CGSize, _ transform: (CGContext) -> Void)
     return ctx.makeImage()
 }
 
-/// Tight box around the non-transparent pixels, in the image's own coordinates
-/// (origin bottom-left). The Kenney SVG is 64x64 with no viewBox and the art
-/// fills only the middle, so this is measured rather than assumed.
+/// Tight box around the non-transparent pixels (origin bottom-left). The Kenney
+/// SVG is 64x64 with no viewBox and the art fills only the middle, so this is
+/// measured rather than assumed - an asset update re-trims itself.
 func alphaBoundingBox(_ image: CGImage) -> CGRect? {
     let width = image.width, height = image.height
     var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -109,55 +130,64 @@ let padArt = CGRect(x: box.minX / measureScale, y: box.minY / measureScale,
 print(String(format: "pad art: x %.2f-%.2f y %.2f-%.2f of the 64x64 source",
              padArt.minX, padArt.maxX, padArt.minY, padArt.maxY))
 
-// MARK: - The mark
+// MARK: - The battery
 
-func drawBattery(in ctx: CGContext, box: CGRect, level: Double, charging: Bool) {
-    let stroke = box.height * strokeFraction
-    let nubWidth = box.width * 0.06
-    let body = CGRect(x: box.minX + stroke / 2, y: box.minY + stroke / 2,
-                      width: box.width * bodyWidthFraction - stroke,
-                      height: box.height - stroke)
-    let radius = body.height * 0.32
-    ctx.setLineWidth(stroke)
-    ctx.setStrokeColor(NSColor.black.cgColor)
-    ctx.addPath(CGPath(roundedRect: body, cornerWidth: radius, cornerHeight: radius, transform: nil))
-    ctx.strokePath()
+/// A lightning bolt in `rect`, the usual six-point zigzag.
+func boltPath(in rect: CGRect) -> CGPath {
+    let path = CGMutablePath()
+    func point(_ fx: CGFloat, _ fy: CGFloat) -> CGPoint {
+        CGPoint(x: rect.minX + rect.width * fx, y: rect.minY + rect.height * fy)
+    }
+    path.move(to: point(0.60, 1.0))
+    path.addLine(to: point(0.05, 0.44))
+    path.addLine(to: point(0.42, 0.44))
+    path.addLine(to: point(0.36, 0.0))
+    path.addLine(to: point(0.95, 0.58))
+    path.addLine(to: point(0.58, 0.58))
+    path.closeSubpath()
+    return path
+}
 
-    // The positive terminal.
-    let nub = CGRect(x: body.maxX + stroke * 0.9, y: box.midY - box.height * nubHeightFraction / 2,
-                     width: nubWidth, height: box.height * nubHeightFraction)
+func drawBattery(in ctx: CGContext, at origin: CGPoint, level: Double, charging: Bool) {
+    let border = batteryShortSide * borderRatio
+    let inset = batteryShortSide * fillInsetRatio
+    let body = CGRect(x: origin.x, y: origin.y, width: batteryShortSide, height: bodyLength)
+
+    // Square corners throughout - this is the whole reason it doesn't read as
+    // the system battery. Border drawn as filled-outer minus cleared-inner.
     ctx.setFillColor(NSColor.black.cgColor)
-    ctx.addPath(CGPath(roundedRect: nub, cornerWidth: nubWidth * 0.45,
-                       cornerHeight: nubWidth * 0.45, transform: nil))
-    ctx.fillPath()
+    ctx.fill(body)
+    ctx.saveGState()
+    ctx.setBlendMode(.clear)
+    ctx.fill(body.insetBy(dx: border, dy: border))
+    ctx.restoreGState()
 
-    // The fill. Empty means EMPTY - a flat pad shows bare shell, the way every
-    // other battery on the system does. Above zero the bar has a floor so 10%
-    // still shows something, but the floor is kept small: at half the track
-    // height it swallowed 10% and 20% into the same sliver, which is exactly the
-    // end of the range where the steps have to be readable.
-    let inset = box.height * fillInsetFraction
-    let track = body.insetBy(dx: inset, dy: inset)
+    // Terminal, on top.
+    ctx.setFillColor(NSColor.black.cgColor)
+    ctx.fill(CGRect(x: body.midX - batteryShortSide * nubShortRatio / 2, y: body.maxY,
+                    width: batteryShortSide * nubShortRatio, height: nubLength))
+
+    // The charge, rising from the bottom. Empty means EMPTY - a flat pad shows
+    // bare shell, like every other battery. Above zero the bar has a floor so
+    // 10% still shows, kept small so 10% and 20% stay distinguishable; that is
+    // exactly the end of the range that has to be readable.
+    let track = body.insetBy(dx: border + inset, dy: border + inset)
     if level > 0 {
-        let barWidth = max(track.width * CGFloat(level), track.height * 0.25)
-        let bar = CGRect(x: track.minX, y: track.minY, width: barWidth, height: track.height)
-        let barRadius = bar.height * 0.3
-        ctx.addPath(CGPath(roundedRect: bar, cornerWidth: barRadius,
-                           cornerHeight: barRadius, transform: nil))
-        ctx.fillPath()
+        let height = max(track.height * CGFloat(level), track.width * 0.22)
+        ctx.fill(CGRect(x: track.minX, y: track.minY, width: track.width, height: height))
     }
 
     guard charging else { return }
-    // A bolt knocked out of the bar alone vanishes wherever the bar isn't, so
-    // punch an oversized bolt-shaped hole and set a solid bolt inside it. That
-    // gives the bolt its own gap and it reads over fill, over empty, and across
-    // the boundary between them.
-    let bolt = boltPath(centredIn: CGRect(x: track.midX - track.height * 0.42,
-                                          y: track.midY - track.height * 0.62,
-                                          width: track.height * 0.84, height: track.height * 1.24))
+    // A bolt knocked out of the bar alone vanishes wherever the bar isn't and
+    // reads as damage at a low level. Punch an oversized bolt-shaped hole, then
+    // set a solid bolt inside it: it then reads over fill, over empty, and
+    // across the boundary between them.
+    let boltBox = CGRect(x: body.midX - body.width * 0.21, y: body.midY - bodyLength * 0.26,
+                         width: body.width * 0.42, height: bodyLength * 0.52)
+    let bolt = boltPath(in: boltBox)
     ctx.saveGState()
     ctx.setBlendMode(.clear)
-    ctx.addPath(bolt.copy(strokingWithWidth: stroke * 1.6, lineCap: .round,
+    ctx.addPath(bolt.copy(strokingWithWidth: border * 1.25, lineCap: .round,
                           lineJoin: .round, miterLimit: 10))
     ctx.fillPath()
     ctx.restoreGState()
@@ -166,33 +196,17 @@ func drawBattery(in ctx: CGContext, box: CGRect, level: Double, charging: Bool) 
     ctx.fillPath()
 }
 
-/// A lightning bolt in `rect`, as the usual six-point zigzag.
-func boltPath(centredIn rect: CGRect) -> CGPath {
-    let path = CGMutablePath()
-    func point(_ fx: CGFloat, _ fy: CGFloat) -> CGPoint {
-        CGPoint(x: rect.minX + rect.width * fx, y: rect.minY + rect.height * fy)
-    }
-    path.move(to: point(0.62, 1.0))
-    path.addLine(to: point(0.08, 0.46))
-    path.addLine(to: point(0.44, 0.46))
-    path.addLine(to: point(0.34, 0.0))
-    path.addLine(to: point(0.92, 0.56))
-    path.addLine(to: point(0.56, 0.56))
-    path.closeSubpath()
-    return path
-}
-
 func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
-    let px = CGSize(width: markWidth * CGFloat(scale), height: markHeight * CGFloat(scale))
     guard let ctx = CGContext(
-        data: nil, width: Int(px.width.rounded()), height: Int(px.height.rounded()),
+        data: nil, width: Int((markWidth * CGFloat(scale)).rounded()),
+        height: Int((markHeight * CGFloat(scale)).rounded()),
         bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
     ctx.setAllowsAntialiasing(true)
     ctx.interpolationQuality = .high
     ctx.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
 
-    // Pad on the left, vertically centred, drawn from the trimmed SVG art.
+    // Pad on the left, vertically centred, from the trimmed SVG art.
     let padFit = min(padWidth / padArt.width, markHeight / padArt.height)
     let graphics = NSGraphicsContext(cgContext: ctx, flipped: false)
     NSGraphicsContext.saveGraphicsState()
@@ -213,26 +227,18 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     ctx.fill(CGRect(x: 0, y: 0, width: markWidth, height: markHeight))
     ctx.restoreGState()
 
-    // Battery on the right, slightly shorter than the pad so it reads as a
-    // companion rather than a second icon.
-    let batteryHeight = markHeight * 0.66
     drawBattery(in: ctx,
-                box: CGRect(x: padWidth + gap, y: (markHeight - batteryHeight) / 2,
-                            width: batteryWidth, height: batteryHeight),
+                at: CGPoint(x: padWidth + gap, y: (markHeight - batteryHeight) / 2),
                 level: level, charging: charging)
     return ctx.makeImage()
 }
 
 // MARK: - Emit
 
-func assetName(level: Int, charging: Bool) -> String {
-    "ControllerBattery\(level)\(charging ? "Charging" : "")"
-}
-
 var written = 0
 for level in levels {
     for charging in [false, true] {
-        let name = assetName(level: level, charging: charging)
+        let name = "ControllerBattery\(level)\(charging ? "Charging" : "")"
         let dir = assetRoot.appendingPathComponent("\(name).imageset")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var entries: [String] = []
@@ -268,4 +274,5 @@ for level in levels {
                             atomically: true, encoding: .utf8)
     }
 }
-print("wrote \(levels.count * 2) imagesets (\(written) PNGs) at \(Int(markWidth))x\(Int(markHeight))pt")
+print("wrote \(levels.count * 2) imagesets (\(written) PNGs) at "
+      + String(format: "%.0fx%.0fpt", markWidth, markHeight))
