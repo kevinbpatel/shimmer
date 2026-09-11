@@ -39,6 +39,15 @@ There is no PlayStation-controller SF Symbol to use instead - the system
 catalog has only `playstation.logo` (the PS letters mark, which Apple restricts
 to unmodified, referential use) and a generic `gamecontroller`.
 
+The way that mark is composed - the pad clipped to its left half with a
+quarter-turned battery laid over it - follows **Steam**'s Big Picture controller
+indicator, whose layout and battery proportions were read out of the Steam
+client's own stylesheet (`ControllerBatteryImgContainer` / `ControllerImg` /
+`ControllerBatteryIndicator`). Only those measurements were used: every pixel
+shimmer ships is drawn from the numbers, because Valve's client artwork carries
+no redistribution grant. Steam is a trademark of **Valve Corporation**, which
+has not endorsed shimmer.
+
 "DualSense" and the controller's design are trademarks / trade dress of **Sony
 Interactive Entertainment Inc.**, which CC0 does not and cannot waive. shimmer
 is not affiliated with or endorsed by Sony: the mark appears only while a
