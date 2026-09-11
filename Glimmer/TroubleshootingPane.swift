@@ -37,15 +37,21 @@ struct RawHIDControl: View {
 
     var body: some View {
         if model.rawHIDControllerEnabled {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label(working ? "On" : "On - waiting for permission",
-                          systemImage: working ? "checkmark.circle.fill" : "hourglass")
-                        .foregroundStyle(working ? .green : .secondary)
+                    // Icon AND text carry the state - never colour alone, so the
+                    // row still reads for a colourblind user and VoiceOver.
+                    Label {
+                        Text(working ? "On" : "Needs Input Monitoring")
+                    } icon: {
+                        Image(systemName: working
+                              ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(working ? Color.green : Color.orange)
+                    }
                     Spacer()
                     Button("Turn Off") { model.rawHIDControllerEnabled = false }
                 }
-                if !working { permissionCard }
+                if !working { permissionActions }
             }
             .onAppear { working = currentlyWorking }
             .onReceive(poll) { _ in working = currentlyWorking }
@@ -60,26 +66,38 @@ struct RawHIDControl: View {
         }
     }
 
-    /// Friendly "you're one toggle away" card. We don't try to programmatically
-    /// re-request (it silently no-ops once macOS has a stale/denied entry -
-    /// common with unsigned dev builds); we just hand the user straight to the
-    /// right System Settings pane.
-    private var permissionCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "gamecontroller")
-                .font(.title3).foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("One more step - turn on Input Monitoring").fontWeight(.medium)
-                Text("Flip **Shimmer** on under Input Monitoring, then **quit & reopen** "
-                    + "Shimmer - macOS only applies the change on relaunch.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Open Settings") { Self.registerAndOpen() }
-                .buttonStyle(.borderedProminent)
+    /// The two steps, as two buttons, in the order they have to happen.
+    ///
+    /// This replaced a tinted card with a gamecontroller glyph and a paragraph
+    /// of instructions. Two reasons. It was the only plate on a page of flat
+    /// gutter rows, so it read as something pasted in from a web page; and the
+    /// paragraph was telling the user to go and do a thing the app can just do
+    /// - macOS applies Input Monitoring only on relaunch, so "Quit & Reopen" is
+    /// a button, not a sentence. The button titles ARE the instructions, which
+    /// is why there is no explanatory text left here.
+    private var permissionActions: some View {
+        HStack(spacing: 8) {
+            Button("Open Input Monitoring…") { Self.registerAndOpen() }
+            Button("Quit & Reopen") { Self.relaunch() }
+                // Relaunching mid-session would drop the stream.
+                .disabled(model.isStreaming)
+                .help(model.isStreaming
+                      ? "Finish the current stream first"
+                      : "macOS applies Input Monitoring only when the app restarts")
         }
-        .padding(12)
-        .background(.tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    /// Start a fresh instance, then exit this one. `createsNewApplicationInstance`
+    /// is load-bearing: without it LaunchServices just reactivates the running
+    /// copy and nothing restarts.
+    @MainActor static func relaunch() {
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL, configuration: config
+        ) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
     }
 
     private func enable() {
