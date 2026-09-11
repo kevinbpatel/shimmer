@@ -15,7 +15,7 @@ struct MainWindow: View {
             if model.hosts.isEmpty {
                 EmptyPairingState()
             } else {
-                ConnectSurface()
+                LibraryWindow()
             }
         }
         // One-time proactive offer when a DualSense is connected (see
@@ -95,11 +95,13 @@ struct MainWindow: View {
             if model.hosts.isEmpty { model.refreshHostRoute() }
         }
         .toolbar {
-            // Single navigation pill merging the host dropdown with the
-            // Settings gear. With zero hosts paired the host menu has nothing
-            // to point at, so the pill collapses to a standalone gear button.
-            ToolbarItem(placement: .navigation) {
-                if model.hosts.isEmpty {
+            // ONLY the empty state needs a toolbar from here: once a PC is
+            // paired the library owns the whole bar (host name + address as the
+            // window title, add-PC, Settings, search). Leaving the old host
+            // pill mounted here put a second gear and a redundant host dropdown
+            // next to the library's own.
+            if model.hosts.isEmpty {
+                ToolbarItem(placement: .navigation) {
                     Button {
                         openSettings()
                     } label: {
@@ -108,12 +110,9 @@ struct MainWindow: View {
                     }
                     .keyboardShortcut(",", modifiers: .command)
                     .help("Settings")
-                } else {
-                    HostAndSettingsPill()
                 }
             }
         }
-        .navigationTitle("Shimmer")
     }
 }
 

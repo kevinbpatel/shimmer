@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+The launcher is a library. PCs live in a sidebar, the selected PC's apps fill
+the window as a grid of cover art, and the toolbar carries the PC's name and
+address, add-PC, Settings, and a search field. Click a cover to stream it.
+The window resizes, so a bigger window shows more games.
+
+This replaces the fixed-size hero card - one PC, its name in 34pt, a row of
+small tiles and a Stream button - which could not grow and put the PC, rather
+than the games, at the centre of the screen. The shape is
+moonlight-macos-enhanced's, which is Moonlight's.
+
 Settings are legible again. The window was translucent (`.thinMaterial`) with
 the form's own background hidden, so whatever sat behind it showed through the
 CONTENT - park Settings over the launcher's purple card and every row became a

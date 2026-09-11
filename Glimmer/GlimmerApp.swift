@@ -120,27 +120,22 @@ struct GlimmerApp: App {
                 // with the margins squeezed flat - which is exactly what a stale
                 // 584 here did. A floor equal to the content leaves nothing to
                 // drag.
-                .frame(minWidth: 680)
+                .frame(minWidth: 820, minHeight: 560)
                 // Liquid Glass: on macOS 26 `.regularMaterial` resolves to
                 // the system material; future SDKs may expose a dedicated
                 // `.glassBackground` shape style for window containers.
                 .containerBackground(.regularMaterial, for: .window)
         }
-        .windowStyle(.hiddenTitleBar)
-        // The window is exactly its content and cannot be dragged bigger. The
-        // launcher is one fixed-height hero card, a chip row, a button and a
-        // footer - nothing in it grows, so a resize could only ever add empty
-        // space, which is precisely what it was doing.
-        //
-        // This works only because every element below now states a definite
-        // size: the card is a fixed 248x520, the column no longer ends in a
-        // Spacer, and MainWindow no longer forces itself to .infinity. An
-        // earlier attempt set this while the content was still flexible - the
-        // window stayed resizable and the card stretched to fill it.
-        //
-        // No .defaultSize: it would be a second opinion about a size the content
-        // already knows.
-        .windowResizability(.contentSize)
+        // The title bar is VISIBLE now: the library puts the selected PC's name
+        // and address there (navigationTitle / navigationSubtitle) and hangs
+        // add-PC, Settings and the search field off the toolbar, the way the
+        // reference app does. Hiding it took all of that with it.
+        // Resizable, with a floor. The window is a library now - a grid that
+        // reflows and a sidebar - so bigger genuinely shows more, which is
+        // exactly the opposite of the fixed hero card this replaced (it could
+        // only ever have gained empty space, which is why it was pinned).
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 980, height: 680)
         // Opt OUT of window state restoration so a previously-X-closed
         // launcher always re-spawns fresh next launch (the bug that made
         // first Dock click do nothing pre-restoration-fix).

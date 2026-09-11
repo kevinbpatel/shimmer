@@ -17,6 +17,7 @@
 		82EEF25A701FD81C0CDC8240 /* HostsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A6B7F5AA2DBCDB1B8D9A413 /* HostsStore.swift */; };
 		A10000001 /* GlimmerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000011 /* GlimmerApp.swift */; };
 		A10000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000012 /* ContentView.swift */; };
+		A1C0DE911000000000000000 /* LibraryWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE912000000000000000 /* LibraryWindow.swift */; };
 		A10000003 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000013 /* AppModel.swift */; };
 		A1C0DE901000000000000000 /* AppArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE902000000000000000 /* AppArtworkStore.swift */; };
 		A10000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000014 /* Assets.xcassets */; };
@@ -326,6 +327,7 @@
 		A10000010 /* Shimmer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shimmer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000011 /* GlimmerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlimmerApp.swift; sourceTree = "<group>"; };
 		A10000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1C0DE912000000000000000 /* LibraryWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LibraryWindow.swift"; sourceTree = "<group>"; };
 		A10000013 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		A1C0DE902000000000000000 /* AppArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppArtworkStore.swift"; sourceTree = "<group>"; };
 		A10000014 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -671,6 +673,7 @@
 				A10000011 /* GlimmerApp.swift */,
 				A1009002 /* UpdaterController.swift */,
 				A10000012 /* ContentView.swift */,
+				A1C0DE912000000000000000 /* LibraryWindow.swift */,
 				A10000017 /* SettingsView.swift */,
 				A1C0DE832000000000000000 /* SettingsAudioPane.swift */,
 				A1C0DE822000000000000000 /* SettingsVideoPane.swift */,
@@ -1087,6 +1090,7 @@
 				A10000001 /* GlimmerApp.swift in Sources */,
 				A1009001 /* UpdaterController.swift in Sources */,
 				A10000002 /* ContentView.swift in Sources */,
+				A1C0DE911000000000000000 /* LibraryWindow.swift in Sources */,
 				A10000005 /* SettingsView.swift in Sources */,
 				A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */,
 				A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */,
