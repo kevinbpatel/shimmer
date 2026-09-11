@@ -43,9 +43,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     /// Window height for this tab, matching the reference app's behaviour of
     /// resizing itself to the page rather than being dragged.
-    /// The CONTENT height. The window is `.fullSizeContentView` but macOS
-    /// still adds its 32pt title bar on top, so these are the reference app's
-    /// window heights (528 / 588 / 540) minus that.
+    /// CONTENT height for this tab. The reference app's windows are 528 / 588
+    /// / 540; macOS adds its 32pt title bar on top of whatever the content
+    /// asks for, even with `.fullSizeContentView`, so subtract it here.
     var windowHeight: CGFloat {
         switch self {
         case .computers: return 528 - 32
@@ -75,14 +75,14 @@ struct SettingsTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 18, weight: .regular))
-                            .frame(height: 20)
+                            .font(.system(size: 17, weight: .regular))
+                            .frame(height: 19)
                         Text(tab.title)
                             .font(.system(size: 11))
                     }
                     .foregroundStyle(tint(for: tab))
-                    .frame(minWidth: 62)
-                    .padding(.vertical, 6)
+                    .frame(minWidth: 58)
+                    .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -101,8 +101,8 @@ struct SettingsTabBar: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.top, 2)
+        .padding(.bottom, 6)
         .padding(.horizontal, 12)
     }
 

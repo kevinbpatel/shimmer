@@ -30,12 +30,7 @@ struct AppShell: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 28)
-                // The window is `.fullSizeContentView`, but SwiftUI still
-                // insets its content by the title bar's height unless the top
-                // safe area is waived - which left this row sitting BELOW the
-                // traffic lights instead of beside them.
-                .ignoresSafeArea(.container, edges: .top)
+                .frame(height: 30)
             SettingsTabBar(selection: $model.settingsTab)
             Divider()
             switch model.settingsTab {
@@ -44,6 +39,11 @@ struct AppShell: View {
             case .about: AboutPane()
             }
         }
+        // Waived on the WHOLE stack, not just the title row. Waiving it on the
+        // title alone drew that row beside the traffic lights but still let the
+        // layout reserve the title bar's 32pt for everything below, so the tab
+        // strip began ~40pt lower than the reference app's - all of it empty.
+        .ignoresSafeArea(.container, edges: .top)
         // Fixed, not resizable - the window follows the tab.
         .frame(width: SettingsMetrics.windowWidth,
                height: model.settingsTab.windowHeight,
