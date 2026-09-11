@@ -230,6 +230,14 @@ extension AppModel {
     /// a give-up: the next menu open re-reads, so the charm reappears the
     /// moment the OS reports data.
     var menuBarControllerBattery: (percent: Int, charging: Bool)? {
+        // Observation dependencies. Neither GameController's registry nor the
+        // raw-HID reader is @Observable, so without touching these the menu-bar
+        // LABEL (which, unlike the dropdown, is never rebuilt on open) would
+        // show whatever the battery read at launch, forever. `controllerConnected`
+        // covers pads arriving and leaving; `controllerBatteryTick` is the slow
+        // timer that covers the pad draining while connected.
+        _ = controllerConnected
+        _ = controllerBatteryTick
         // Prefer the HID-decoded battery: opening the DualSense over raw HID
         // makes gamecontrollerd drop the enhanced-report battery, so
         // GCController.battery reads nil while the reader is live. The HID
@@ -248,5 +256,32 @@ extension AppModel {
             return (reading.percent, reading.charging == true)
         }
         return nil
+    }
+
+    /// SF Symbol naming the connected pad, for the menu-bar charm and its
+    /// battery readout.
+    ///
+    /// `playstation.logo` is Sony's own mark, shipped in SF Symbols. It is used
+    /// ONLY when the pad genuinely is a PlayStation one - a DualSense (the raw
+    /// HID reader only ever opens those) or a DualShock 4 - which is the
+    /// referential use the symbol exists for: it says "this is your PlayStation
+    /// controller", never "this app is a Sony product". Every other pad gets
+    /// Apple's generic `gamecontroller.fill`, which is also the fallback when
+    /// the battery came from somewhere we can't attribute to a category.
+    /// Attribution is in CREDITS.md alongside the Steam glyph's.
+    var menuBarControllerSymbol: String {
+        _ = controllerConnected
+        // A live raw-HID battery decode means a DualSense by construction:
+        // DualSenseHID opens nothing else.
+        if DualSenseHID.shared.battery != nil { return "playstation.logo" }
+        for controller in GCController.controllers() {
+            switch controller.productCategory {
+            case GCProductCategoryDualSense, GCProductCategoryDualShock4:
+                return "playstation.logo"
+            default:
+                continue
+            }
+        }
+        return "gamecontroller.fill"
     }
 }

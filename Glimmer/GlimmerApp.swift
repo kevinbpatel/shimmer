@@ -174,7 +174,31 @@ struct GlimmerApp: App {
                 .environment(model)
                 .background(OpenWindowCapture())
         } label: {
-            if let symbol = model.menuBarSystemImageName {
+            // Precedence, worst news first:
+            //   error        -> the warning triangle alone (nothing else matters)
+            //   pad connected-> the controller's own glyph + its battery percentage
+            //   streaming    -> play.fill
+            //   idle         -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
+            //
+            // The pad outranks `play.fill` deliberately: a live stream is
+            // already obvious from the screen in front of you, whereas the
+            // percentage is the one number you want mid-session and the one
+            // you'd have to open a menu to see. See `menuBarControllerSymbol`
+            // for why a PlayStation pad gets Sony's mark and everything else
+            // gets Apple's generic one.
+            if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
+                Image(systemName: symbol)
+            } else if let battery = model.menuBarControllerBattery {
+                // An HStack, NOT a `Label`: MenuBarExtra renders its label view
+                // into the status item and a Label arrives icon-only there - the
+                // title is silently dropped (measured, 2026-09-11: the same view
+                // as a Label drew the glyph and no percentage). Spelling out the
+                // Image + Text is what actually puts the number in the menu bar.
+                HStack(spacing: 3) {
+                    Image(systemName: model.menuBarControllerSymbol)
+                    Text("\(battery.percent)%")
+                }
+            } else if let symbol = model.menuBarSystemImageName {
                 Image(systemName: symbol)
             } else {
                 Image("MenuBarIcon")

@@ -29,6 +29,13 @@ Moonlight client shows the artwork the host serves for it. It was traced from
 the box art Sunshine itself returns for that app, flattened to a monochrome
 template so it tints like a system symbol.
 
+The PlayStation logo shown in the menu bar is Apple's `playstation.logo` SF
+Symbol, and the mark is a trademark of **Sony Interactive Entertainment Inc.**
+shimmer is not affiliated with or endorsed by Sony; the symbol appears only
+when a DualSense or DualShock 4 is actually connected, to name that controller
+and show its battery. Every other pad gets Apple's generic `gamecontroller`
+symbol instead.
+
 shimmer's interface owes a debt to
 **[moonlight-macos-enhanced](https://github.com/skyhua0224/moonlight-macos-enhanced)**
 by [skyhua0224](https://github.com/skyhua0224) (GPLv3, a fork of Moonlight for

@@ -91,13 +91,67 @@ struct MenuBarContent: View {
                 }
             }
 
+            // Stream audio - the stream's own level, not the Mac's.
+            //
+            // No slider: this dropdown is a real system NSMenu, which has no
+            // slider item (the Sound extra's is a private view-backed one), so a
+            // SwiftUI `Slider` here draws nothing at all. A ladder of 10% steps
+            // plus Louder / Quieter is the shape that renders AND reads native.
+            //
+            // Shown whether or not a stream is live, because mute persists: a
+            // control that disappears with the session is one the user can't
+            // undo before starting the next one.
+            Section("Stream Audio") {
+                Button {
+                    model.toggleStreamMute()
+                } label: {
+                    Label(model.streamMuted ? "Unmute" : "Mute",
+                          systemImage: model.streamMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                }
+                Menu {
+                    Button {
+                        model.stepStreamVolume(by: AppModel.streamVolumeStep)
+                    } label: {
+                        Label("Louder", systemImage: "speaker.plus")
+                    }
+                    .disabled(model.streamVolume >= 1)
+                    Button {
+                        model.stepStreamVolume(by: -AppModel.streamVolumeStep)
+                    } label: {
+                        Label("Quieter", systemImage: "speaker.minus")
+                    }
+                    .disabled(model.streamVolume <= AppModel.minStreamVolume)
+                    Section {
+                        ForEach(AppModel.streamVolumeLevels, id: \.self) { level in
+                            Button {
+                                model.setStreamVolume(level)
+                            } label: {
+                                // Checkmark by hand: an NSMenu item's state is
+                                // not something SwiftUI exposes here, so the
+                                // selected rung carries the glyph itself - the
+                                // same trick the "Switch PC" list above uses.
+                                if model.isSelectedStreamVolume(level) {
+                                    Label("\(Int((level * 100).rounded()))%", systemImage: "checkmark")
+                                } else {
+                                    Text("\(Int((level * 100).rounded()))%")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Volume: \(model.streamVolumePercent)%",
+                          systemImage: model.streamMuted ? "speaker.slash" : "speaker.wave.2")
+                }
+            }
+
             // Controller battery charm - shown whenever a pad reporting battery
-            // is connected to the Mac (sampled on menu open).
+            // is connected to the Mac (sampled on menu open). The glyph matches
+            // the one in the menu-bar label so the two read as one thing.
             if let battery = model.menuBarControllerBattery {
                 Section("Controller") {
                     Label(
                         "\(battery.percent)% battery\(battery.charging ? " · charging" : "")",
-                        systemImage: battery.charging ? "battery.100.bolt" : "gamecontroller"
+                        systemImage: battery.charging ? "battery.100.bolt" : model.menuBarControllerSymbol
                     )
                 }
             }

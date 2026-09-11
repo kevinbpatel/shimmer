@@ -234,6 +234,24 @@ final class AppModel {
         didSet { UserDefaults.standard.set(showStreamStats, forKey: "showStreamStats") }
     }
 
+    /// The STREAM's own output volume (0...1) and mute - not the Mac's: they
+    /// scale decoded game audio at our player node and nothing else. Both
+    /// persist. AppModel+StreamAudio.swift owns the rest of this feature.
+    var streamVolume: Double = AppModel.loadStreamVolume() {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(streamVolume, forKey: "streamVolume")
+            applyStreamVolume()
+        }
+    }
+    var streamMuted: Bool = UserDefaults.standard.bool(forKey: "streamMuted") {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(streamMuted, forKey: "streamMuted")
+            applyStreamVolume()
+        }
+    }
+
     /// The overlay's shape, fixed rather than configured. It answers one
     /// question - "is my stream OK right now" - and a corner picker, a row-set
     /// picker and eight threshold steppers were a preferences panel bolted to
@@ -336,6 +354,12 @@ final class AppModel {
     /// stored property, SwiftUI views that read it rebuild as controllers come
     /// and go - used to show/hide the controller-permission UI without polling.
     var controllerConnected: Bool = !GCController.controllers().isEmpty
+
+    /// Bumped on a slow timer (`startControllerBatteryPolling`) so the menu-bar
+    /// charm's battery READING refreshes while the menu is closed - it comes
+    /// from GameController / raw HID, neither observable. Same sentinel trick
+    /// as `displayInfoRevision`.
+    var controllerBatteryTick: Int = 0
 
     /// Opt-in raw-HID DualSense reading (Options / Create / Mute buttons that
     /// macOS's GameController framework hides). Requires the Input Monitoring

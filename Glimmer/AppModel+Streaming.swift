@@ -133,7 +133,16 @@ extension AppModel {
             guard let self else { return }
             // The Swift-native engine is the only path.
             let session = StreamSession(backend: NativeBackend())
-            await MainActor.run { self.nativeSession = session }
+            await MainActor.run {
+                self.nativeSession = session
+                // Seed the persisted stream volume / mute BEFORE the first
+                // packet decodes, so a stream the user left muted comes up
+                // muted instead of blasting for the half-second it takes them
+                // to reach the menu bar. The decoder just stores it here (its
+                // engine doesn't exist yet) and applies it when it builds the
+                // graph - see AudioDecoder.outputVolume.
+                self.applyStreamVolume()
+            }
             var caughtError: Error?
             do {
                 // Provider closures (rather than captured values) so the user

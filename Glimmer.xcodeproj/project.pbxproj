@@ -139,6 +139,7 @@
 		A1C0DE000910000000000000 /* DebugAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000920000000000000 /* DebugAutomation.swift */; };
 		D2000097 /* AppModel+Defaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000096 /* AppModel+Defaults.swift */; };
 		D1000060 /* AppModel+Streaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100005F /* AppModel+Streaming.swift */; };
+		A1C0DESTRMAUD10000000000 /* AppModel+StreamAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DESTRMAUD20000000000 /* AppModel+StreamAudio.swift */; };
 		D1000062 /* AppModel+Pairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1000061 /* AppModel+Pairing.swift */; };
 		E20000A4 /* AppModel+Power.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000A3 /* AppModel+Power.swift */; };
 		E20000A2 /* LunaPower.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000A1 /* LunaPower.swift */; };
@@ -263,6 +264,7 @@
 		D2000095 /* QualityPresetMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000094 /* QualityPresetMigrationTests.swift */; };
 		DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */; };
 		A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE792000000000000000 /* StreamChoicesTests.swift */; };
+		A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */; };
 		A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */; };
 		A1C0DE931000000000000000 /* AppSymbolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE932000000000000000 /* AppSymbolTests.swift */; };
 		DEC0DE840000000000000013 /* TerminationGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000014 /* TerminationGateTests.swift */; };
@@ -447,6 +449,7 @@
 		A1C0DE000920000000000000 /* DebugAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugAutomation.swift"; sourceTree = "<group>"; };
 		D2000096 /* AppModel+Defaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Defaults.swift"; sourceTree = "<group>"; };
 		D100005F /* AppModel+Streaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Streaming.swift"; sourceTree = "<group>"; };
+		A1C0DESTRMAUD20000000000 /* AppModel+StreamAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+StreamAudio.swift"; sourceTree = "<group>"; };
 		D1000061 /* AppModel+Pairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Pairing.swift"; sourceTree = "<group>"; };
 		E20000A3 /* AppModel+Power.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Power.swift"; sourceTree = "<group>"; };
 		E20000A1 /* LunaPower.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LunaPower.swift"; sourceTree = "<group>"; };
@@ -572,6 +575,7 @@
 		D2000094 /* QualityPresetMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualityPresetMigrationTests.swift; sourceTree = "<group>"; };
 		DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamDisplayModeTests.swift; sourceTree = "<group>"; };
 		A1C0DE792000000000000000 /* StreamChoicesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamChoicesTests.swift"; sourceTree = "<group>"; };
+		A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamVolumeTests.swift"; sourceTree = "<group>"; };
 		A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FrameRateRangeTests.swift"; sourceTree = "<group>"; };
 		A1C0DE932000000000000000 /* AppSymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSymbolTests.swift"; sourceTree = "<group>"; };
 		DEC0DE840000000000000014 /* TerminationGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminationGateTests.swift; sourceTree = "<group>"; };
@@ -761,6 +765,7 @@
 				E20000A3 /* AppModel+Power.swift */,
 				E20000A1 /* LunaPower.swift */,
 				D100005F /* AppModel+Streaming.swift */,
+				A1C0DESTRMAUD20000000000 /* AppModel+StreamAudio.swift */,
 				D1A00001 /* AppModel+HostRoute.swift */,
 				D1A00003 /* AppModel+SessionReceipt.swift */,
 				D100005D /* AppModel+Lifecycle.swift */,
@@ -937,6 +942,7 @@
 				D2000094 /* QualityPresetMigrationTests.swift */,
 				DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */,
 				A1C0DE792000000000000000 /* StreamChoicesTests.swift */,
+				A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
 				A1C0DE932000000000000000 /* AppSymbolTests.swift */,
 				DEC0DE840000000000000014 /* TerminationGateTests.swift */,
@@ -1179,6 +1185,7 @@
 				E20000A4 /* AppModel+Power.swift in Sources */,
 				E20000A2 /* LunaPower.swift in Sources */,
 				D1000060 /* AppModel+Streaming.swift in Sources */,
+				A1C0DESTRMAUD10000000000 /* AppModel+StreamAudio.swift in Sources */,
 				D1A00002 /* AppModel+HostRoute.swift in Sources */,
 				D1A00004 /* AppModel+SessionReceipt.swift in Sources */,
 				D100005E /* AppModel+Lifecycle.swift in Sources */,
@@ -1341,6 +1348,7 @@
 				D2000095 /* QualityPresetMigrationTests.swift in Sources */,
 				DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */,
 				A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */,
+				A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,
 				A1C0DE931000000000000000 /* AppSymbolTests.swift in Sources */,
 				DEC0DE840000000000000013 /* TerminationGateTests.swift in Sources */,
