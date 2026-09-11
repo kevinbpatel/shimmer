@@ -181,7 +181,17 @@ extension AppModel {
         cfg.coversNotch = effectiveStreamCoversNotch
         cfg.displayMode = effectiveDisplayMode
         let codecPref = HostCodecPreference.load(for: host.id)
-        cfg.videoFormats = codecPref.apply(to: .probedSupported)
+        var formats = codecPref.apply(to: .probedSupported)
+        // Don't advertise 10-bit profiles when we're not asking for HDR. The
+        // host picks the best format we offer, so offering Main10 got us a
+        // 10-bit stream tagged BT.2020 for SDR content - the over-saturation
+        // fixed in derivedColorSpaceKey. Not offering it removes the mis-tag at
+        // the source instead of compensating for it, and 10-bit buys nothing
+        // on an SDR pipeline. moonlight-qt masks the same way.
+        if !cfg.hdr {
+            formats = formats.subtracting([.hevcMain10, .av1Main10])
+        }
+        cfg.videoFormats = formats
         // Codec-aware wire budget (see wireBitrateKbps): the H.264-anchored dial
         // scaled by the negotiated codec's efficiency. The spec chip reads the same
         // path so what's shown matches what's sent.

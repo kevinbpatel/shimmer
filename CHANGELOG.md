@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+10-bit profiles are no longer advertised when HDR is off, so an SDR stream now
+arrives as 8-bit with native Rec.709 tags rather than 10-bit tagged BT.2020.
+
 Fix: colours were over-saturated on an SDR display - contrast and vibrancy
 visibly pushed. Asking for HDR makes Sunshine encode 10-bit and advertise
 BT.2020 primaries, but the desktop it captures is still Rec.709, so the stream
