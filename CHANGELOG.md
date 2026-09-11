@@ -3,7 +3,11 @@
 ## Unreleased
 
 One window, three tabs - Computers, Settings, About - with the title centred
-above them. The PC list and its cover grid are the Computers tab (a sidebar, a
+above them. Computers mirrors the reference app's account tab: a 200pt list of
+PCs with a round glyph, a status dot and the address under the name, a
+full-height divider, and a bottom bar carrying "Add PC…" and "Remove PC…";
+the detail column leads with a centred badge, the PC's name and its address
+before the covers. The PC list and its cover grid are the Computers tab (a sidebar, a
 grid and an "Add PC…" button on the bottom edge); every setting is one
 scrolling page under Settings. The metrics are copied from Tailscale's own
 Settings window, measured off a screen capture of it: the label gutter, the

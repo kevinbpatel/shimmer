@@ -17,6 +17,7 @@ struct ComputersTab: View {
     @Environment(AppModel.self) private var model
 
     @State private var showPairSheet = false
+    @State private var showUnpairConfirm = false
     @State private var search = ""
 
     /// Selection is the host ID, not the Host: Host is a value type the store
@@ -41,6 +42,7 @@ struct ComputersTab: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
+                // 200pt, measured off the reference app's own window.
                 .frame(width: 200)
             Divider()
             detail
@@ -50,30 +52,42 @@ struct ComputersTab: View {
             PairSheet(initialAddress: "")
                 .presentationBackground(.thinMaterial)
         }
+        .confirmationDialog("Remove this PC?", isPresented: $showUnpairConfirm, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) {
+                if let host = model.selectedHost { model.unpair(host) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("\(model.selectedHost?.displayName ?? "This PC") will need to be paired again before you can stream from it.")
+        }
     }
 
     // MARK: Sidebar
 
     private var sidebar: some View {
         VStack(spacing: 0) {
+            // No section header: the reference app's account list has none, and
+            // the tab is already called Computers.
             List(selection: hostSelection) {
-                Section("Computers") {
-                    ForEach(model.hosts) { host in
-                        HostRow(host: host)
-                            .tag(host.id)
-                            .hostContextMenu(host)
-                    }
+                ForEach(model.hosts) { host in
+                    HostRow(host: host)
+                        .tag(host.id)
+                        .hostContextMenu(host)
                 }
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 42)
 
             Divider()
-            HStack {
-                Button("Add PC…") { showPairSheet = true }
-                Spacer(minLength: 0)
+            // A full-width button on a 39pt bar, like "Add Account…".
+            Button {
+                showPairSheet = true
+            } label: {
+                Text("Add PC…").frame(maxWidth: .infinity)
             }
-            .padding(10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
     }
 
@@ -83,22 +97,32 @@ struct ComputersTab: View {
     private var detail: some View {
         if let host = model.selectedHost {
             VStack(spacing: 0) {
-                header(host)
-                Divider()
                 ScrollView {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 128, maximum: 150), spacing: 18, alignment: .top)],
-                        alignment: .leading, spacing: 24
-                    ) {
-                        ForEach(apps) { app in
-                            AppCoverTile(app: app, host: host)
+                    VStack(spacing: 0) {
+                        hostHeader(host)
+                        if host.apps.count > 8 { searchField.padding(.bottom, 14) }
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 128, maximum: 150), spacing: 18, alignment: .top)],
+                            alignment: .center, spacing: 24
+                        ) {
+                            ForEach(apps) { app in
+                                AppCoverTile(app: app, host: host)
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
                 .overlay { if model.isStreaming { streamingOverlay(host) } }
+
+                Divider()
+                HStack {
+                    Spacer(minLength: 0)
+                    Button("Remove PC…") { showUnpairConfirm = true }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
             }
             .task(id: host.id) { model.artwork.prefetch(apps: host.apps, on: host) }
         } else if model.hosts.isEmpty {
@@ -111,43 +135,49 @@ struct ComputersTab: View {
         }
     }
 
-    private func header(_ host: Host) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(host.displayName)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(host.localAddress ?? host.manualAddress ?? host.name)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+    /// The centred identity block the reference app puts at the top of its
+    /// detail column: a round glyph, the name under it, then the detail.
+    private func hostHeader(_ host: Host) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.22))
+                    .frame(width: 56, height: 56)
+                Image(systemName: "display")
+                    .font(.system(size: 26, weight: .regular))
+                    .foregroundStyle(Color.accentColor)
             }
-            Spacer(minLength: 12)
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .font(.system(size: 12))
-                TextField("Search apps", text: $search)
-                    .textFieldStyle(.plain)
-                    .frame(width: 160)
-                if !search.isEmpty {
-                    Button {
-                        search = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.07), in: Capsule())
+            Text(host.displayName)
+                .font(.system(size: 13, weight: .semibold))
+            Text(host.localAddress ?? host.manualAddress ?? host.name)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.top, 24)
+        .padding(.bottom, 18)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary).font(.system(size: 12))
+            TextField("Search apps", text: $search)
+                .textFieldStyle(.plain)
+                .frame(width: 170)
+            if !search.isEmpty {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(0.07), in: Capsule())
     }
 
     /// Shown over the grid while a session is up, so the window says what is
-    /// happening instead of the grid just dimming. The stream itself lives in
-    /// its own window (or Picture in Picture); this is the way back to it.
+    /// happening instead of the grid just dimming.
     private func streamingOverlay(_ host: Host) -> some View {
         VStack(spacing: 10) {
             Image(systemName: "airplayvideo")
@@ -177,43 +207,57 @@ struct ComputersTab: View {
 
 // MARK: - Sidebar row
 
+/// One PC: a round glyph with a status dot, the name, and the address beneath -
+/// the shape of the reference app's account rows (41.5pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
     @Environment(AppModel.self) private var model
 
     /// Liveness is only ever polled for the SELECTED host (HostStatusPoller),
     /// so that is the only one this can honestly colour. Every other row gets
-    /// the "unknown" grey rather than a guess - a green dot on a PC that has
-    /// not been contacted since launch would be a lie.
+    /// the "unknown" grey rather than a guess.
     private var dotColor: Color {
-        guard host.id == model.selectedHost?.id else { return .secondary.opacity(0.5) }
+        guard host.id == model.selectedHost?.id else { return .secondary.opacity(0.55) }
         guard let live = model.hostLiveStatus,
               Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return .secondary.opacity(0.5)
+            return .secondary.opacity(0.55)
         }
         switch live.state {
         case .asleep: return .red
         case .certMismatch: return .orange
-        case .unknown: return .secondary.opacity(0.5)
+        case .unknown: return .secondary.opacity(0.55)
         case .idle, .streamingApp, .streamingUnknownApp: return .green
         }
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(dotColor)
-                .frame(width: 8, height: 8)
-            Text(host.displayName)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            if model.isStreaming, host.id == model.selectedHost?.id {
-                Image(systemName: "play.circle.fill")
-                    .foregroundStyle(.green)
-                    .imageScale(.small)
+        HStack(spacing: 10) {
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.22))
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Image(systemName: "display")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color.accentColor))
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: 9, height: 9)
+                    .overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
+                    .offset(x: 1, y: 1)
             }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(host.displayName)
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                Text(host.localAddress ?? host.manualAddress ?? host.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
     }
 }
 
