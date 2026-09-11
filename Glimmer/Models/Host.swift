@@ -79,12 +79,11 @@ struct LibraryApp: Identifiable, Hashable {
         let n = name.lowercased()
         func has(_ needles: String...) -> Bool { needles.contains { n.contains($0) } }
 
-        // Desktops and remote shells. `desktopcomputer` is the Mac's own
-        // machine glyph; `display` is a plainer panel, so a low-res desktop is
-        // distinguishable from the full one at a glance without implying
-        // something is wrong with it.
+        // Desktops and remote shells. A low-res desktop is still a desktop, so
+        // it carries the same machine glyph - the name is what distinguishes
+        // them, and two near-identical monitor icons side by side read as an
+        // inconsistency rather than a distinction.
         if has("big picture") { return "gamecontroller.fill" }
-        if has("low res", "lowres") { return "display" }
         if has("desktop") { return "desktopcomputer" }
         if has("terminal", "shell", "command prompt", "powershell") { return "terminal" }
         if has("remote", "rdp", "vnc") { return "display.and.arrow.down" }
@@ -117,6 +116,22 @@ struct LibraryApp: Identifiable, Hashable {
 
         // This is a game-streaming client: a game is the right default.
         return "gamecontroller.fill"
+    }
+
+    /// What actually gets drawn for this app: a system symbol, or one of the
+    /// few bundled marks a symbol can't express.
+    enum Glyph: Hashable {
+        case symbol(String)
+        case asset(String)
+    }
+
+    /// Steam has no SF Symbol and no near-enough stand-in, so its mark is
+    /// bundled as a template image (Assets/SteamGlyph) and tints like a symbol.
+    /// SteamVR is deliberately NOT caught here - it keeps the headset symbol.
+    var glyph: Glyph {
+        let n = name.lowercased()
+        if n.contains("steam"), !n.contains("steamvr") { return .asset("SteamGlyph") }
+        return .symbol(systemImage)
     }
 
     /// A stable hue for the app's icon plate, so two apps are told apart at a

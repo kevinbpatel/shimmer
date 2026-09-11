@@ -22,6 +22,13 @@ under the **GNU General Public License v3** (see [LICENSE](LICENSE)), the same
 license as the originals. The GPLv3 notice on the ported files is accurate and
 intentional.
 
+The Steam logo bundled as `Assets.xcassets/SteamGlyph` is a trademark of
+**Valve Corporation**. shimmer is not affiliated with or endorsed by Valve; the
+mark is used only to label the Steam entry a host publishes, the way every
+Moonlight client shows the artwork the host serves for it. It was traced from
+the box art Sunshine itself returns for that app, flattened to a monochrome
+template so it tints like a system symbol.
+
 shimmer's interface owes a debt to
 **[moonlight-macos-enhanced](https://github.com/skyhua0224/moonlight-macos-enhanced)**
 by [skyhua0224](https://github.com/skyhua0224) (GPLv3, a fork of Moonlight for

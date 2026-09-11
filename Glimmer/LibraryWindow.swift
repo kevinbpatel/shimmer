@@ -113,8 +113,12 @@ struct ComputersTab: View {
                                 Button {
                                     model.requestStream(app: app, on: host)
                                 } label: {
-                                    Label(app.name, systemImage: app.systemImage)
-                                        .frame(minWidth: 150, alignment: .leading)
+                                    Label {
+                                        Text(app.name)
+                                    } icon: {
+                                        AppGlyphIcon(app: app)
+                                    }
+                                    .frame(minWidth: 150, alignment: .leading)
                                 }
                                 .disabled(model.isStreaming)
                                 .help(model.isStreaming
@@ -320,5 +324,28 @@ private struct HostRow: View {
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(selected ? Color.primary.opacity(0.13) : Color.clear))
+    }
+}
+
+// MARK: - App glyph
+
+/// An app's icon: a system symbol, or a bundled template mark for the few
+/// things SF Symbols has no glyph for. Sized to sit on a button's text line.
+private struct AppGlyphIcon: View {
+    let app: LibraryApp
+
+    var body: some View {
+        switch app.glyph {
+        case .symbol(let name):
+            Image(systemName: name)
+        case .asset(let name):
+            Image(name)
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                // Matched to the cap height of the symbols beside it, so a
+                // bundled mark and an SF Symbol sit on the same line.
+                .frame(width: 14, height: 14)
+        }
     }
 }

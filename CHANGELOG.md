@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-A PC's apps lead its page, as buttons with a native symbol: a Mac for the
-desktop, a plain display for a low-res desktop, a gamepad for Steam. The PC's
+A PC's apps lead its page, as buttons with a native symbol: a Mac for either
+desktop, and Steam's own mark for Steam. The PC's
 name isn't repeated above them - the row selected in the list already says
 which machine you're looking at.
 

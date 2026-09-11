@@ -46,11 +46,10 @@ struct AppSymbolTests {
         // broader branch would swallow them.
         #expect(LibraryApp.symbol(forName: "Steam Big Picture") == "gamecontroller.fill")
         #expect(LibraryApp.symbol(forName: "Steam") == "gamecontroller.fill")
-        // A low-res desktop must not share the full desktop's glyph.
-        #expect(LibraryApp.symbol(forName: "Low Res Desktop") == "display")
+        // A low-res desktop IS a desktop: same glyph, the name distinguishes it.
         #expect(LibraryApp.symbol(forName: "Desktop") == "desktopcomputer")
         #expect(LibraryApp.symbol(forName: "Low Res Desktop")
-                != LibraryApp.symbol(forName: "Desktop"))
+                == LibraryApp.symbol(forName: "Desktop"))
         #expect(LibraryApp.symbol(forName: "SteamVR") == "visionpro")
     }
 
@@ -59,6 +58,18 @@ struct AppSymbolTests {
         // a game, not a generic "app" placeholder.
         #expect(LibraryApp.symbol(forName: "Elden Ring") == "gamecontroller.fill")
         #expect(LibraryApp.symbol(forName: "") == "gamecontroller.fill")
+    }
+
+    /// Steam's mark is a bundled template image, not a symbol - and SteamVR
+    /// must not be swallowed by the same match.
+    @MainActor
+    @Test func steamUsesTheBundledMarkAndSteamVRDoesNot() {
+        let steam = LibraryApp(id: 1, name: "Steam Big Picture", hdr: false, hidden: false)
+        let vr = LibraryApp(id: 2, name: "SteamVR", hdr: false, hidden: false)
+        #expect(steam.glyph == .asset("SteamGlyph"))
+        #expect(vr.glyph == .symbol("visionpro"))
+        // The asset has to actually be in the bundle, or the button draws air.
+        #expect(NSImage(named: "SteamGlyph") != nil)
     }
 
     @Test func theIconHueIsStableAndInRange() {
