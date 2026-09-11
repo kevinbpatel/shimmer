@@ -598,8 +598,7 @@ final class AppModel {
 
     /// Settings is a page inside the main window (Tailscale's shape), not a
     /// separate Settings scene - so which page is showing is app state.
-    var showSettings = false
-    var settingsTab: SettingsTab = .stream
+    var settingsTab: SettingsTab = .computers
 
 
     isolated deinit {

@@ -12,13 +12,7 @@ struct MainWindow: View {
     var body: some View {
         @Bindable var model = model
         return Group {
-            if model.showSettings {
-                SettingsPage()
-            } else if model.hosts.isEmpty {
-                EmptyPairingState()
-            } else {
-                LibraryWindow()
-            }
+            AppShell()
         }
         // One-time proactive offer when a DualSense is connected (see
         // maybeOfferRawHID) - explains the feature before macOS's Input
@@ -105,7 +99,7 @@ struct MainWindow: View {
             if model.hosts.isEmpty {
                 ToolbarItem(placement: .navigation) {
                     Button {
-                        model.showSettings = true
+                        model.settingsTab = .settings
                     } label: {
                         Image(systemName: "gearshape")
                             .symbolRenderingMode(.hierarchical)
@@ -403,7 +397,7 @@ private struct HostAndSettingsPill: View {
                 }
             }
             Button {
-                model.showSettings = true
+                model.settingsTab = .settings
             } label: {
                 Image(systemName: "gearshape")
                     .symbolRenderingMode(.hierarchical)

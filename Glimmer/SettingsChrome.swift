@@ -21,30 +21,22 @@ import SwiftUI
 /// The pages the settings view can show. Raw values are persisted as the
 /// remembered tab, so leave them alone when renaming a title.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case stream, video, audio, input, pcs, app, about
+    case computers, settings, about
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .stream: return "Stream"
-        case .video: return "Video"
-        case .audio: return "Audio"
-        case .input: return "Input"
-        case .pcs: return "PCs"
-        case .app: return "App"
+        case .computers: return "Computers"
+        case .settings: return "Settings"
         case .about: return "About"
         }
     }
 
     var symbol: String {
         switch self {
-        case .stream: return "slider.horizontal.3"
-        case .video: return "video.fill"
-        case .audio: return "speaker.wave.2.fill"
-        case .input: return "keyboard.fill"
-        case .pcs: return "display"
-        case .app: return "gearshape.fill"
+        case .computers: return "display"
+        case .settings: return "slider.horizontal.3"
         case .about: return "info.circle"
         }
     }

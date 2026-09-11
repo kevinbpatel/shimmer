@@ -100,7 +100,7 @@ struct StreamPane: View {
 
     var body: some View {
         @Bindable var model = model
-        SettingsPageBody {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("Resolution") {
                 Picker("", selection: resolutionSelection) {
                     ForEach(ResolutionChoice.all, id: \.self) { choice in

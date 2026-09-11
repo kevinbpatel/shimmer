@@ -162,7 +162,7 @@ struct GlimmerApp: App {
                 Button("Settings…") {
                     AppDelegate.openMainWindow?()
                     NSApp.activate()
-                    model.showSettings = true
+                    model.settingsTab = .settings
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }

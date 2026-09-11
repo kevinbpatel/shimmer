@@ -1,32 +1,27 @@
 //
 //  LibraryWindow.swift
 //
-//  The launcher, as a library rather than a card: PCs down the left, that PC's
-//  apps as a grid of cover art filling the window, and the window's own toolbar
-//  carrying the host name, add-PC, Settings and a search field.
-//
-//  This replaces the fixed-size hero card (one PC, a big name, a row of small
-//  tiles, one Stream button). The shape is moonlight-macos-enhanced's, which is
-//  in turn Moonlight's: the thing you look at is your GAMES, and the PC is a
-//  choice in a list rather than the subject of the screen. Streaming is a
-//  double-click on a cover, not a separate button.
+//  The Computers tab: PCs down the left, the selected PC's apps as a grid of
+//  cover art on the right, and the actions along the bottom edge - the shape of
+//  Tailscale's Accounts tab, inside the same tabbed window as Settings and
+//  About rather than a page of its own.
 //
 //  Everything underneath is unchanged - `selectHost`, `requestStream`,
-//  `PairSheet`, the host context menu, and the artwork store are the same calls
-//  the card made.
+//  `PairSheet`, the host context menu and the artwork store are the same calls
+//  the old hero card made.
 //
 
 import SwiftUI
 
-struct LibraryWindow: View {
+struct ComputersTab: View {
     @Environment(AppModel.self) private var model
 
     @State private var showPairSheet = false
     @State private var search = ""
 
-    /// The List's selection is the host id, not the Host: Host is a value type
-    /// that the store replaces wholesale on every refresh, so tagging rows with
-    /// it would drop the selection each poll.
+    /// Selection is the host ID, not the Host: Host is a value type the store
+    /// replaces wholesale on every refresh, so tagging rows with it would drop
+    /// the selection on each poll.
     private var hostSelection: Binding<String?> {
         Binding(
             get: { model.selectedHost?.id },
@@ -44,7 +39,23 @@ struct LibraryWindow: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 236)
+            Divider()
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .sheet(isPresented: $showPairSheet) {
+            PairSheet(initialAddress: "")
+                .presentationBackground(.thinMaterial)
+        }
+    }
+
+    // MARK: Sidebar
+
+    private var sidebar: some View {
+        VStack(spacing: 0) {
             List(selection: hostSelection) {
                 Section("Computers") {
                     ForEach(model.hosts) { host in
@@ -55,54 +66,44 @@ struct LibraryWindow: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 300)
-        } detail: {
-            detail
-        }
-        .navigationSplitViewStyle(.balanced)
-        .searchable(text: $search, prompt: "Search apps")
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    showPairSheet = true
-                } label: {
-                    Label("Add PC", systemImage: "plus")
-                }
-                .help("Pair another PC")
+            .scrollContentBackground(.hidden)
 
-                Button {
-                    model.showSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Settings")
+            Divider()
+            HStack {
+                Button("Add PC…") { showPairSheet = true }
+                Spacer(minLength: 0)
             }
-        }
-        .sheet(isPresented: $showPairSheet) {
-            PairSheet(initialAddress: "")
-                .presentationBackground(.thinMaterial)
+            .padding(10)
         }
     }
+
+    // MARK: Detail
 
     @ViewBuilder
     private var detail: some View {
         if let host = model.selectedHost {
-            ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 128, maximum: 150), spacing: 18, alignment: .top)],
-                    alignment: .leading, spacing: 24
-                ) {
-                    ForEach(apps) { app in
-                        AppCoverTile(app: app, host: host)
+            VStack(spacing: 0) {
+                header(host)
+                Divider()
+                ScrollView {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 128, maximum: 150), spacing: 18, alignment: .top)],
+                        alignment: .leading, spacing: 24
+                    ) {
+                        ForEach(apps) { app in
+                            AppCoverTile(app: app, host: host)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 28)
+                .overlay { if model.isStreaming { streamingOverlay(host) } }
             }
-            .navigationTitle(host.displayName)
-            .navigationSubtitle(hostSubtitle(host))
-            .overlay { if model.isStreaming { streamingOverlay(host) } }
             .task(id: host.id) { model.artwork.prefetch(apps: host.apps, on: host) }
+        } else if model.hosts.isEmpty {
+            EmptyPairingState()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ContentUnavailableView("No PC selected",
                                    systemImage: "display",
@@ -110,13 +111,43 @@ struct LibraryWindow: View {
         }
     }
 
-    private func hostSubtitle(_ host: Host) -> String {
-        host.localAddress ?? host.manualAddress ?? host.name
+    private func header(_ host: Host) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(host.displayName)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(host.localAddress ?? host.manualAddress ?? host.name)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                TextField("Search apps", text: $search)
+                    .textFieldStyle(.plain)
+                    .frame(width: 160)
+                if !search.isEmpty {
+                    Button {
+                        search = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(0.07), in: Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     /// Shown over the grid while a session is up, so the window says what is
-    /// happening instead of just dimming. The stream itself lives in its own
-    /// window (or Picture in Picture); this is the way back to it.
+    /// happening instead of the grid just dimming. The stream itself lives in
+    /// its own window (or Picture in Picture); this is the way back to it.
     private func streamingOverlay(_ host: Host) -> some View {
         VStack(spacing: 10) {
             Image(systemName: "airplayvideo")

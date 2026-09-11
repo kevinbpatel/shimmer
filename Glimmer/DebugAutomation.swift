@@ -66,7 +66,6 @@ extension AppModel {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(i) * 3.0) { [weak self] in
                     NSApp.activate()
                     self?.settingsTab = pane
-                    self?.showSettings = true
                 }
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {

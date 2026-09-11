@@ -197,7 +197,7 @@ struct ShortcutsPane: View {
 
     var body: some View {
         @Bindable var model = model
-        SettingsPageBody {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("In-stream keys") {
                 HotkeyRow(label: "Leave the stream", hotkey: $model.quitHotkey)
                     .frame(maxWidth: 420)

@@ -12,7 +12,7 @@ struct AudioPane: View {
 
     var body: some View {
         @Bindable var model = model
-        SettingsPageBody {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("Channels") {
                 Picker("", selection: $model.audioLayout) {
                     ForEach(AudioLayout.allCases) { layout in

@@ -107,7 +107,7 @@ struct MenuBarContent: View {
             Button {
                 AppDelegate.openMainWindow?()
                 NSApp.activate()
-                model.showSettings = true
+                model.settingsTab = .settings
                 activate()
             } label: {
                 Label("Settings…", systemImage: "gearshape")

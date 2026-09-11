@@ -30,7 +30,7 @@ struct VideoPane: View {
 
     var body: some View {
         @Bindable var model = model
-        SettingsPageBody {
+        VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("Codec") {
                 if let host = model.selectedHost {
                     Picker("", selection: codecSelection) {
