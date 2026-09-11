@@ -3,6 +3,43 @@ import AppKit
 
 // MARK: - Main Window
 
+/// Hands the title bar to the content. macOS 26 pins a SwiftUI `Window`'s
+/// title to the LEADING edge (removing the toolbar does not change it), while
+/// the app this is modelled on centres it. So the system title is hidden, the
+/// bar is made transparent and the content is extended under it; `AppShell`
+/// draws the centred title itself. Zero sized and non-interactive - it exists
+/// only to reach the NSWindow.
+private struct WindowChromeTweak: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            Self.apply(to: view.window)
+            Self.applyLate(to: view.window)
+        }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { Self.apply(to: nsView.window) }
+    }
+    private static func apply(to window: NSWindow?) {
+        guard let window else { return }
+        window.toolbar = nil
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.styleMask.insert(.fullSizeContentView)
+        window.isMovableByWindowBackground = true
+    }
+
+    /// SwiftUI finishes configuring the window AFTER the first layout pass and
+    /// puts `.fullSizeContentView` back, which left a 32pt reserved title bar
+    /// and pushed the centred title below the traffic lights. Re-assert once
+    /// the run loop has settled.
+    static func applyLate(to window: NSWindow?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { apply(to: window) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { apply(to: window) }
+    }
+}
+
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
@@ -13,6 +50,7 @@ struct MainWindow: View {
         @Bindable var model = model
         return Group {
             AppShell()
+                .background(WindowChromeTweak().frame(width: 0, height: 0))
         }
         // One-time proactive offer when a DualSense is connected (see
         // maybeOfferRawHID) - explains the feature before macOS's Input
@@ -89,24 +127,6 @@ struct MainWindow: View {
         // (selectedHost is nil here → monitor(address: nil), the teardown).
         .task(id: model.hosts.isEmpty) {
             if model.hosts.isEmpty { model.refreshHostRoute() }
-        }
-        .toolbar {
-            // ONLY the empty state needs a toolbar from here: once a PC is
-            // paired the library owns the whole bar (host name + address as the
-            // window title, add-PC, Settings, search). Leaving the old host
-            // pill mounted here put a second gear and a redundant host dropdown
-            // next to the library's own.
-            if model.hosts.isEmpty {
-                ToolbarItem(placement: .navigation) {
-                    Button {
-                        model.settingsTab = .settings
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                    .help("Settings")
-                }
-            }
         }
     }
 }

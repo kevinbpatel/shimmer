@@ -57,18 +57,18 @@ struct SettingsTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 19, weight: .regular))
-                            .frame(height: 22)
+                            .font(.system(size: 18, weight: .regular))
+                            .frame(height: 20)
                         Text(tab.title)
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                     }
                     .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
-                    .frame(minWidth: 74)
-                    .padding(.vertical, 7)
-                    .padding(.horizontal, 6)
+                    .frame(minWidth: 62)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
                     .background {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(selection == tab ? Color.primary.opacity(0.10) : .clear)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(selection == tab ? Color.accentColor.opacity(0.10) : .clear)
                     }
                     .contentShape(Rectangle())
                 }
@@ -78,8 +78,8 @@ struct SettingsTabBar: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 9)
         .padding(.horizontal, 12)
     }
 }
@@ -90,9 +90,27 @@ struct SettingsTabBar: View {
 /// lines up with the others as the user flips tabs - a per-pane width makes
 /// the labels visibly jump.
 enum SettingsMetrics {
+    /// Measured off Tailscale's own Settings window (600x588 points, captured
+    /// and sampled pixel by pixel):
+    ///   * gutter labels right-align at x=168, controls start at x=180 (gap 12)
+    ///   * the checkbox is 18pt; its label starts 7pt after it, at x=204
+    ///   * explanatory notes align with the checkbox LABEL, not the checkbox -
+    ///     they start at x=203, i.e. 23pt into the control column
+    ///   * notes wrap by x=532, so ~330pt of measure
+    ///   * checkbox rows sit on a 25pt rhythm (18pt control + 7pt)
+    ///   * trailing buttons right-align 41pt from the window edge
     static let labelGutter: CGFloat = 168
-    static let rowSpacing: CGFloat = 14
+    static let labelGap: CGFloat = 12
+    static let noteIndent: CGFloat = 23
+    static let noteWidth: CGFloat = 330
+    static let noteSize: CGFloat = 11
+    static let rowSpacing: CGFloat = 18
     static let contentSpacing: CGFloat = 6
+    /// The settings column is a FIXED width, centred in whatever the window
+    /// is: 168 + 12 + 380. Tailscale's window is only 600pt wide so its two
+    /// columns fill it; letting ours stretch across a library-sized window
+    /// left the gutter stranded with an acre of dead space to the right.
+    static let columnWidth: CGFloat = 560
 }
 
 /// One labelled group: the label sits in the right-aligned gutter, everything
@@ -109,7 +127,7 @@ struct SettingsField<Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: SettingsMetrics.labelGap) {
             Text(label.map { $0.hasSuffix(":") ? $0 : "\($0):" } ?? "")
                 .frame(width: SettingsMetrics.labelGutter, alignment: .trailing)
                 .foregroundStyle(.primary)
@@ -125,14 +143,23 @@ struct SettingsField<Content: View>: View {
 /// measure rather than the full window width.
 struct SettingsNote: View {
     private let text: String
-    init(_ text: String) { self.text = text }
+    /// Tailscale indents its notes to line up with the checkbox LABEL rather
+    /// than the checkbox, so the explanation reads as belonging to the thing
+    /// above it. Pass false for a row whose control has no leading glyph.
+    private let indented: Bool
+
+    init(_ text: String, indented: Bool = true) {
+        self.text = text
+        self.indented = indented
+    }
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: SettingsMetrics.noteSize))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 460, alignment: .leading)
+            .frame(width: SettingsMetrics.noteWidth, alignment: .leading)
+            .padding(.leading, indented ? SettingsMetrics.noteIndent : 0)
     }
 }
 
@@ -146,10 +173,10 @@ struct SettingsPageBody<Content: View>: View {
             VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
                 content
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 18)
+            .frame(width: SettingsMetrics.columnWidth, alignment: .leading)
+            .padding(.top, 20)
             .padding(.bottom, 28)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 }

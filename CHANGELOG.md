@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+One window, three tabs - Computers, Settings, About - with the title centred
+above them. The PC list and its cover grid are the Computers tab (a sidebar, a
+grid and an "Add PC…" button on the bottom edge); every setting is one
+scrolling page under Settings. The metrics are copied from Tailscale's own
+Settings window, measured off a screen capture of it: the label gutter, the
+18pt checkboxes, the note indent and wrap, the row rhythm, the tab strip and
+the accent-tinted selected tab.
+
 Settings live in the main window now, not a separate Settings window. A row of
 icon tabs across the top - Stream, Video, Audio, Input, PCs, App, About -
 switches pages, and every page is flat rows: the label right-aligned in a

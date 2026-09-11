@@ -41,7 +41,7 @@ struct ComputersTab: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 236)
+                .frame(width: 200)
             Divider()
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

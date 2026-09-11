@@ -23,6 +23,19 @@ struct AppShell: View {
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 0) {
+            // The title bar area: the system title is hidden (see
+            // WindowChromeTweak) so it can be centred here, clear of the
+            // traffic lights, exactly as the reference app has it.
+            Text("Shimmer")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                // The window is `.fullSizeContentView`, but SwiftUI still
+                // insets its content by the title bar's height unless the top
+                // safe area is waived - which left this row sitting BELOW the
+                // traffic lights instead of beside them.
+                .ignoresSafeArea(.container, edges: .top)
             SettingsTabBar(selection: $model.settingsTab)
             Divider()
             switch model.settingsTab {
