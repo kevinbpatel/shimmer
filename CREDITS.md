@@ -29,24 +29,30 @@ Moonlight client shows the artwork the host serves for it. It was traced from
 the box art Sunshine itself returns for that app, flattened to a monochrome
 template so it tints like a system symbol.
 
-The DualSense mark in the menu bar (`Assets.xcassets/DualSenseGlyph`) is
-generated from `controller_playstation5.svg` in
-**[Kenney's Input Prompts](https://kenney.nl/assets/input-prompts)**, released
-into the public domain under **CC0 1.0**. The unmodified source SVG is kept at
-`scripts/assets/kenney-controller_playstation5.svg`; the trim-and-template pass
-that turns it into the menu-bar asset is `scripts/generate-dualsense-glyph.swift`.
-There is no PlayStation-controller SF Symbol to use instead - the system
-catalog has only `playstation.logo` (the PS letters mark, which Apple restricts
-to unmodified, referential use) and a generic `gamecontroller`.
+The menu-bar controller mark (`Assets.xcassets/ControllerBattery*`) reproduces
+**Steam**'s Big Picture controller indicator: the pad clipped to its left half
+with a quarter-turned battery beside it. Both the layout and the battery were
+taken from the Steam client itself - the stylesheet's
+`ControllerBatteryImgContainer` / `ControllerImg` / `ControllerBatteryIndicator`
+rules, and the `Battery` component's own geometry (body 39×24, 3-thick border,
+3×8 nub, a 27×12 fill track). The battery is redrawn from those numbers.
 
-The way that mark is composed - the pad clipped to its left half with a
-quarter-turned battery laid over it - follows **Steam**'s Big Picture controller
-indicator, whose layout and battery proportions were read out of the Steam
-client's own stylesheet (`ControllerBatteryImgContainer` / `ControllerImg` /
-`ControllerBatteryIndicator`). Only those measurements were used: every pixel
-shimmer ships is drawn from the numbers, because Valve's client artwork carries
-no redistribution grant. Steam is a trademark of **Valve Corporation**, which
-has not endorsed shimmer.
+**The DualSense glyph itself is Valve's artwork, used verbatim** - the
+`ControllerType` PS5 glyph, kept at `scripts/assets/steam-controller_dualsense.svg`
+and composed by `scripts/generate-controller-battery.swift`. It ships inside the
+Steam client and is **not covered by any redistribution grant**; including it
+here is a deliberate choice to match Big Picture exactly, made with that
+understood, and it is the one asset in this repository without a license behind
+it. Steam and the Steam logo are trademarks of **Valve Corporation**, which has
+not endorsed shimmer and is not affiliated with it. A public-domain alternative
+(`scripts/assets/kenney-controller_playstation5.svg`, from
+[Kenney's Input Prompts](https://kenney.nl/assets/input-prompts), **CC0 1.0**)
+is kept alongside it, and swapping back is a one-line change to the generator's
+`padSource`.
+
+There is no PlayStation-controller SF Symbol to use instead - the system catalog
+has only `playstation.logo` (the PS letters mark, which Apple restricts to
+unmodified, referential use) and a generic `gamecontroller`.
 
 "DualSense" and the controller's design are trademarks / trade dress of **Sony
 Interactive Entertainment Inc.**, which CC0 does not and cannot waive. shimmer

@@ -49,9 +49,12 @@
 // landing at 20px fixes the scale at 0.833 px/unit, which puts the visible pad
 // at 26.4 units and the gap at 3.6 - the numbers used below.
 //
-// Only geometry is taken. Valve's client artwork ships under no redistribution
-// grant, so every pixel here is drawn from the numbers, and the pad is Kenney's
-// CC0 DualSense rather than Steam's own glyph.
+// The battery is drawn from the numbers above rather than lifted. The PAD is
+// Steam's own DualSense glyph, taken verbatim from the same bundle (viewBox
+// 0 0 36 36, six paths, fill currentColor) - an explicit, informed call by the
+// repo's owner to match Big Picture exactly; Valve's client artwork carries no
+// redistribution grant, and CREDITS.md says so plainly. The CC0 alternative it
+// replaced (Kenney's) is still in scripts/assets/, so swapping back is one line.
 //
 // Usage: swift scripts/generate-controller-battery.swift
 
@@ -59,7 +62,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-let padSource = URL(fileURLWithPath: "scripts/assets/kenney-controller_playstation5.svg")
+let padSource = URL(fileURLWithPath: "scripts/assets/steam-controller_dualsense.svg")
 let assetRoot = URL(fileURLWithPath: "Glimmer/Assets.xcassets")
 
 /// The eleven levels a DualSense actually reports - its HID status byte carries
@@ -85,6 +88,12 @@ let fillShort: CGFloat = 12
 let padVisibleUnits: CGFloat = 26.4
 let padHeightUnits: CGFloat = 34.8
 let gapUnits: CGFloat = 3.6
+/// How far the pad's bottom edge sits above the battery's. The pad is NOT
+/// centred against the battery - Steam sits it low, so the battery overhangs it
+/// by 1.2 units at the bottom and 6.0 at the top (measured: battery 19..53,
+/// pad 24..52). Centring it instead puts the pad a whole point too high at
+/// menu-bar size, which reads as the pad floating.
+let padBottomUnits: CGFloat = 1.2
 
 // Turned a quarter: the battery's long axis runs vertically, nub on top.
 let markHeightUnits = bodyLong + nubLong                 // 42
@@ -119,9 +128,11 @@ func renderSVG(_ image: NSImage, size: CGSize, _ transform: (CGContext) -> Void)
     return ctx.makeImage()
 }
 
-/// Tight box around the non-transparent pixels (origin bottom-left). The Kenney
-/// SVG is 64x64 with no viewBox and the art fills only the middle, so this is
-/// measured rather than assumed - an asset update re-trims itself.
+/// Tight box around the non-transparent pixels (origin bottom-left). Measured
+/// rather than assumed, so the pad art can be swapped without retuning anything:
+/// the source is drawn into a fixed 64x64 canvas whatever its own viewBox says
+/// (Steam's is 36x36, Kenney's 64x64 with the art floating in the middle), and
+/// everything downstream works off this box.
 func alphaBoundingBox(_ image: CGImage) -> CGRect? {
     let width = image.width, height = image.height
     var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -232,7 +243,7 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     // which overhangs it above and below.
     let padVisible = padVisibleUnits * unit
     let padFull = padVisible * 2
-    let padHeight = padHeightUnits * unit
+    _ = padHeightUnits
     ctx.saveGState()
     ctx.clip(to: CGRect(x: 0, y: 0, width: padVisible, height: markHeight))
     let padFit = padFull / padArt.width
@@ -240,7 +251,7 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = graphics
     ctx.saveGState()
-    ctx.translateBy(x: 0, y: (markHeight - padHeight) / 2)
+    ctx.translateBy(x: 0, y: padBottomUnits * unit)
     ctx.scaleBy(x: padFit, y: padFit)
     ctx.translateBy(x: -padArt.minX, y: -padArt.minY)
     padSVG.draw(in: NSRect(x: 0, y: 0, width: 64, height: 64))

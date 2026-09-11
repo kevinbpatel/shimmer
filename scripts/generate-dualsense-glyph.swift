@@ -1,7 +1,7 @@
 #!/usr/bin/swift
 // Generates Assets.xcassets/DualSenseGlyph.imageset - the menu-bar controller
 // mark - from Kenney's CC0 `controller_playstation5.svg`, kept unmodified at
-// scripts/assets/kenney-controller_playstation5.svg. See CREDITS.md.
+// scripts/assets/steam-controller_dualsense.svg. See CREDITS.md.
 //
 // Two things this does that a plain export wouldn't:
 //   * TRIMS. The source is a 64x64 SVG with no viewBox and the art only fills
@@ -18,7 +18,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-let source = URL(fileURLWithPath: "scripts/assets/kenney-controller_playstation5.svg")
+let source = URL(fileURLWithPath: "scripts/assets/steam-controller_dualsense.svg")
 let outputDir = URL(fileURLWithPath: "Glimmer/Assets.xcassets/DualSenseGlyph.imageset")
 
 /// Point size of the glyph in the menu bar. A DualSense is about 1.5:1, and 20pt
