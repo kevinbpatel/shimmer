@@ -55,13 +55,6 @@ struct VideoPane: View {
                     + "up only once a PQ or HLG stream is actually running.")
             }
 
-            SettingsField("App icons") {
-                Toggle("Show cover art from the PC", isOn: $model.showCoverArt)
-                SettingsNote("Off, each app gets a macOS symbol chosen from its name. On, the tiles use the "
-                    + "artwork the host serves - worth it for a library with real covers, though Sunshine's "
-                    + "stock art is a generic plate with the app's name printed on it.")
-            }
-
             SettingsRule()
 
             SettingsField("Stats overlay") {

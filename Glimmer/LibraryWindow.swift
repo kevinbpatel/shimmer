@@ -103,21 +103,54 @@ struct ComputersTab: View {
         if let host = model.selectedHost {
             VStack(spacing: 0) {
                 ScrollView {
-                    VStack(spacing: 0) {
-                        hostHeader(host)
-                        if host.apps.count > 8 { searchField.padding(.bottom, 14) }
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 84, maximum: 92), spacing: 14, alignment: .top)],
-                            alignment: .center, spacing: 24
-                        ) {
-                            ForEach(apps) { app in
-                                AppCoverTile(app: app, host: host)
+                    VStack(alignment: .leading, spacing: 12) {
+                        // The name is the heading, centred, with no badge above
+                        // it - the round glyph read as decoration.
+                        Text(host.displayName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 4)
+
+                        field("Address") {
+                            Text(host.localAddress ?? host.manualAddress ?? host.name)
+                                .textSelection(.enabled)
+                        }
+                        field("Status") {
+                            HStack(spacing: 7) {
+                                Circle().fill(statusColor).frame(width: 9, height: 9)
+                                Text(statusText)
                             }
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 20)
+                        if let played = host.lastPlayedDescription {
+                            // The stored string reads "last played 5 hours ago",
+                            // which repeats the label in a two-column list.
+                            let trimmed = played.hasPrefix("last played ")
+                                ? String(played.dropFirst("last played ".count))
+                                : played
+                            field("Last played") { Text(trimmed).foregroundStyle(.secondary) }
+                        }
+                        field("Apps") {
+                            if host.apps.count > 8 { searchField.padding(.bottom, 2) }
+                            ForEach(apps) { app in
+                                Button {
+                                    model.requestStream(app: app, on: host)
+                                } label: {
+                                    Label(app.name, systemImage: app.systemImage)
+                                        .frame(minWidth: 150, alignment: .leading)
+                                }
+                                .disabled(model.isStreaming)
+                                .help(model.isStreaming
+                                      ? "Finish the current stream first" : "Stream \(app.name)")
+                            }
+                            if apps.isEmpty {
+                                Text("No apps to show.").foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.top, 22)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .overlay { if model.isStreaming { streamingOverlay(host) } }
 
@@ -129,7 +162,6 @@ struct ComputersTab: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
             }
-            .task(id: host.id) { model.artwork.prefetch(apps: host.apps, on: host) }
         } else if model.hosts.isEmpty {
             EmptyPairingState()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -140,26 +172,46 @@ struct ComputersTab: View {
         }
     }
 
-    /// The centred identity block the reference app puts at the top of its
-    /// detail column: a round glyph, the name under it, then the detail.
-    private func hostHeader(_ host: Host) -> some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.22))
-                    .frame(width: 56, height: 56)
-                Image(systemName: "display")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundStyle(Color.accentColor)
-            }
-            Text(host.displayName)
-                .font(.system(size: 13, weight: .semibold))
-            Text(host.localAddress ?? host.manualAddress ?? host.name)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+    /// One detail row. The reference app right-aligns its labels ~109pt into
+    /// the detail column with the values ~20pt beyond - narrower than the
+    /// Settings gutter because this column is only 400pt wide.
+    private func field<Content: View>(
+        _ label: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 18) {
+            Text(label)
+                .frame(width: 92, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 6) { content() }
+            Spacer(minLength: 0)
         }
-        .padding(.top, 24)
-        .padding(.bottom, 18)
+    }
+
+    private var statusColor: Color {
+        guard let live = model.hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
+            return .secondary.opacity(0.55)
+        }
+        switch live.state {
+        case .asleep: return .red
+        case .certMismatch: return .orange
+        case .unknown: return .secondary.opacity(0.55)
+        case .idle, .streamingApp, .streamingUnknownApp: return .green
+        }
+    }
+
+    private var statusText: String {
+        guard let live = model.hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
+            return "Checking…"
+        }
+        switch live.state {
+        case .idle: return "Online"
+        case .streamingApp(let name): return "Streaming \(name)"
+        case .streamingUnknownApp: return "Streaming"
+        case .asleep: return "Asleep or offline"
+        case .certMismatch: return "Trust needed - pair again"
+        case .unknown: return "Checking…"
+        }
     }
 
     private var searchField: some View {
@@ -271,89 +323,5 @@ private struct HostRow: View {
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(selected ? Color.primary.opacity(0.13) : Color.clear))
-    }
-}
-
-// MARK: - App tile
-
-/// One launchable app, drawn as a macOS-style icon: a rounded-square plate in
-/// a hue derived from the name, with an SF Symbol on it and the title beneath.
-///
-/// NOT the host's box art. Sunshine serves `/appasset` for every app, but its
-/// defaults are generic plates with DESKTOP or STEAM printed on them, which
-/// read as cheap cards rather than app icons. Real artwork is still available
-/// behind Settings > "Show cover art from the PC" for hosts that have it.
-private struct AppCoverTile: View {
-    let app: LibraryApp
-    let host: Host
-    @Environment(AppModel.self) private var model
-    @State private var hovered = false
-
-    private static let plate: CGFloat = 64
-
-    private var plateColor: Color {
-        Color(hue: app.iconHue, saturation: 0.42, brightness: 0.62)
-    }
-
-    var body: some View {
-        VStack(spacing: 7) {
-            Group {
-                if model.showCoverArt, let image = model.artwork.image(for: app, on: host) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    ZStack {
-                        LinearGradient(
-                            colors: [plateColor.opacity(0.95), plateColor.opacity(0.70)],
-                            startPoint: .top, endPoint: .bottom)
-                        Image(systemName: app.systemImage)
-                            .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
-                    }
-                }
-            }
-            .frame(width: Self.plate, height: Self.plate)
-            // The macOS app-icon squircle.
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
-            .overlay(alignment: .topTrailing) {
-                if app.name == model.runningAppName { runningBadge }
-            }
-            .shadow(color: .black.opacity(0.30), radius: 4, y: 2)
-            .scaleEffect(hovered ? 1.07 : 1.0)
-            .animation(.easeOut(duration: 0.18), value: hovered)
-
-            Text(app.name)
-                .font(.system(size: 11))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .truncationMode(.middle)
-                .frame(height: 28, alignment: .top)
-        }
-        .frame(width: 84)
-        .contentShape(Rectangle())
-        .onHover { hovered = $0 }
-        .onTapGesture { model.requestStream(app: app, on: host) }
-        .opacity(model.isStreaming ? 0.5 : 1.0)
-        .help(model.isStreaming ? "Finish the current stream first" : "Stream \(app.name)")
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Stream \(app.name)")
-    }
-
-    private var runningBadge: some View {
-        Image(systemName: "figure.run")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 18, height: 18)
-            .background(Circle().fill(Color.accentColor))
-            .overlay(Circle().strokeBorder(.black.opacity(0.35), lineWidth: 1))
-            .offset(x: 5, y: -5)
-            .help("Running on this PC now")
     }
 }

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Each PC's page is a field list - Address, Status (with a live dot), Last
+played - and its apps are plain macOS buttons with a system symbol, the way a
+Mac app states facts and offers actions. The round badge above the name is
+gone, the window background is opaque rather than a material that picked up
+the desktop behind it, and the tab strip greys out when the window isn't
+frontmost like every other piece of macOS chrome.
+
 App tiles are macOS icons, not cover cards. Each app gets an SF Symbol chosen
 from its name on a rounded-square plate tinted by a hue derived from that name
 - the way real app icons are told apart. Hosts do serve box art, but

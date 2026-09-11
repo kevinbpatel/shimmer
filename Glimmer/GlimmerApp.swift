@@ -120,10 +120,11 @@ struct GlimmerApp: App {
                 // with the margins squeezed flat - which is exactly what a stale
                 // 584 here did. A floor equal to the content leaves nothing to
                 // drag.
-                // Liquid Glass: on macOS 26 `.regularMaterial` resolves to
-                // the system material; future SDKs may expose a dedicated
-                // `.glassBackground` shape style for window containers.
-                .containerBackground(.regularMaterial, for: .window)
+                // OPAQUE, not a material. A translucent window picks up the
+                // desktop behind it - which is why this window's background
+                // colour changed between two screenshots taken over different
+                // wallpaper - and the app this is modelled on is flat.
+                .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
         }
         // The title bar is VISIBLE now: the library puts the selected PC's name
         // and address there (navigationTitle / navigationSubtitle) and hangs

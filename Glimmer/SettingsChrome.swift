@@ -60,6 +60,11 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 /// rest monochrome - no underline, no segmented control.
 struct SettingsTabBar: View {
     @Binding var selection: SettingsTab
+    /// macOS desaturates window chrome when the window is not frontmost, and
+    /// the reference app's tabs do exactly that. Without this the selected tab
+    /// stayed vivid blue on an inactive window, which is what made the two
+    /// headers look so different side by side.
+    @Environment(\.controlActiveState) private var activeState
 
     var body: some View {
         HStack(spacing: 4) {
@@ -75,13 +80,18 @@ struct SettingsTabBar: View {
                         Text(tab.title)
                             .font(.system(size: 11))
                     }
-                    .foregroundStyle(selection == tab ? Color.accentColor : Color.primary)
+                    .foregroundStyle(tint(for: tab))
                     .frame(minWidth: 62)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 8)
                     .background {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(selection == tab ? Color.accentColor.opacity(0.10) : .clear)
+                            .fill(selection == tab ? plateFill : .clear)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(selection == tab
+                                                  ? Color.primary.opacity(0.13) : .clear,
+                                                  lineWidth: 1))
                     }
                     .contentShape(Rectangle())
                 }
@@ -91,9 +101,20 @@ struct SettingsTabBar: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 9)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
         .padding(.horizontal, 12)
+    }
+
+    private var isActive: Bool { activeState != .inactive }
+
+    private func tint(for tab: SettingsTab) -> Color {
+        guard selection == tab else { return isActive ? .primary : .secondary }
+        return isActive ? Color.accentColor : .secondary
+    }
+
+    private var plateFill: Color {
+        isActive ? Color.accentColor.opacity(0.10) : Color.primary.opacity(0.08)
     }
 }
 
