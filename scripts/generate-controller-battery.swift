@@ -173,7 +173,7 @@ let padArt = CGRect(x: box.minX / measureScale, y: box.minY / measureScale,
 func boltPath() -> CGPath {
     let path = CGMutablePath()
     func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-        CGPoint(x: x, y: 30 - y)     // viewBox y-down, body top at y=30
+        CGPoint(x: x, y: 36 - y)     // viewBox is y-down; flip into our y-up frame
     }
     path.move(to: point(16, 20)); path.addLine(to: point(21, 11))
     path.addLine(to: point(21, 16)); path.addLine(to: point(26, 16))
@@ -182,35 +182,52 @@ func boltPath() -> CGPath {
     return path
 }
 
-/// Draws the battery at `origin`, turned a quarter so the nub points up.
+/// Steam's shell, `M39 6H0V30H39V22H42V14H39V6Z` plus the hole `M36 9H3V27H36V9Z`,
+/// as ONE even-odd path in the battery's own units.
+///
+/// It has to be one path. Filling the outer rect and then CLEARING the inner one
+/// lays two anti-aliased edges over each other, and since the border lands on
+/// fractional pixels at any sane menu-bar size, that leaves a grey rim - worst
+/// where the nub meets the body, which is exactly where it read as mush. A
+/// single even-odd fill gives each edge one clean coverage value.
+func shellPath() -> CGPath {
+    let p = CGMutablePath()
+    p.move(to: CGPoint(x: 39, y: 6))
+    for pt in [(0.0, 6.0), (0.0, 30.0), (39.0, 30.0), (39.0, 22.0),
+               (42.0, 22.0), (42.0, 14.0), (39.0, 14.0)] {
+        p.addLine(to: CGPoint(x: pt.0, y: pt.1))
+    }
+    p.closeSubpath()
+    p.move(to: CGPoint(x: 36, y: 9))
+    for pt in [(3.0, 9.0), (3.0, 27.0), (36.0, 27.0)] {
+        p.addLine(to: CGPoint(x: pt.0, y: pt.1))
+    }
+    p.closeSubpath()
+    return p
+}
+
+/// Draws the battery at `origin`, turned a quarter so the nub points up. Steam
+/// gets there with `rotate: 270deg` on the horizontal icon; this rotates the
+/// same geometry, which is identical and keeps it one path.
 func drawBattery(in ctx: CGContext, origin: CGPoint, level: Double, charging: Bool) {
     ctx.saveGState()
     ctx.translateBy(x: origin.x, y: origin.y)
     ctx.scaleBy(x: unit, y: unit)
-    // +90 degrees puts the nub (at +x) on top; then slide the rotated art back
-    // into the positive quadrant.
     ctx.rotate(by: .pi / 2)
-    ctx.translateBy(x: 0, y: -bodyShort)
+    ctx.translateBy(x: 0, y: -bodyShort - 6)   // art sits at y 6..30 in the viewBox
 
     ctx.setFillColor(NSColor.black.cgColor)
-    ctx.fill(CGRect(x: 0, y: 0, width: bodyLong, height: bodyShort))
-    ctx.saveGState()
-    ctx.setBlendMode(.clear)
-    ctx.fill(CGRect(x: border, y: border,
-                    width: bodyLong - border * 2, height: bodyShort - border * 2))
-    ctx.restoreGState()
+    ctx.addPath(shellPath())
+    ctx.fillPath(using: .evenOdd)
 
-    ctx.setFillColor(NSColor.black.cgColor)
-    ctx.fill(CGRect(x: bodyLong, y: (bodyShort - nubShort) / 2, width: nubLong, height: nubShort))
-
-    // The charge. Empty draws a bare shell, as Steam's does at level 0.
+    // The charge, `<rect x=6 y=12 width={level}% of 27 height=12>`. Empty draws a
+    // bare shell, as Steam's does at level 0.
     if level > 0 {
-        ctx.fill(CGRect(x: fillOffsetLong, y: fillOffsetShort,
-                        width: fillLong * CGFloat(level), height: fillShort))
+        ctx.fill(CGRect(x: fillOffsetLong, y: 12, width: fillLong * CGFloat(level), height: fillShort))
     }
 
     if charging {
-        // Steam draws the bolt straight over the fill in `currentColor`. In a
+        // Steam sets the bolt straight over the fill in `currentColor`. In a
         // one-colour template that would vanish into it, so the bolt gets a
         // punched-out gap first and is then set solid inside it - the same mark,
         // legible whether it lands on fill or on bare shell.
