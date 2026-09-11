@@ -35,56 +35,77 @@ struct RawHIDControl: View {
         DualSenseHID.shared.reportCount > 0 || DualSenseHID.accessGranted
     }
 
+    /// `true` once the user has been sent to System Settings, so the row can
+    /// show ONE action at a time. Load-bearing because `IOHIDCheckAccess` is
+    /// cached per process: after the user flips the toggle we cannot observe the
+    /// grant landing, so "you have been there, now relaunch" is the only signal
+    /// available - and it is the right one, since relaunch is genuinely the next
+    /// step either way.
+    @State private var sentToSettings = false
+
     var body: some View {
-        if model.rawHIDControllerEnabled {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    // Icon AND text carry the state - never colour alone, so the
-                    // row still reads for a colourblind user and VoiceOver.
-                    Label {
-                        Text(working ? "On" : "Needs Input Monitoring")
-                    } icon: {
-                        Image(systemName: working
-                              ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(working ? Color.green : Color.orange)
+        // A checkbox, like every other row on this page. It replaced an
+        // "Enable…" button / "Turn Off" button pair plus a two-button permission
+        // card - four controls for one setting, on a page whose grammar is one
+        // label and one control. The warning line below borrows the shape the
+        // login-item and Wi-Fi helper rows already use for "macOS needs you to
+        // approve this": one short orange line, one button.
+        Toggle("Use the Options, Create and Mute buttons", isOn: enabledBinding)
+            .alert("Enable enhanced DualSense buttons?", isPresented: $showExplain) {
+                Button("Enable") { enable() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(AppModel.rawHIDExplanation)
+            }
+        if model.rawHIDControllerEnabled, !working {
+            HStack(spacing: 8) {
+                // Short enough to stay on ONE line beside the button - a
+                // wrapped message leaves the button floating against two lines
+                // of text, which is what made this row look assembled rather
+                // than designed. The button title carries the detail.
+                Label(sentToSettings ? "Relaunch to finish" : "Input Monitoring is off",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12)).foregroundStyle(.orange)
+                if sentToSettings {
+                    Button("Quit & Reopen") { Self.relaunch() }
+                        // Relaunching mid-session would drop the stream.
+                        .disabled(model.isStreaming)
+                        .help(model.isStreaming
+                              ? "Finish the current stream first"
+                              : "macOS applies Input Monitoring only when the app restarts")
+                } else {
+                    Button("Open Input Monitoring") {
+                        sentToSettings = true
+                        Self.registerAndOpen()
                     }
-                    Spacer()
-                    Button("Turn Off") { model.rawHIDControllerEnabled = false }
                 }
-                if !working { permissionActions }
             }
             .onAppear { working = currentlyWorking }
             .onReceive(poll) { _ in working = currentlyWorking }
-        } else {
-            Button("Enable…") { showExplain = true }
-                .alert("Enable enhanced DualSense buttons?", isPresented: $showExplain) {
-                    Button("Enable") { enable() }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text(AppModel.rawHIDExplanation)
-                }
         }
     }
 
-    /// The two steps, as two buttons, in the order they have to happen.
-    ///
-    /// This replaced a tinted card with a gamecontroller glyph and a paragraph
-    /// of instructions. Two reasons. It was the only plate on a page of flat
-    /// gutter rows, so it read as something pasted in from a web page; and the
-    /// paragraph was telling the user to go and do a thing the app can just do
-    /// - macOS applies Input Monitoring only on relaunch, so "Quit & Reopen" is
-    /// a button, not a sentence. The button titles ARE the instructions, which
-    /// is why there is no explanatory text left here.
-    private var permissionActions: some View {
-        HStack(spacing: 8) {
-            Button("Open Input Monitoring…") { Self.registerAndOpen() }
-            Button("Quit & Reopen") { Self.relaunch() }
-                // Relaunching mid-session would drop the stream.
-                .disabled(model.isStreaming)
-                .help(model.isStreaming
-                      ? "Finish the current stream first"
-                      : "macOS applies Input Monitoring only when the app restarts")
-        }
+    /// Turning it ON routes through the explanation alert first - macOS's own
+    /// Input Monitoring dialog says "keystrokes", and that is worth defusing
+    /// before it appears. Turning it OFF is immediate.
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { model.rawHIDControllerEnabled },
+            set: { on in
+                if on {
+                    showExplain = true
+                } else {
+                    model.rawHIDControllerEnabled = false
+                    sentToSettings = false
+                }
+            })
+    }
+
+    private func enable() {
+        model.rawHIDControllerEnabled = true
+        // For a never-asked user this prompts and grants; for a denied/stale
+        // entry it no-ops, so the warning line guides them to System Settings.
+        if !DualSenseHID.accessGranted { Self.registerAndOpen() }
     }
 
     /// Start a fresh instance, then exit this one. `createsNewApplicationInstance`
@@ -98,13 +119,6 @@ struct RawHIDControl: View {
         ) { _, _ in
             DispatchQueue.main.async { NSApp.terminate(nil) }
         }
-    }
-
-    private func enable() {
-        model.rawHIDControllerEnabled = true
-        // For a never-asked user this prompts and grants; for a denied/stale
-        // entry it no-ops, so the permission card guides them to System Settings.
-        if !DualSenseHID.accessGranted { Self.registerAndOpen() }
     }
 
     /// IOHIDRequestAccess is the ONLY call that adds Glimmer to the Input
