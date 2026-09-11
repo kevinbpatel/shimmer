@@ -21,18 +21,39 @@ import os.log
 
 extension AppModel {
 
-    /// UI entry point for a launch. If the host is already streaming an app
-    /// that ISN'T ours, arm `pendingTakeover` for a confirm before we /launch
-    /// over the live occupant; otherwise stream straight through.
+    /// UI entry point for a launch. If the host is already streaming a
+    /// DIFFERENT app, arm `pendingTakeover` for a confirm before we quit it;
+    /// otherwise stream straight through.
+    ///
+    /// Asking for the app that is already running is not a takeover, it's a
+    /// resume: the host keeps the session and hands it to us (`currentgame ==
+    /// our appID → /resume`, see StreamSession+Start). Nothing is lost, so
+    /// there is nothing to confirm - the dialog there was pure friction on the
+    /// commonest path there is, reconnecting to your own session after the
+    /// stream window closed.
+    ///
+    /// The one case this lets through quietly is another device streaming the
+    /// same app: resuming takes it from them. nvhttp gives us no way to tell
+    /// that apart from our own orphaned session - both are just `currentgame`
+    /// - and every Moonlight client resumes on a name match too.
     func requestStream(app: LibraryApp, on host: Host) {
         if !isStreaming,
            let live = hostLiveStatus, live.hostID == host.id,
            Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
-           case .streamingApp(let occupant) = live.state {
+           case .streamingApp(let occupant) = live.state,
+           Self.isTakeover(occupant: occupant, launching: app.name) {
             pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant)
             return
         }
         stream(app: app, on: host)
+    }
+
+    /// Does starting `appName` cost the host's current session? Only when some
+    /// OTHER app holds it - the same app is a resume. Pure so the distinction
+    /// is checkable without a host or a live status.
+    nonisolated static func isTakeover(occupant: String?, launching appName: String) -> Bool {
+        guard let occupant, !occupant.isEmpty else { return false }
+        return occupant != appName
     }
 
     /// Confirm the armed takeover and launch over the host's current session.

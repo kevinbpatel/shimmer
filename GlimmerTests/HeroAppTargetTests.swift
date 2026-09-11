@@ -71,4 +71,27 @@ struct HeroAppTargetTests {
         #expect(resolved?.name != "Half-Life 3")
         #expect(resolved?.name == "Desktop")
     }
+
+    // MARK: Takeover, or just a resume
+
+    /// The regression that made the dialog useless: asking for the app the host
+    /// is ALREADY streaming resumes it, so it must not prompt. That's the
+    /// commonest path there is - reconnecting after the stream window closed.
+    @Test func resumingTheRunningAppIsNotATakeover() {
+        #expect(!AppModel.isTakeover(occupant: "Steam Big Picture",
+                                     launching: "Steam Big Picture"))
+        #expect(!AppModel.isTakeover(occupant: "Desktop", launching: "Desktop"))
+    }
+
+    @Test func launchingOverADifferentAppIsATakeover() {
+        #expect(AppModel.isTakeover(occupant: "Steam Big Picture", launching: "Desktop"))
+        #expect(AppModel.isTakeover(occupant: "Desktop", launching: "Steam Big Picture"))
+        // Names are compared exactly - "Low Res Desktop" really is another app.
+        #expect(AppModel.isTakeover(occupant: "Desktop", launching: "Low Res Desktop"))
+    }
+
+    @Test func anIdleHostIsNeverATakeover() {
+        #expect(!AppModel.isTakeover(occupant: nil, launching: "Desktop"))
+        #expect(!AppModel.isTakeover(occupant: "", launching: "Desktop"))
+    }
 }

@@ -102,8 +102,9 @@ struct MainWindow: View {
             StreamEndedToast()
                 .padding(.top, 16)
         }
-        // Takeover confirmation: launching over a host that's already streaming
-        // someone else's session boots them out, so confirm before we /launch.
+        // Takeover confirmation: launching a DIFFERENT app over a host that's
+        // already streaming quits the running one, so confirm before we /launch.
+        // Asking for the app already running never lands here - that resumes.
         .confirmationDialog(
             "Take over the stream?",
             isPresented: Binding(
@@ -116,7 +117,11 @@ struct MainWindow: View {
             Button("Take over", role: .destructive) { model.confirmPendingTakeover() }
             Button("Cancel", role: .cancel) { model.pendingTakeover = nil }
         } message: { pending in
-            Text("\(pending.host.displayName) is already streaming \(pending.occupantApp). Starting your stream will end that session.")
+            // Both apps get named: this only fires when they DIFFER (asking for
+            // the running app resumes it instead - see requestStream), so "what
+            // am I losing, and for what" is the whole question being asked.
+            Text("\(pending.host.displayName) is already streaming \(pending.occupantApp). "
+                 + "Starting \(pending.app.name) will quit it and end that session.")
         }
         .background {
             // ⌘1-⌘9 host switching (multi-PC households only) - invisible,
