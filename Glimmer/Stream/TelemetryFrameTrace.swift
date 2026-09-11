@@ -74,7 +74,7 @@ final class FrameTraceWriter: @unchecked Sendable {
     deinit { bufferLock.deallocate() }
 
     /// Open the trace file + arm the flush timer. Mirrors the exporter's NDJSON
-    /// path: `~/Library/Logs/Glimmer/telemetry-frames-<ISO8601>.ndjson`.
+    /// path: `~/Library/Logs/Shimmer/telemetry-frames-<ISO8601>.ndjson`.
     func start(isoStamp: String) {
         flushQueue.async { [weak self] in
             guard let self else { return }

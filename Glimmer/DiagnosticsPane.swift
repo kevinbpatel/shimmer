@@ -29,7 +29,7 @@ struct DiagnosticsPane: View {
     /// the telemetry gate.
     @AppStorage("diagFileLogDebug") private var fileLogDebug = false
 
-    /// `~/Library/Logs/Glimmer` - the SAME directory the telemetry NDJSON writer
+    /// `~/Library/Logs/Shimmer` - the SAME directory the telemetry NDJSON writer
     /// and the per-session Diag log sink use (see TelemetryExporter.openNDJSONFile
     /// + LogStore). Resolved live so it shows the real per-user path.
     private var telemetryLogDir: URL {

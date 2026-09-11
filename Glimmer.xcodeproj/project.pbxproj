@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		026FD8A0211FCD7B527606B0 /* StatsOverlaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A952BEEC96F2A8042E0F4C3 /* StatsOverlaySettings.swift */; };
 		040BDEEE8B8E58AC0375BF3A /* StreamingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448F2B492E4B38A0CFF51260 /* StreamingState.swift */; };
 		086CF5A56FDAE0E5A8341CEA /* Glimmer Login Helper.app in Embed Login Helper */ = {isa = PBXBuildFile; fileRef = 68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		109EA4B557EB9EFC0400C751 /* AWDLHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C61CA646A8599B4EC06C5 /* AWDLHelperManager.swift */; };
@@ -314,7 +313,6 @@
 		1A6B7F5AA2DBCDB1B8D9A413 /* HostsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostsStore.swift; sourceTree = "<group>"; };
 		2C2C61CA646A8599B4EC06C5 /* AWDLHelperManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AWDLHelperManager.swift; sourceTree = "<group>"; };
 		398ABCA94CDDF4D5B2770B8F /* KeyboardScanMap.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeyboardScanMap.swift; path = Stream/KeyboardScanMap.swift; sourceTree = "<group>"; };
-		3A952BEEC96F2A8042E0F4C3 /* StatsOverlaySettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatsOverlaySettings.swift; sourceTree = "<group>"; };
 		447FF92C9458E21549E4965D /* HostStatusPoller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostStatusPoller.swift; sourceTree = "<group>"; };
 		448F2B492E4B38A0CFF51260 /* StreamingState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingState.swift; sourceTree = "<group>"; };
 		48756631ACFBD0A1FFEBD539 /* ControlTransport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Stream/ControlTransport.swift; sourceTree = "<group>"; };
@@ -894,7 +892,6 @@
 				ABCD20260610000000004D01 /* ControllerHaptics+Actuation.swift */,
 				ABCD20260609000000001701 /* ControllerMotion.swift */,
 				448F2B492E4B38A0CFF51260 /* StreamingState.swift */,
-				3A952BEEC96F2A8042E0F4C3 /* StatsOverlaySettings.swift */,
 				A647C41163064ECDA1D86EA8 /* MacSystemStats.swift */,
 				71A5B2E11628E68BFAF05421 /* AppIcon.icon */,
 				2C2C61CA646A8599B4EC06C5 /* AWDLHelperManager.swift */,
@@ -1309,7 +1306,6 @@
 				ABCD20260610000000004D02 /* ControllerHaptics+Actuation.swift in Sources */,
 				ABCD20260609000000001702 /* ControllerMotion.swift in Sources */,
 				040BDEEE8B8E58AC0375BF3A /* StreamingState.swift in Sources */,
-				026FD8A0211FCD7B527606B0 /* StatsOverlaySettings.swift in Sources */,
 				FB153DF267467B06C6BE3467 /* MacSystemStats.swift in Sources */,
 				109EA4B557EB9EFC0400C751 /* AWDLHelperManager.swift in Sources */,
 				C6C5CBE04F4781BF9891C433 /* ControlTransport.swift in Sources */,

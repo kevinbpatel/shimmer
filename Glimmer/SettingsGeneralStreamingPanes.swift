@@ -1,9 +1,8 @@
 //
 //  SettingsGeneralStreamingPanes.swift
 //
-//  The App settings pane (login items, default action, the Wi-Fi helper) and
-//  the stats-overlay custom-rows picker the Video pane embeds. SettingsRoot
-//  composes panes across files, so the types are internal. (Filename keeps
+//  The App settings pane: login items, the Wi-Fi helper, and diagnostics.
+//  SettingsRoot composes panes across files, so the types are internal. (Filename keeps
 //  its pre-redesign name - renaming means touching the pbxproj for zero
 //  behavioural gain; the Stream / Video / Audio panes that replaced the old
 //  Quality pane live in their own files.) `LoginItemManager`, the registration
@@ -95,10 +94,30 @@ struct AppPane: View {
                 }
             }
 
+            SettingsRule()
+
+            // Deliberately NOT behind the `showDiagnostics` reveal the rest of
+            // this group sits behind. This switch is the first thing to flip
+            // when a stream misbehaves - it starts the recorder whose output
+            // (one JSON object per second, plus GET /snapshot on loopback) is
+            // how anyone, human or otherwise, finds out WHY. A troubleshooting
+            // switch nobody can find troubleshoots nothing.
+            SettingsField("Troubleshooting") {
+                Toggle("Record stream health while streaming", isOn: $model.telemetryEnabled)
+                if model.telemetryEnabled {
+                    Button("Show recordings in Finder") {
+                        let dir = FileManager.default.homeDirectoryForCurrentUser
+                            .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
+                        try? FileManager.default.createDirectory(
+                            at: dir, withIntermediateDirectories: true)
+                        NSWorkspace.shared.open(dir)
+                    }
+                }
+            }
+
             if model.showDiagnostics {
                 SettingsRule()
                 SettingsField("Diagnostics") {
-                    Toggle("Performance telemetry", isOn: $model.telemetryEnabled)
                     DisclosureGroup("Controller input test") {
                         ControllerInputTest().settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                     }
@@ -118,97 +137,5 @@ struct AppPane: View {
                 : SMAppService.mainApp
             loginItemNeedsApproval = (service.status == .requiresApproval)
         }
-    }
-}
-
-// MARK: - Stats custom rows picker
-//
-// Standalone view (not inlined in the QualityPane) because the
-// Section{} body in SwiftUI's Form has tight rules about what counts as
-// a single row vs. a multi-row group, and a grouped checkbox grid sits
-// most cleanly as its own view. Reads + writes the manager directly via
-// @Environment; no separate binding plumbing.
-struct StatsCustomRowsPicker: View {
-    @Environment(AppModel.self) private var model
-
-    /// Row catalogue grouped by section for display. The order here
-    /// matches the rendering order in StreamStatsSnapshot.rows() - the
-    /// user sees the same top-to-bottom shape in the checkbox list as
-    /// in the overlay. Audio sits at the bottom and is unchecked by
-    /// default; users opt in via Custom.
-    private static let sections: [(title: String, rows: [(StatsRow.Kind, String)])] = [
-        ("Frame rates", [
-            (.hostFps, "Host FPS"),
-            (.networkFps, "Network FPS"),
-            (.decodeFps, "Decode FPS"),
-            (.renderFps, "Render FPS")
-        ]),
-        ("Network", [
-            (.latency, "Latency"),
-            (.jitter, "Jitter"),
-            (.networkDrops, "Network drop rate")
-        ]),
-        ("Pipeline", [
-            (.decoderDrops, "Decoder drops"),
-            (.smoothness, "Smoothness"),
-            (.decodeTime, "Decode time"),
-            (.bitrate, "Bitrate"),
-            (.hostProcessing, "Host encode latency")
-        ]),
-        ("Mac", [
-            (.macCpu, "Mac CPU"),
-            (.macRam, "Mac RAM"),
-            (.macBattery, "Mac battery"),
-            (.controllerBattery, "Controller battery")
-        ]),
-        ("Config", [
-            (.audio, "Audio configuration")
-        ])
-    ]
-
-    init() {
-        // Exhaustiveness tripwire: every StatsRow.Kind must appear in the
-        // hand-maintained catalogue above, or that row silently becomes
-        // un-toggleable in Custom (how .smoothness went missing - added
-        // to the enum and Extended, never to this list). Debug-only;
-        // assert() compiles out of release builds.
-        assert(
-            Set(Self.sections.flatMap { $0.rows.map(\.0) }) == Set(StatsRow.Kind.allCases),
-            "Custom-rows catalogue is out of sync with StatsRow.Kind.allCases")
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Self.sections, id: \.title) { section in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(section.title)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                    ForEach(section.rows, id: \.0) { row in
-                        Toggle(row.1, isOn: rowBinding(for: row.0))
-                            .toggleStyle(.checkbox)
-                    }
-                }
-            }
-        }
-        .padding(.top, 6)
-    }
-
-    /// Two-way binding for one row's membership in the custom-rows set.
-    /// Set-mutation goes through the property's didSet so the
-    /// UserDefaults persistence kicks in on every toggle.
-    private func rowBinding(for kind: StatsRow.Kind) -> Binding<Bool> {
-        Binding(
-            get: { model.statsOverlayCustomRows.contains(kind) },
-            set: { isOn in
-                if isOn {
-                    model.statsOverlayCustomRows.insert(kind)
-                } else {
-                    model.statsOverlayCustomRows.remove(kind)
-                }
-            }
-        )
     }
 }

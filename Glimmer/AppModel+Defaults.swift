@@ -64,14 +64,4 @@ extension AppModel {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
-
-    /// Decode the persisted stats-overlay custom-row set, or nil when the key is
-    /// absent or decodes to an empty set (so the default initial set holds).
-    static func persistedCustomRows() -> Set<StatsRow.Kind>? {
-        guard let raw = UserDefaults.standard.array(forKey: "statsOverlayCustomRows") as? [String] else {
-            return nil
-        }
-        let decoded = raw.compactMap(StatsRow.Kind.init(rawValue:))
-        return decoded.isEmpty ? nil : Set(decoded)
-    }
 }
