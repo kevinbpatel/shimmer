@@ -367,12 +367,6 @@ final class AppModel {
     var autoPictureInPicture: Bool = true {
         didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
     }
-    /// While the stream is in Picture in Picture, the Mac pointer over the PiP
-    /// window is mirrored onto the host as an absolute position (and a plain
-    /// click on the picture goes through). Read when the PiP panel appears.
-    var pipPointerMirror: Bool = true {
-        didSet { UserDefaults.standard.set(pipPointerMirror, forKey: "pipPointerMirror") }
-    }
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
@@ -389,9 +383,10 @@ final class AppModel {
     var captureSysKeys: Bool = false {
         didSet { UserDefaults.standard.set(captureSysKeys, forKey: "captureSysKeys") }
     }
-    var streamCoversNotch: Bool = true {
-        didSet { UserDefaults.standard.set(streamCoversNotch, forKey: "streamCoversNotch") }
-    }
+    /// Full-screen streams always cover the whole panel, notch included, so a
+    /// panel-native stream renders 1:1. This was a switch; it is a constant now
+    /// because the answer was always yes - which is why it defaulted on.
+    let streamCoversNotch = true
     /// The Custom preset's "Show the stream in a window" choice: full screen
     /// (the default) or a normal titled window at Custom's own resolution,
     /// refresh, bitrate and HDR. Only in force under Custom (see
@@ -668,7 +663,6 @@ final class AppModel {
         }
         customHDR = Self.persistedBool("customHDR") ?? customHDR
         captureSysKeys = Self.persistedBool("captureSysKeys") ?? captureSysKeys
-        streamCoversNotch = Self.persistedBool("streamCoversNotch") ?? streamCoversNotch
         // Registered default (GlimmerApp) answers the absent-key case; an
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
@@ -695,7 +689,6 @@ final class AppModel {
         statsHotkey = Self.persistedDecoded("statsHotkey", HotkeyChord.self) ?? statsHotkey
         pipHotkey = Self.persistedDecoded("pipHotkey", HotkeyChord.self) ?? pipHotkey
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
-        pipPointerMirror = Self.persistedBool("pipPointerMirror") ?? pipPointerMirror
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 

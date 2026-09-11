@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Three switches became behaviour: raw mouse motion while streaming, the mouse
+over the Picture in Picture window moving the host pointer, and covering the
+notch in full screen. All three defaulted on, turning them off made things
+worse, and none of them earned a row in Settings.
+
 A PC's apps lead its page, as buttons with a native symbol: a Mac for either
 desktop, and Steam's own mark for Steam. The PC's
 name isn't repeated above them - the row selected in the list already says

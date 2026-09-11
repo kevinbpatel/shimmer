@@ -177,11 +177,6 @@ struct StreamPane: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 260)
-                if model.currentDisplayHasNotch, model.effectiveDisplayMode == .fullScreen {
-                    Toggle("Fill the notch", isOn: $model.streamCoversNotch)
-                    SettingsNote("Covers the whole panel, camera notch included, so a panel-native stream "
-                        + "renders 1:1. A thin strip of the picture hides behind the notch.")
-                }
                 if model.streamDisplayMode == .window {
                     SettingsNote("The pointer belongs to the game while it's over the window - hold Esc or press "
                         + "\(model.releasePointerHotkey.displayString) to get it back. Applies to the next stream.")
@@ -192,9 +187,9 @@ struct StreamPane: View {
 
             SettingsField("Picture in Picture") {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
-                Toggle("Mouse over the PiP window moves the host pointer", isOn: $model.pipPointerMirror)
                 SettingsNote("The stream keeps playing in a small floating window you can drag to any corner, "
-                    + "and controllers keep working. \(model.pipHotkey.displayString) pops it out on demand either way.")
+                    + "controllers keep working, and the mouse over that window moves the host's pointer. "
+                    + "\(model.pipHotkey.displayString) pops it out on demand either way.")
             }
 
             SettingsRule()
