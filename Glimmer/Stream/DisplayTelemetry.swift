@@ -49,6 +49,14 @@ struct DisplayProbe: Sendable {
     /// realized refresh well under it (the pacer's `refresh_min_hz`) reads as a
     /// genuine ramp-down rather than a slow panel.
     var maxRefreshHz: Int
+    /// True while the stream is showing in the system Picture in Picture window
+    /// rather than its own. Recorded because every present-side number above
+    /// means something different in PiP - the stream window is ordered out, the
+    /// pacer rides a screen-bound link, and the video is a small panel over a
+    /// live desktop instead of the only thing on screen. Without this field a
+    /// log cannot answer "was it in PiP when that happened", which is exactly
+    /// the question a realized-refresh trace raises.
+    var pipActive: Bool
 }
 
 /// Accumulator + main-actor sampler for the DISPLAY signals. Owned by the
