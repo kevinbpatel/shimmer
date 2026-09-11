@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Two pickers are gone. Audio channels are always the richest layout this Mac's
+default output can take, and there is no "default app" setting: the library
+shows a button per app, so the menu-bar item, the launch after pairing, and
+wake-then-resume all target whatever you last played on that PC (or whatever
+the PC reports running right now), falling back to Desktop.
+
 Three switches became behaviour: raw mouse motion while streaming, the mouse
 over the Picture in Picture window moving the host pointer, and covering the
 notch in full screen. All three defaulted on, turning them off made things

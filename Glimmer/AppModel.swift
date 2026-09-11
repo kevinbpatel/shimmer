@@ -183,17 +183,8 @@ final class AppModel {
             appAppearance.apply()
         }
     }
-    /// Audio channel layout asked of the host: follow the Mac's output device
-    /// or force a layout (a stereo headset on a Mac whose default output is a
-    /// 7.1 receiver, and vice versa).
-    var audioLayout: AudioLayout = .auto {
-        didSet { UserDefaults.standard.set(audioLayout.rawValue, forKey: "audioLayout") }
-    }
 
     // Defaults
-    var defaultLaunchApp: String = "Desktop" {
-        didSet { UserDefaults.standard.set(defaultLaunchApp, forKey: "defaultLaunchApp") }
-    }
     var muteMacWhileStreaming: Bool = false {
         didSet {
             UserDefaults.standard.set(muteMacWhileStreaming, forKey: "muteMacWhileStreaming")
@@ -632,7 +623,6 @@ final class AppModel {
         // pin included), rather than letting it reach into AppModel.
         artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
         muteMacWhileStreaming = UserDefaults.standard.bool(forKey: "muteMacWhileStreaming")
-        defaultLaunchApp = UserDefaults.standard.string(forKey: "defaultLaunchApp") ?? defaultLaunchApp
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
@@ -648,7 +638,6 @@ final class AppModel {
         bitrateAuto = Self.persistedBool("bitrateAuto") ?? bitrateAuto
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
-        audioLayout = Self.persistedRawValue("audioLayout", AudioLayout.self) ?? audioLayout
         appAppearance = Self.persistedRawValue("appAppearance", AppAppearance.self) ?? appAppearance
         // One-shot: HDR was hard-coded ON for the panel presets and only asked
         // under Custom, so an install that turned it off under Custom and then

@@ -1,11 +1,11 @@
 //
 //  StreamChoices.swift
 //
-//  The value types behind the Stream and Audio panes' pickers: the standard
-//  resolutions, the resolution / frame-rate choices the pickers bind to (a
-//  view of the persisted preset + custom numbers, not a fourth store), the
-//  stepped bitrate scale, and the audio channel layout. Pure values so the
-//  resolution rules are unit-testable (GlimmerTests/StreamChoicesTests.swift).
+//  The value types behind the Stream pane's pickers: the standard resolutions,
+//  the resolution / frame-rate choices the pickers bind to (a view of the
+//  persisted preset + custom numbers, not a fourth store), and the stepped
+//  bitrate scale. Pure values so the rules are unit-testable
+//  (GlimmerTests/StreamChoicesTests.swift).
 //
 
 import Foundation
@@ -109,32 +109,6 @@ extension StreamSizeBounds {
     static let bitrateMbps = 5...300
     static func clampBitrateMbps(_ value: Int) -> Int {
         min(max(value, bitrateMbps.lowerBound), bitrateMbps.upperBound)
-    }
-}
-
-/// Audio channel layout asked of the host.
-enum AudioLayout: String, CaseIterable, Identifiable {
-    case auto, stereo, surround51, surround71
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .auto: return "Match this Mac's output"
-        case .stereo: return "Stereo"
-        case .surround51: return "5.1 surround"
-        case .surround71: return "7.1 surround"
-        }
-    }
-
-    /// The engine config: probe the default output device for `.auto`.
-    var streamAudioConfig: AudioConfig {
-        switch self {
-        case .auto: return .bestForCurrentOutput()
-        case .stereo: return .stereo
-        case .surround51: return .surround51
-        case .surround71: return .surround71
-        }
     }
 }
 

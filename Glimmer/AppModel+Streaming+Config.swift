@@ -60,17 +60,19 @@ extension AppModel {
 
     // MARK: Streaming
 
+    /// The fallback target when nothing better is known. There is no "default
+    /// app" setting any more: the library shows a button per app, so picking
+    /// one in Settings as well was a second answer to a question the user
+    /// answers by clicking. Desktop is the one entry every host publishes.
     var defaultAppName: String {
-        if let host = selectedHost,
-           host.apps.contains(where: { $0.name == defaultLaunchApp }) {
-            return defaultLaunchApp
-        }
-        return "Desktop"
+        guard let host = selectedHost else { return "Desktop" }
+        if host.apps.contains(where: { $0.name == "Desktop" }) { return "Desktop" }
+        return host.apps.first?.name ?? "Desktop"
     }
 
     func streamDefaultApp() {
         guard let host = selectedHost else { return }
-        let app = host.apps.first(where: { $0.name == defaultAppName })
+        let app = host.apps.first(where: { $0.name == heroTargetAppName })
             ?? host.apps.first(where: { $0.name == "Desktop" })
             ?? host.apps.first
         if let app { requestStream(app: app, on: host) }
@@ -159,7 +161,8 @@ extension AppModel {
         var cfg = StreamConfig(width: effectiveWidth, height: effectiveHeight,
                                fps: effectiveFPS, bitrateKbps: effectiveBitrateKbps)
         cfg.hdr = effectiveHDR
-        cfg.audio = audioLayout.streamAudioConfig
+        // Always the richest layout this Mac's default output can take.
+        cfg.audio = .bestForCurrentOutput()
         cfg.captureSysKeys = captureSysKeys
         // The notch choice only means something on a notched panel; elsewhere
         // the session always takes the borderless cover (see

@@ -77,28 +77,6 @@ struct AppPane: View {
         }
     }
 
-    /// Default-launch options - the host applist with "Desktop" pinned first.
-    private var launchAppOptions: [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for name in ["Desktop"] + (model.selectedHost?.apps.map(\.name) ?? [])
-        where seen.insert(name).inserted {
-            out.append(name)
-        }
-        let current = model.defaultLaunchApp
-        if !current.isEmpty, seen.insert(current).inserted { out.append(current) }
-        return out
-    }
-
-    /// A stored app that is not on the selected host (set on another PC) is
-    /// annotated so the picker does not imply it will launch here.
-    private func launchOptionLabel(_ name: String) -> String {
-        guard name != "Desktop",
-              let host = model.selectedHost,
-              !host.apps.contains(where: { $0.name == name }) else { return name }
-        return "\(name) (not on \(host.displayName))"
-    }
-
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
@@ -133,17 +111,6 @@ struct AppPane: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 300)
-            }
-
-            SettingsField("On connect, launch") {
-                Picker("", selection: $model.defaultLaunchApp) {
-                    ForEach(launchAppOptions, id: \.self) { name in
-                        Text(launchOptionLabel(name)).tag(name)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 260)
-                SettingsNote("Right-click a PC in the library to pick a different app per connection.")
             }
 
             SettingsRule()
