@@ -139,10 +139,17 @@ extension FramePacer {
     /// - ProMotion, or an Adaptive-Sync external - `preferred` becomes the
     /// STREAM rate rather than the panel max, which is what lets the display
     /// drop to the content's cadence instead of running the panel flat out.
-    /// Measured before this existed: a 60fps stream on a 24-120Hz MacBook Pro
-    /// panel held 120.04Hz realized for 321 consecutive seconds, because
-    /// `preferred: panelMax` is exactly what we were asking for and the
-    /// compositor obliged.
+    /// MEASURED, both sides. Before: a 60fps stream held 120.04Hz realized for
+    /// 321 consecutive seconds - `preferred: panelMax` is exactly what we were
+    /// asking for and the compositor obliged. After: the same stream on the same
+    /// Studio Display XDR (46.9-120Hz, continuous) settles at 60.02Hz and stays
+    /// there - 265 samples in one run, 74 in another, not one excursion.
+    ///
+    /// It works in the BORDERLESS COVER, which was the open question: full
+    /// screen here is a window at level 25, not a macOS Space, and the one
+    /// public report on macOS VRR says borderless-windowed pins to panel max.
+    /// It does not. Nothing about the window was the blocker; our own request
+    /// was.
     ///
     /// FIXED-REFRESH PANELS KEEP THE OLD REQUEST. The EXPERIMENT above was run
     /// on a wired 4K240 where asking for stream Hz quantized the CALLBACK grid
@@ -169,8 +176,13 @@ extension FramePacer {
     /// Whether the screen `view` sits on can actually run at a variable rate.
     /// `NSScreen.h` is explicit: "minimumRefreshInterval and
     /// maximumRefreshInterval will be the same for displays that do not support
-    /// variable refresh rates". Measured: the MacBook Pro's built-in panel
-    /// reports 24.0-120.0Hz, a fixed 75Hz external reports 75.0-75.0Hz.
+    /// variable refresh rates". Measured: a Studio Display XDR in its adaptive
+    /// mode reports 46.9-120.04Hz with `displayUpdateGranularity` 0 (the header:
+    /// "the display can update at any time between the minimum and maximum"),
+    /// the same panel pinned to a fixed rate reports 120.0-120.0Hz, a MacBook
+    /// Pro built-in panel 24.0-120.0Hz, a 75Hz external 75.0-75.0Hz. So this
+    /// also reads the user's System Settings choice, not just the hardware -
+    /// which is correct: a display the user has pinned should stay pinned.
     @MainActor
     static func panelSupportsVariableRefresh(for view: NSView) -> Bool {
         guard let screen = view.window?.screen ?? NSScreen.main else { return false }
