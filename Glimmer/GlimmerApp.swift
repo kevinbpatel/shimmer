@@ -194,9 +194,22 @@ struct GlimmerApp: App {
                 // title is silently dropped (measured, 2026-09-11: the same view
                 // as a Label drew the glyph and no percentage). Spelling out the
                 // Image + Text is what actually puts the number in the menu bar.
-                HStack(spacing: 3) {
-                    model.menuBarControllerGlyph.image()
-                    Text("\(battery.percent)%")
+                // The pad AND its charge, as one baked image - the status item
+                // button has a single image slot, so this cannot be composed
+                // here. See MenuBarBatteryGlyph for what was probed. A bar reads
+                // without being parsed and is the shape every other battery on
+                // this Mac uses; the exact percentage stays in the dropdown.
+                //
+                // Only a PlayStation pad has this art. Anything else keeps the
+                // generic controller symbol and the number.
+                if model.menuBarControllerGlyph == .playStation {
+                    Image(MenuBarBatteryGlyph.assetName(
+                        forPercent: battery.percent, charging: battery.charging))
+                } else {
+                    HStack(spacing: 3) {
+                        model.menuBarControllerGlyph.image()
+                        Text("\(battery.percent)%")
+                    }
                 }
             } else if let symbol = model.menuBarSystemImageName {
                 Image(systemName: symbol)
