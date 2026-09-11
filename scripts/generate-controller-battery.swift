@@ -34,20 +34,29 @@
 // So the pad is clipped to its LEFT HALF and a quarter-turned battery (nub up)
 // stands beside it, taller than the pad and overhanging it top and bottom.
 //
-// The CSS's own numbers cannot be used directly - `rotate` is a transform
-// applied after layout, so `width: 20px` describes the PRE-rotation box and
-// reading it literally got the proportions badly wrong. The sizes below are
-// measured off a real Big Picture screenshot instead, in source pixels:
+// THE LAYOUT IS NOT GUESSED EITHER - IT IS STEAM'S OWN, RUN THROUGH A BROWSER.
+// The CSS cannot be read literally: `rotate` is a transform applied AFTER
+// layout, so `width: 20px` describes the PRE-rotation box, and the battery's
+// own component wraps its svg in a div (`<div class={cn(className, BatteryIcon,
+// LegacySizing)}>`), so the positioning classes land on the wrapper, not the
+// art. Measuring a screenshot with a ruler instead got the proportions close but
+// wrong, twice.
 //
-//     controller visible   30..51 x 24..52    22 x 29, hard vertical cut at 51
-//     gap                  52..54             3 empty columns
-//     battery body         55..74 x 21..53    20 x 33
-//     nub                  62..67 x 19..20    6 x 2, centred
+// So the real construction was rebuilt as a page - Steam's DOM, Steam's four CSS
+// rules, Steam's two SVGs - and handed to Chrome, which does the flex sizing,
+// the `preserveAspectRatio` fit, the clip and the post-layout rotation itself.
+// Magnified 40x (transform: scale, so layout stays at 1x and the vectors stay
+// sharp) and measured, that gives, in container pixels:
 //
-// The two agree: the battery body is 24 units wide by 39 tall once turned, an
-// aspect of 0.615, and the screenshot measures 20 x 33 = 0.606. Body 24 units
-// landing at 20px fixes the scale at 0.833 px/unit, which puts the visible pad
-// at 26.4 units and the gap at 3.6 - the numbers used below.
+//     pad, clipped to its left half    x  0.0..11.0   y 4.125..18.75
+//     gap                              x 11.0..13.0
+//     battery incl. nub                x 13.0..23.0   y 0.500..18.00
+//
+// which is 23 x 18.25 overall. Dividing through by the battery (its 42 units of
+// long axis measure 17.5px, so 1 unit = 0.41667px) gives the numbers below:
+// pad 26.4 wide by 35.1 tall, gap 4.8, and - the one that kept reading as the
+// pad floating - the pad hangs 1.8 units BELOW the battery rather than sitting
+// inside it.
 //
 // The battery is drawn from the numbers above rather than lifted. The PAD is
 // Steam's own DualSense glyph, taken verbatim from the same bundle (viewBox
@@ -84,19 +93,23 @@ let fillOffsetShort: CGFloat = 6  // fill sub-svg y 12, body top 6 -> 6 in body-
 let fillLong: CGFloat = 27
 let fillShort: CGFloat = 12
 
-// Layout, same units (see the header for how the scale was fixed).
+// Layout, same units (see the header for where these came from).
 let padVisibleUnits: CGFloat = 26.4
-let padHeightUnits: CGFloat = 34.8
-let gapUnits: CGFloat = 3.6
-/// How far the pad's bottom edge sits above the battery's. The pad is NOT
-/// centred against the battery - Steam sits it low, so the battery overhangs it
-/// by 1.2 units at the bottom and 6.0 at the top (measured: battery 19..53,
-/// pad 24..52). Centring it instead puts the pad a whole point too high at
-/// menu-bar size, which reads as the pad floating.
-let padBottomUnits: CGFloat = 1.2
+/// Only a check: the pad's height follows from its own aspect once its width is
+/// fixed, and for Steam's glyph that lands here. If a swapped-in pad drifts far
+/// from this, the source's proportions differ from Steam's.
+let padHeightUnits: CGFloat = 35.1
+let gapUnits: CGFloat = 4.8
+/// How far the pad hangs BELOW the battery. The pad is not centred against it
+/// and does not sit inside it: Steam's battery starts 1.8 units up from the
+/// bottom of the mark, and the pad's bottom edge is the lowest thing in it.
+/// Centring the pad instead puts it a whole point too high at menu-bar size,
+/// which reads as the pad floating.
+let padDropUnits: CGFloat = 1.8
 
-// Turned a quarter: the battery's long axis runs vertically, nub on top.
-let markHeightUnits = bodyLong + nubLong                 // 42
+// Turned a quarter: the battery's long axis runs vertically, nub on top. The
+// mark is as tall as the battery plus the pad's overhang beneath it.
+let markHeightUnits = bodyLong + nubLong + padDropUnits  // 43.8
 let markWidthUnits = padVisibleUnits + gapUnits + bodyShort
 
 /// Height of the finished mark in points, which sets the scale for everything.
@@ -166,109 +179,136 @@ guard let measured = renderSVG(padSVG, size: CGSize(width: measureDimension, hei
 let padArt = CGRect(x: box.minX / measureScale, y: box.minY / measureScale,
                     width: box.width / measureScale, height: box.height / measureScale)
 
+// The pad's height is not set here - it follows from its own aspect once the
+// visible width is fixed. Check it against what Steam's glyph measured to in the
+// browser, so swapping the source in can't silently change the mark's shape.
+let padActualHeightUnits = padVisibleUnits * 2 * (padArt.height / padArt.width)
+if abs(padActualHeightUnits - padHeightUnits) > 0.5 {
+    let note = "warning: pad art is \(String(format: "%.2f", padActualHeightUnits)) units tall, "
+        + "Steam's is \(padHeightUnits) - the source's proportions differ\n"
+    FileHandle.standardError.write(Data(note.utf8))
+}
+
 // MARK: - Drawing
 
-/// Steam's bolt, `M16 20L21 11V16H26L21 25V20H16Z`, in the 48x36 viewBox. Given
-/// back in the battery's own (y-up, body-local) frame.
-func boltPath() -> CGPath {
-    let path = CGMutablePath()
-    func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-        CGPoint(x: x, y: 36 - y)     // viewBox is y-down; flip into our y-up frame
-    }
-    path.move(to: point(16, 20)); path.addLine(to: point(21, 11))
-    path.addLine(to: point(21, 16)); path.addLine(to: point(26, 16))
-    path.addLine(to: point(21, 25)); path.addLine(to: point(21, 20))
-    path.closeSubpath()
-    return path
-}
-
-/// Steam's shell, `M39 6H0V30H39V22H42V14H39V6Z` plus the hole `M36 9H3V27H36V9Z`,
-/// as ONE even-odd path in the battery's own units.
+/// The battery's geometry for one output scale, resolved to WHOLE DEVICE PIXELS.
 ///
-/// It has to be one path. Filling the outer rect and then CLEARING the inner one
-/// lays two anti-aliased edges over each other, and since the border lands on
-/// fractional pixels at any sane menu-bar size, that leaves a grey rim - worst
-/// where the nub meets the body, which is exactly where it read as mush. A
-/// single even-odd fill gives each edge one clean coverage value.
-func shellPath() -> CGPath {
-    let p = CGMutablePath()
-    p.move(to: CGPoint(x: 39, y: 6))
-    for pt in [(0.0, 6.0), (0.0, 30.0), (39.0, 30.0), (39.0, 22.0),
-               (42.0, 22.0), (42.0, 14.0), (39.0, 14.0)] {
-        p.addLine(to: CGPoint(x: pt.0, y: pt.1))
-    }
-    p.closeSubpath()
-    p.move(to: CGPoint(x: 36, y: 9))
-    for pt in [(3.0, 9.0), (3.0, 27.0), (36.0, 27.0)] {
-        p.addLine(to: CGPoint(x: pt.0, y: pt.1))
-    }
-    p.closeSubpath()
-    return p
-}
+/// This is the difference between a battery and a smudge. Its border is 3 of the
+/// body's 39 units, which at menu-bar size is 2.33 device pixels at 2x and 1.16
+/// at 1x - fractional at every scale there is, so every edge anti-aliases to a
+/// soft grey band and the nub, the smallest feature and the one at the top,
+/// dissolves entirely. Steam has the same problem and lives with it; we don't
+/// have to, because the shape is nothing but axis-aligned rectangles.
+///
+/// So each edge is snapped independently to the pixel grid rather than a
+/// thickness being chosen and applied. Snapping edges keeps the border's
+/// proportion (it lands on 2 or 3 pixels depending on where the edge falls,
+/// which is what Steam's own raster does) instead of forcing one number that is
+/// uniformly too thin or too heavy.
+struct BatteryPixels {
+    let outer: CGRect, hole: CGRect, nub: CGRect, fillTrack: CGRect
+    /// Long-axis origin of the body, kept so the bolt can be placed in the same
+    /// frame without re-deriving it.
+    let bodyLeft: CGFloat, bodyBottom: CGFloat, right: CGFloat, unitPx: CGFloat
 
-/// Draws the battery at `origin`, turned a quarter so the nub points up. Steam
-/// gets there with `rotate: 270deg` on the horizontal icon; this rotates the
-/// same geometry, which is identical and keeps it one path.
-func drawBattery(in ctx: CGContext, origin: CGPoint, level: Double, charging: Bool) {
-    ctx.saveGState()
-    ctx.translateBy(x: origin.x, y: origin.y)
-    ctx.scaleBy(x: unit, y: unit)
-    ctx.rotate(by: .pi / 2)
-    ctx.translateBy(x: 0, y: -bodyShort - 6)   // art sits at y 6..30 in the viewBox
-
-    ctx.setFillColor(NSColor.black.cgColor)
-    ctx.addPath(shellPath())
-    ctx.fillPath(using: .evenOdd)
-
-    // The charge, `<rect x=6 y=12 width={level}% of 27 height=12>`. Empty draws a
-    // bare shell, as Steam's does at level 0.
-    if level > 0 {
-        ctx.fill(CGRect(x: fillOffsetLong, y: 12, width: fillLong * CGFloat(level), height: fillShort))
+    /// - Parameter scale: 1 or 2; everything here is in that scale's device pixels.
+    init(scale: Int) {
+        let u = unit * CGFloat(scale)
+        let x0 = (padVisibleUnits + gapUnits) * u    // battery's left edge
+        let y0 = padDropUnits * u                    // the body's bottom, above the pad's overhang
+        // Turned a quarter: the body's LONG axis runs up the image, its short
+        // axis across it, so units along the long axis snap in y and across in x.
+        func sx(_ across: CGFloat) -> CGFloat { (x0 + across * u).rounded() }
+        func sy(_ along: CGFloat) -> CGFloat { (y0 + along * u).rounded() }
+        func rect(_ a0: CGFloat, _ a1: CGFloat, _ l0: CGFloat, _ l1: CGFloat) -> CGRect {
+            CGRect(x: sx(a0), y: sy(l0), width: max(1, sx(a1) - sx(a0)),
+                   height: max(1, sy(l1) - sy(l0)))
+        }
+        outer = rect(0, bodyShort, 0, bodyLong)              // M39 6H0V30H39...
+        // The border is inset from the SNAPPED outer rect by one rounded
+        // thickness, not snapped edge by edge. Snapping its edges independently
+        // is a touch truer in total area but lands 3 pixels on one side and 2 on
+        // the other, and at this size that reads as a crooked battery.
+        let wall = max(1, (border * u).rounded())
+        hole = outer.insetBy(dx: wall, dy: wall)             // M36 9H3V27H36V9Z
+        nub = rect((bodyShort - nubShort) / 2, (bodyShort + nubShort) / 2,   // x 39..42, y 14..22
+                   bodyLong, bodyLong + nubLong)
+        fillTrack = rect(fillOffsetShort, fillOffsetShort + fillShort,       // x=6 w=27, y=12 h=12
+                         fillOffsetLong, fillOffsetLong + fillLong)
+        bodyLeft = x0; bodyBottom = y0; right = sx(bodyShort); unitPx = u
     }
 
-    if charging {
-        // Steam sets the bolt straight over the fill in `currentColor`. In a
-        // one-colour template that would vanish into it, so the bolt gets a
-        // punched-out gap first and is then set solid inside it - the same mark,
-        // legible whether it lands on fill or on bare shell.
-        let bolt = boltPath()
-        ctx.saveGState()
-        ctx.setBlendMode(.clear)
-        ctx.addPath(bolt.copy(strokingWithWidth: 2.6, lineCap: .round,
-                              lineJoin: .round, miterLimit: 10))
-        ctx.fillPath()
-        ctx.restoreGState()
-        ctx.setFillColor(NSColor.black.cgColor)
-        ctx.addPath(bolt)
-        ctx.fillPath()
+    /// Shell and hole as ONE even-odd path. It has to be one path: filling the
+    /// outer rect and then CLEARING the inner one lays two anti-aliased edges
+    /// over each other and leaves a grey rim, worst where the nub meets the body.
+    /// A single even-odd fill gives each edge one coverage value.
+    var shell: CGPath {
+        let p = CGMutablePath()
+        p.move(to: CGPoint(x: outer.minX, y: outer.minY))
+        for pt in [(outer.maxX, outer.minY), (outer.maxX, outer.maxY), (nub.maxX, outer.maxY),
+                   (nub.maxX, nub.maxY), (nub.minX, nub.maxY), (nub.minX, outer.maxY),
+                   (outer.minX, outer.maxY)] {
+            p.addLine(to: CGPoint(x: pt.0, y: pt.1))
+        }
+        p.closeSubpath()
+        p.addRect(hole)
+        return p
     }
-    ctx.restoreGState()
+
+    /// The charge, `<rect x=6 y=12 width={level}% of 27 height=12>`, growing up
+    /// from the body's bottom. Its length is FLOORED, never rounded: a mark that
+    /// reads fuller than the pad actually is, is the one error that matters.
+    func fill(level: Double) -> CGRect? {
+        guard level > 0 else { return nil }   // level 0 draws a bare shell, as Steam's does
+        let length = (fillLong * CGFloat(level) * unitPx).rounded(.down)
+        guard length >= 1 else { return nil }
+        return CGRect(x: fillTrack.minX, y: fillTrack.minY, width: fillTrack.width, height: length)
+    }
+
+    /// Steam's bolt, `M16 20L21 11V16H26L21 25V20H16Z` in the 48x36 viewBox,
+    /// turned with the rest of the battery. Left un-snapped: it is all diagonals,
+    /// so there is no grid for it to land on.
+    var bolt: CGPath {
+        let p = CGMutablePath()
+        // viewBox -> body-local (long from the body's left, across from its
+        // bottom edge at y=30) -> the turned frame, where long runs up and
+        // across runs in from the right.
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: right - (30 - y) * unitPx, y: bodyBottom + x * unitPx)
+        }
+        p.move(to: point(16, 20)); p.addLine(to: point(21, 11))
+        p.addLine(to: point(21, 16)); p.addLine(to: point(26, 16))
+        p.addLine(to: point(21, 25)); p.addLine(to: point(21, 20))
+        p.closeSubpath()
+        return p
+    }
 }
 
 func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
+    let s = CGFloat(scale)
+    let width = Int((markWidth * s).rounded()), height = Int((markHeight * s).rounded())
     guard let ctx = CGContext(
-        data: nil, width: Int((markWidth * CGFloat(scale)).rounded()),
-        height: Int((markHeight * CGFloat(scale)).rounded()),
+        data: nil, width: width, height: height,
         bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
     ctx.setAllowsAntialiasing(true)
     ctx.interpolationQuality = .high
-    ctx.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
+    // Deliberately NOT scaled: the battery below is computed in device pixels so
+    // it can be snapped to them, and a scaled CTM would put it back on halves.
 
     // The pad, drawn at DOUBLE its visible width and clipped to the left half -
-    // Steam's `clip-path: inset(0 50% 0 0)` - and centred against the battery,
-    // which overhangs it above and below.
-    let padVisible = padVisibleUnits * unit
+    // Steam's `clip-path: inset(0 50% 0 0)` - and hanging below the battery.
+    let padVisible = padVisibleUnits * unit * s
     let padFull = padVisible * 2
-    _ = padHeightUnits
     ctx.saveGState()
-    ctx.clip(to: CGRect(x: 0, y: 0, width: padVisible, height: markHeight))
+    // The clip is a hard vertical cut in Steam too, so land it on a whole device
+    // pixel rather than leaving a half-inked column down the pad's open side.
+    ctx.clip(to: CGRect(x: 0, y: 0, width: padVisible.rounded(), height: CGFloat(height)))
     let padFit = padFull / padArt.width
     let graphics = NSGraphicsContext(cgContext: ctx, flipped: false)
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = graphics
     ctx.saveGState()
-    ctx.translateBy(x: 0, y: padBottomUnits * unit)
     ctx.scaleBy(x: padFit, y: padFit)
     ctx.translateBy(x: -padArt.minX, y: -padArt.minY)
     padSVG.draw(in: NSRect(x: 0, y: 0, width: 64, height: 64))
@@ -280,11 +320,31 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     ctx.saveGState()
     ctx.setBlendMode(.sourceIn)
     ctx.setFillColor(NSColor.black.cgColor)
-    ctx.fill(CGRect(x: 0, y: 0, width: markWidth, height: markHeight))
+    ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
     ctx.restoreGState()
 
-    drawBattery(in: ctx, origin: CGPoint(x: (padVisibleUnits + gapUnits) * unit, y: 0),
-                level: level, charging: charging)
+    let battery = BatteryPixels(scale: scale)
+    ctx.setFillColor(NSColor.black.cgColor)
+    ctx.addPath(battery.shell)
+    ctx.fillPath(using: .evenOdd)
+    if let charge = battery.fill(level: level) { ctx.fill(charge) }
+
+    if charging {
+        // Steam sets the bolt straight over the fill in `currentColor`. In a
+        // one-colour template that would vanish into it, so the bolt gets a
+        // punched-out gap first and is then set solid inside it - the same mark,
+        // legible whether it lands on fill or on bare shell.
+        let bolt = battery.bolt
+        ctx.saveGState()
+        ctx.setBlendMode(.clear)
+        ctx.addPath(bolt.copy(strokingWithWidth: 2.6 * battery.unitPx, lineCap: .round,
+                              lineJoin: .round, miterLimit: 10))
+        ctx.fillPath()
+        ctx.restoreGState()
+        ctx.setFillColor(NSColor.black.cgColor)
+        ctx.addPath(bolt)
+        ctx.fillPath()
+    }
     return ctx.makeImage()
 }
 

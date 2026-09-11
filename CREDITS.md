@@ -34,8 +34,11 @@ The menu-bar controller mark (`Assets.xcassets/ControllerBattery*`) reproduces
 with a quarter-turned battery beside it. Both the layout and the battery were
 taken from the Steam client itself - the stylesheet's
 `ControllerBatteryImgContainer` / `ControllerImg` / `ControllerBatteryIndicator`
-rules, and the `Battery` component's own geometry (body 39×24, 3-thick border,
-3×8 nub, a 27×12 fill track). The battery is redrawn from those numbers.
+/ `BatteryIcon.LegacySizing` rules, and the `Battery` component's own geometry
+(body 39×24, 3-thick border, 3×8 nub, a 27×12 fill track). The battery is
+redrawn from those numbers, and the arrangement was recovered by rebuilding
+Steam's markup as a page and letting a browser do the layout, rather than by
+measuring a screenshot.
 
 **The DualSense glyph itself is Valve's artwork, used verbatim** - the
 `ControllerType` PS5 glyph, kept at `scripts/assets/steam-controller_dualsense.svg`
