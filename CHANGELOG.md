@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Settings is labels and controls only - every explanatory paragraph under a
+control is gone, and so is the Appearance picker: the app follows the system
+the way a Mac app should.
+
 The "Your next stream" summary row is gone.
 
 10-bit profiles are no longer advertised when HDR is off, so an SDR stream now

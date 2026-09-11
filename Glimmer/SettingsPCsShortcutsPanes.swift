@@ -30,13 +30,10 @@ struct ShortcutsPane: View {
                     .frame(maxWidth: 420)
                 HotkeyRow(label: "Capture or release the pointer", hotkey: $model.releasePointerHotkey)
                     .frame(maxWidth: 420)
-                SettingsNote("Click a shortcut to record a new one. These fire inside the stream only.")
             }
 
             SettingsField("macOS keys") {
                 Toggle("Use ⌘ shortcuts inside the game", isOn: $model.captureSysKeys)
-                SettingsNote("This Mac stops answering ⌘ shortcuts while the stream is focused, so they "
-                    + "reach the game instead. Takes effect on the next stream.")
             }
 
             SettingsRule()
@@ -58,15 +55,12 @@ struct ShortcutsPane: View {
                         Button("Record…") { showChordCapture = true }
                     }
                 }
-                SettingsNote("Hold the chord on the pad to end a stream without reaching for the keyboard.")
             }
 
             if model.controllerConnected || model.rawHIDControllerEnabled {
                 SettingsField("DualSense") {
                     RawHIDControl()
                         .frame(maxWidth: 460, alignment: .leading)
-                    SettingsNote("Adds the DualSense buttons macOS hides and the host's adaptive-trigger "
-                        + "effects. Needs Input Monitoring.")
                 }
             }
         }

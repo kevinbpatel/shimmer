@@ -120,9 +120,6 @@ struct StreamPane: View {
                             .onChange(of: model.customHeight) { _, _ in clampCustomResolution() }
                     }
                 }
-                SettingsNote("Match display sends every pixel of this Mac's panel - sharpest, and it wants "
-                    + "a solid network. HiDPI is the panel's default Retina scale: a touch softer for about "
-                    + "a quarter of the bits. Your choice is kept until you change it.")
             }
 
             SettingsField("Frame rate") {
@@ -141,11 +138,6 @@ struct StreamPane: View {
                         Text("Hz").foregroundStyle(.secondary)
                     }
                 }
-                if model.streamDisplayMode == .window {
-                    SettingsNote("In a window the stream is capped at this display's \(model.currentDisplayMaxHz) Hz - it can't show more.")
-                } else {
-                    SettingsNote("Your display can show up to \(model.currentDisplayMaxHz) Hz. Asking for more than the host can render just costs bandwidth.")
-                }
             }
 
             SettingsField("Bitrate") {
@@ -159,13 +151,6 @@ struct StreamPane: View {
                         .monospacedDigit()
                         .foregroundStyle(model.bitrateAuto ? .secondary : .primary)
                 }
-                if model.bitrateAuto {
-                    SettingsNote("Recommended for \(model.effectiveWidth) × \(model.effectiveHeight) at \(model.effectiveFPS) Hz. "
-                        + "AV1 and HEVC spend about 20% fewer bits for the same picture.")
-                } else {
-                    SettingsNote("Sent to the host as-is. Too high for the link shows up as stutter and dropped "
-                        + "frames, not as a sharper picture.")
-                }
             }
 
             SettingsField("Show the stream") {
@@ -177,19 +162,10 @@ struct StreamPane: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 260)
-                if model.streamDisplayMode == .window {
-                    SettingsNote("The pointer belongs to the game while it's over the window - hold Esc or press "
-                        + "\(model.releasePointerHotkey.displayString) to get it back. Applies to the next stream.")
-                } else {
-                    SettingsNote("Applies to the next stream.")
-                }
             }
 
             SettingsField("Picture in Picture") {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
-                SettingsNote("The stream keeps playing in a small floating window you can drag to any corner, "
-                    + "controllers keep working, and the mouse over that window moves the host's pointer. "
-                    + "\(model.pipHotkey.displayString) pops it out on demand either way.")
             }
 
         }

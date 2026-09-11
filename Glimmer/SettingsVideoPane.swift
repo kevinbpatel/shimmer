@@ -40,9 +40,6 @@ struct VideoPane: View {
                     }
                     .labelsHidden()
                     .frame(width: 260)
-                    SettingsNote("Automatic negotiates the best both sides support - AV1, then HEVC, then "
-                        + "H.264 - and only advertises what this Mac decodes in hardware. Pick a lower one if "
-                        + "a PC's encoder misbehaves. Remembered per PC; this is \(host.displayName).")
                 } else {
                     Text("Pair a PC to choose the codec it streams with.")
                         .foregroundStyle(.secondary)
@@ -51,15 +48,12 @@ struct VideoPane: View {
 
             SettingsField("HDR") {
                 Toggle("Brighter highlights, deeper colour", isOn: $model.customHDR)
-                SettingsNote("Needs HDR on the host and an HDR display here. The launcher's HDR badge lights "
-                    + "up only once a PQ or HLG stream is actually running.")
             }
 
             SettingsRule()
 
             SettingsField("Stats overlay") {
                 Toggle("Show stream health over the picture", isOn: $model.showStreamStats)
-                SettingsNote("Toggle it any time mid-stream with \(model.statsHotkey.displayString).")
             }
 
             SettingsField("Position") {
@@ -80,7 +74,6 @@ struct VideoPane: View {
                 }
                 .labelsHidden()
                 .frame(width: 200)
-                SettingsNote(Self.presetSubtitle(model.statsOverlayPreset))
                 if model.statsOverlayPreset == .custom {
                     StatsCustomRowsPicker()
                         .frame(maxWidth: 460, alignment: .leading)

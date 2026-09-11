@@ -16,36 +16,6 @@ import os
 import ServiceManagement
 import SwiftUI
 
-/// The app's appearance. macOS follows the system by default, but a streaming
-/// client is often used in a dark room next to a TV while the Mac itself is in
-/// light mode - so it is worth being able to pin, the way the reference app
-/// (moonlight-macos-enhanced) does.
-enum AppAppearance: String, CaseIterable, Identifiable {
-    case system, light, dark
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .system: return "Match System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        }
-    }
-
-    /// nil means "inherit", which is what an unset `NSApp.appearance` does.
-    var nsAppearance: NSAppearance? {
-        switch self {
-        case .system: return nil
-        case .light: return NSAppearance(named: .aqua)
-        case .dark: return NSAppearance(named: .darkAqua)
-        }
-    }
-
-    /// Applies to every window the app owns, including ones already on screen.
-    @MainActor func apply() { NSApp.appearance = nsAppearance }
-}
-
 // MARK: - App
 
 struct AppPane: View {
@@ -90,8 +60,6 @@ struct AppPane: View {
                         scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
                     }
                     .disabled(!launchAtLogin)
-                SettingsNote("When hidden, Shimmer launches into the menu bar at login without showing the "
-                    + "window. Manual launches via Spotlight, Finder or the Dock always open it.")
                 if loginItemNeedsApproval {
                     HStack(spacing: 8) {
                         Label("macOS needs you to approve Shimmer in Login Items.",
@@ -102,25 +70,11 @@ struct AppPane: View {
                 }
             }
 
-            SettingsField("Appearance") {
-                Picker("", selection: $model.appAppearance) {
-                    ForEach(AppAppearance.allCases) { option in
-                        Text(option.displayName).tag(option)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 300)
-            }
-
             SettingsRule()
 
             SettingsField("Wi-Fi") {
                 Toggle("Smooth out Wi-Fi stutter while streaming",
                        isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
-                SettingsNote("Parks AirDrop's radio (AWDL) for the length of a stream so it can't grab the "
-                    + "Wi-Fi channel and cause multi-second freezes. Restored the instant you stop. Installs a "
-                    + "small helper that needs a one-time approval.")
                 if case .requiresApproval = awdl.state {
                     HStack(spacing: 8) {
                         Label("macOS needs you to approve the Shimmer network helper.",
@@ -145,8 +99,6 @@ struct AppPane: View {
                 SettingsRule()
                 SettingsField("Diagnostics") {
                     Toggle("Performance telemetry", isOn: $model.telemetryEnabled)
-                    SettingsNote("Local only - writes per-frame traces under ~/Library/Logs/Shimmer. "
-                        + "Nothing leaves this Mac.")
                     DisclosureGroup("Controller input test") {
                         ControllerInputTest().frame(maxWidth: 460, alignment: .leading)
                     }

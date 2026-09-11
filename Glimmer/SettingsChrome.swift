@@ -130,16 +130,10 @@ enum SettingsMetrics {
     /// and sampled pixel by pixel):
     ///   * gutter labels right-align at x=168, controls start at x=180 (gap 12)
     ///   * the checkbox is 18pt; its label starts 7pt after it, at x=204
-    ///   * explanatory notes align with the checkbox LABEL, not the checkbox -
-    ///     they start at x=203, i.e. 23pt into the control column
-    ///   * notes wrap by x=532, so ~330pt of measure
     ///   * checkbox rows sit on a 25pt rhythm (18pt control + 7pt)
     ///   * trailing buttons right-align 41pt from the window edge
     static let labelGutter: CGFloat = 168
     static let labelGap: CGFloat = 12
-    static let noteIndent: CGFloat = 23
-    static let noteWidth: CGFloat = 330
-    static let noteSize: CGFloat = 11
     static let rowSpacing: CGFloat = 18
     static let contentSpacing: CGFloat = 6
     /// The settings column is a FIXED width, centred in whatever the window
@@ -176,30 +170,6 @@ struct SettingsField<Content: View>: View {
             }
             Spacer(minLength: 0)
         }
-    }
-}
-
-/// Explanatory copy under a control. Grey, smaller, and wrapped to a readable
-/// measure rather than the full window width.
-struct SettingsNote: View {
-    private let text: String
-    /// Tailscale indents its notes to line up with the checkbox LABEL rather
-    /// than the checkbox, so the explanation reads as belonging to the thing
-    /// above it. Pass false for a row whose control has no leading glyph.
-    private let indented: Bool
-
-    init(_ text: String, indented: Bool = true) {
-        self.text = text
-        self.indented = indented
-    }
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: SettingsMetrics.noteSize))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(width: SettingsMetrics.noteWidth, alignment: .leading)
-            .padding(.leading, indented ? SettingsMetrics.noteIndent : 0)
     }
 }
 

@@ -15,8 +15,6 @@ struct AudioPane: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("This Mac") {
                 Toggle("Mute this Mac while streaming", isOn: $model.muteMacWhileStreaming)
-                SettingsNote("Keeps game audio on the gaming PC's output only; this Mac stays silent for the "
-                    + "length of the stream. Takes effect immediately, mid-stream too.")
             }
         }
     }

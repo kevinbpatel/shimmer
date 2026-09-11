@@ -174,15 +174,6 @@ final class AppModel {
             persistQualitySettings()
         }
     }
-    /// Light, dark, or whatever the system is doing. Applied to NSApp on every
-    /// change and once at launch.
-    var appAppearance: AppAppearance = .system {
-        didSet {
-            guard !isRestoringDefaults else { return }
-            UserDefaults.standard.set(appAppearance.rawValue, forKey: "appAppearance")
-            appAppearance.apply()
-        }
-    }
 
     // Defaults
     var muteMacWhileStreaming: Bool = false {
@@ -638,7 +629,6 @@ final class AppModel {
         bitrateAuto = Self.persistedBool("bitrateAuto") ?? bitrateAuto
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
-        appAppearance = Self.persistedRawValue("appAppearance", AppAppearance.self) ?? appAppearance
         // One-shot: HDR was hard-coded ON for the panel presets and only asked
         // under Custom, so an install that turned it off under Custom and then
         // went back to a panel preset was still being sent HDR. It applies
