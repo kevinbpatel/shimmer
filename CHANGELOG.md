@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Settings live in the main window now, not a separate Settings window. A row of
+icon tabs across the top - Stream, Video, Audio, Input, PCs, App, About -
+switches pages, and every page is flat rows: the label right-aligned in a
+gutter, its controls beside it, the explanation underneath in grey. No
+sidebar, no stacked rounded cards. The shape is Tailscale's Settings window.
+⌘, still opens it; Esc or Done goes back to the library. The app's accent
+colour is the standard blue rather than glimmer's purple.
+
 The launcher is a library. PCs live in a sidebar, the selected PC's apps fill
 the window as a grid of cover art, and the toolbar carries the PC's name and
 address, add-PC, Settings, and a search field. Click a cover to stream it.

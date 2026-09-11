@@ -28,117 +28,67 @@ struct AboutPane: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        // First-party utility tone - see System Settings ▸ About, Disk
-        // Utility ▸ About, Activity Monitor ▸ About: app name + plain
-        // description + version + credits. No marketing voice, no
-        // exclamation marks, no comparisons to other products. The credo
-        // is the one allowed line of soul.
-        Form {
-            Section {
-                HStack(spacing: 18) {
-                    if let icon = NSImage(named: "AppIcon") {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .frame(width: 96, height: 96)
-                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                            .shadow(color: .black.opacity(0.20), radius: 10, x: 0, y: 4)
-                    } else {
-                        Image(systemName: "moon.stars.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.tint)
-                            .frame(width: 96, height: 96)
+        ScrollView {
+            VStack(spacing: 14) {
+                if let icon = NSImage(named: "AppIcon") {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 96, height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                } else {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 72))
+                        .foregroundStyle(.tint)
+                }
+
+                VStack(spacing: 4) {
+                    Text("Shimmer for macOS")
+                        .font(.system(size: 17, weight: .semibold))
+                    Text("Version \(versionString)")
+                        .foregroundStyle(.secondary)
+                        // Hidden reveal for the telemetry/tuning sections in
+                        // App: option-clicking the version line toggles
+                        // `showDiagnostics` - deliberately undiscoverable, so a
+                        // normal user never trips it but a bug report can.
+                        .gesture(
+                            TapGesture()
+                                .modifiers(.option)
+                                .onEnded { model.showDiagnostics.toggle() })
+                    Text("A fork of glimmer that pops the game out into Picture in Picture")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 6) {
+                    if let url = URL(string: AboutLink.repo) { Link("shimmer on GitHub", destination: url) }
+                    if let url = URL(string: AboutLink.upstream) { Link("glimmer, the upstream project", destination: url) }
+                    if let url = URL(string: AboutLink.credits) { Link("Credits", destination: url) }
+                    if let url = URL(string: AboutLink.license) { Link("GNU GPL v3", destination: url) }
+                }
+
+                Divider().frame(maxWidth: 420).padding(.vertical, 6)
+
+                VStack(spacing: 6) {
+                    Text("GPLv3. shimmer's engine is glimmer's, Copyright © 2026 ugfugl.io; shimmer's "
+                        + "additions are Copyright © 2026 Kevin Patel.")
+                    Text("The transport is ported from moonlight-common-c and moonlight-qt.")
+                    if let url = URL(string: AboutLink.donate) {
+                        Link("Sponsor glimmer's author", destination: url).padding(.top, 2)
                     }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Shimmer")
-                            .font(.system(size: 28, weight: .bold))
-                            .tracking(-0.4)
-                        Text("Stream your gaming PC to this Mac - and pop it out.")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                        // The credo, inherited from glimmer. One line, no
-                        // elaboration - it is the project's bar, not a slogan.
-                        Text("Highest fidelity. Lowest resources. Rock stable.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .italic()
-                        Text("Version \(versionString)")
-                            .font(.footnote)
-                            .foregroundStyle(.tertiary)
-                            // Hidden reveal for the telemetry/tuning sections
-                            // inside Settings → Diagnostics. Option-clicking the
-                            // version line toggles `showDiagnostics` - a
-                            // deliberate, undiscoverable gesture so normal users
-                            // never trip it, but a power user (or a bug report)
-                            // can surface them.
-                            .gesture(
-                                TapGesture()
-                                    .modifiers(.option)
-                                    .onEnded { model.showDiagnostics.toggle() }
-                            )
-                            .help(model.showDiagnostics
-                                  ? "Option-click to hide the developer tools"
-                                  : "")
-                    }
-                    Spacer()
                 }
-                .padding(.vertical, 6)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
             }
-            Section("A fork of glimmer") {
-                Text("Shimmer is a fork of glimmer by Se7enbrc that adds macOS Picture in "
-                    + "Picture. The streaming engine - decoder, pacing, audio, input - is "
-                    + "glimmer's work; the pop-out and its macOS workarounds are Shimmer's.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if let url = URL(string: AboutLink.repo) {
-                    Link("github.com/kevinbpatel/shimmer", destination: url)
-                        .font(.footnote)
-                }
-                if let url = URL(string: AboutLink.upstream) {
-                    Link("github.com/Se7enbrc/glimmer (upstream)", destination: url)
-                        .font(.footnote)
-                }
-                if let url = URL(string: AboutLink.donate) {
-                    Link("Support glimmer's author", destination: url)
-                        .font(.footnote)
-                }
-            }
-            Section("License") {
-                Text("Shimmer is free software under the GNU General Public License v3, the "
-                    + "same license as glimmer. You may run, study, share, and modify it; "
-                    + "there is no warranty.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if let url = URL(string: AboutLink.license) {
-                    Link("GNU GPL v3", destination: url)
-                        .font(.footnote)
-                }
-            }
-            Section("Projects we like") {
-                Text("Built for Sunshine, the open-source game-streaming host. Shimmer "
-                    + "speaks the Moonlight protocol - itself carrying NVIDIA GameStream "
-                    + "forward - and the transport is ported from moonlight-common-c, "
-                    + "with respect. Full credits in CREDITS.md.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if let url = URL(string: AboutLink.sunshine) {
-                    Link("github.com/LizardByte/Sunshine", destination: url)
-                        .font(.footnote)
-                }
-                if let url = URL(string: AboutLink.moonlight) {
-                    Link("github.com/moonlight-stream", destination: url)
-                        .font(.footnote)
-                }
-                if let url = URL(string: AboutLink.credits) {
-                    Link("Credits", destination: url)
-                        .font(.footnote)
-                }
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 26)
+            .padding(.bottom, 30)
+            .padding(.horizontal, 24)
         }
-        .formStyle(.grouped)
     }
 
-    /// "1.2.3 (45)" - short marketing version + build number, matching
-    /// what System Settings ▸ General ▸ About shows for first-party apps.
     private var versionString: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
         if let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String, !build.isEmpty, build != short {

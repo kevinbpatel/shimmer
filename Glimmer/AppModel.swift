@@ -596,10 +596,11 @@ final class AppModel {
     /// force any view watching `currentDisplayDescription` to recompute.
     var displayInfoRevision: Int = 0
 
-    /// A pane the Settings window should jump to next time it appears (or
-    /// right away if it's open). Set by the debug automation's screenshot
-    /// loop; SettingsRoot consumes it. Never persisted.
-    var requestedSettingsPane: SettingsPane?
+    /// Settings is a page inside the main window (Tailscale's shape), not a
+    /// separate Settings scene - so which page is showing is app state.
+    var showSettings = false
+    var settingsTab: SettingsTab = .stream
+
 
     isolated deinit {
         for token in workspaceTokens { NSWorkspace.shared.notificationCenter.removeObserver(token) }

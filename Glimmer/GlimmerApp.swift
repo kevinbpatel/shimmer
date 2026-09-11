@@ -155,20 +155,18 @@ struct GlimmerApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: UpdaterController.shared.updater)
             }
+            // The `Settings` scene used to supply this item (and its ⌘,) for
+            // free. Settings is a page in the main window now, so the command
+            // is ours: bring the window forward, then show the page.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    AppDelegate.openMainWindow?()
+                    NSApp.activate()
+                    model.showSettings = true
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
             #endif
-        }
-
-        Settings {
-            SettingsRoot()
-                .environment(model)
-                .frame(minWidth: 720, minHeight: 480)
-                // NO container material here, deliberately. `.thinMaterial`
-                // plus the detail form's hidden background let whatever sat
-                // behind the window show through the CONTENT - park Settings
-                // over the launcher's purple hero card and every row became a
-                // low-contrast lavender smear. System Settings is opaque for
-                // this exact reason; the sidebar keeps its own translucency,
-                // which is the part that is supposed to be translucent.
         }
 
         MenuBarExtra {

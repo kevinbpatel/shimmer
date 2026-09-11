@@ -188,123 +188,71 @@ struct PCTile: View {
 struct ShortcutsPane: View {
     @Environment(AppModel.self) private var model
     @State private var showChordCapture = false
-    // Default-ON: linearize the Mac's mouse acceleration while a stream is
-    // focused so only the game's own sensitivity shapes aim. Key mirrors
-    // MouseAccelerationControl.enabledDefaultsKey (registered true in GlimmerApp,
-    // which is what makes the non-UI UserDefaults.bool read default to on too).
+    /// Default-ON: linearize the Mac's mouse acceleration while a stream is
+    /// focused so only the game's own sensitivity shapes aim. Key mirrors
+    /// MouseAccelerationControl.enabledDefaultsKey (registered true in
+    /// GlimmerApp, which is what makes the non-UI UserDefaults.bool read
+    /// default to on too).
     @AppStorage("disableMouseAccelWhileStreaming") private var rawMouseWhileStreaming: Bool = true
 
     var body: some View {
-        // @Bindable shim - surfaces $model.x bindings from an @Observable
-        // environment value (the macro replaces ObservableObject; @Environment
-        // alone exposes the value but not per-property Bindings).
         @Bindable var model = model
-        Form {
-            Section("In-stream shortcuts") {
+        SettingsPageBody {
+            SettingsField("In-stream keys") {
                 HotkeyRow(label: "Leave the stream", hotkey: $model.quitHotkey)
-                Text("Press this combo at any time during a stream to return to Shimmer.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 420)
                 HotkeyRow(label: "Show or hide stream stats", hotkey: $model.statsHotkey)
-                // Session-scoped on purpose: the hotkey flips the overlay
-                // only for the current stream. The next stream starts from
-                // the stats-overlay toggle in Quality.
-                Text("Flips the overlay on or off for the current stream only - the next stream starts from your Quality preference.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                HotkeyRow(label: "Pop the stream out (Picture in Picture)", hotkey: $model.pipHotkey)
-                Text("Sends the stream to macOS's floating Picture in Picture window so it stays in a corner "
-                    + "while you use other apps. Controllers keep working; click the window's return button "
-                    + "or the Dock icon to go back to fullscreen.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 420)
+                HotkeyRow(label: "Pop out (Picture in Picture)", hotkey: $model.pipHotkey)
+                    .frame(maxWidth: 420)
                 HotkeyRow(label: "Capture or release the pointer", hotkey: $model.releasePointerHotkey)
-                // Window mode only: in full screen the pointer is hidden for
-                // the whole session and there is nothing to toggle, so the
-                // chord reaches the host there like any other key.
-                Text("When the stream is shown in a window the game takes your mouse while the pointer is "
-                    + "over it - hold Esc or switch apps to get it back, and this combo does either without "
-                    + "moving the mouse. In full screen this combo goes to the game.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 420)
+                SettingsNote("Click a shortcut to record a new one. These fire inside the stream only.")
             }
 
-            Section("Controller quit") {
-                // Hold-to-quit chord on the gamepad. Fires the same path as
-                // the keyboard quit hotkey above - useful for couch
-                // streaming where the keyboard isn't reachable.
-                Picker("Hold to leave the stream", selection: $model.controllerQuitChord) {
+            SettingsField("macOS keys") {
+                Toggle("Use ⌘ shortcuts inside the game", isOn: $model.captureSysKeys)
+                SettingsNote("This Mac stops answering ⌘ shortcuts while the stream is focused, so they "
+                    + "reach the game instead. Takes effect on the next stream.")
+            }
+
+            SettingsField("Mouse") {
+                Toggle("Aim with raw mouse motion while streaming", isOn: $rawMouseWhileStreaming)
+                SettingsNote("Removes this Mac's pointer acceleration for the length of a focused stream, "
+                    + "so only the game's own sensitivity shapes your aim.")
+            }
+
+            SettingsRule()
+
+            SettingsField("Controller quit") {
+                Picker("", selection: $model.controllerQuitChord) {
                     ForEach(ControllerQuitChord.allCases, id: \.self) { chord in
                         Text(chord.displayName).tag(chord)
                     }
                 }
+                .labelsHidden()
+                .frame(width: 260)
                 if model.controllerQuitChord == .custom {
-                    HStack {
+                    HStack(spacing: 8) {
                         Text(model.customControllerChord.isEmpty
                              ? "No chord recorded yet"
                              : ControllerButton.describe(model.customControllerChord))
                             .foregroundStyle(model.customControllerChord.isEmpty ? .secondary : .primary)
-                        Spacer()
                         Button("Record…") { showChordCapture = true }
                     }
                 }
-                Text("Hold these buttons together on the gamepad for a moment to quit the stream. "
-                    + "L3 + R3 by default; the keyboard shortcut above always works too.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                SettingsNote("Hold the chord on the pad to end a stream without reaching for the keyboard.")
             }
 
-            // Raw-HID DualSense reader - co-located here (was in Troubleshooting)
-            // so all raw input lives in one place. Shown when a pad is connected
-            // or the feature is already on (its off-switch must not vanish with
-            // the pad). RawHIDControl is defined in TroubleshootingPane.swift.
             if model.controllerConnected || model.rawHIDControllerEnabled {
-                Section {
+                SettingsField("DualSense") {
                     RawHIDControl()
-                } header: {
-                    Text("Extra DualSense buttons")
-                } footer: {
-                    Text("Reads controller buttons macOS hides - on a DualSense, "
-                        + "the Options, Create/Share, and Mute buttons - for the "
-                        + "Moonlight-style exit chord and to forward them to the host. "
-                        + "Off by default; needs Input Monitoring.")
+                        .frame(maxWidth: 460, alignment: .leading)
+                    SettingsNote("Adds the DualSense buttons macOS hides and the host's adaptive-trigger "
+                        + "effects. Needs Input Monitoring.")
                 }
-            }
-
-            Section("macOS keys") {
-                Toggle(isOn: $model.captureSysKeys) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use ⌘ shortcuts inside the game (this Mac stops answering them)")
-                            .fontWeight(.medium)
-                        Text("Forwards ⌘-Tab, ⌘-Space, etc. to your gaming PC. Off by default so macOS keeps owning these combos.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                // Help the curious: the change only applies to the next
-                // session, since the InputForwarder snapshots this flag at
-                // attach time.
-                Text("Takes effect on the next stream. Your quit shortcut still works either way.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Mouse") {
-                Toggle(isOn: $rawMouseWhileStreaming) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Aim with raw mouse motion while streaming").fontWeight(.medium)
-                        Text("Only the game's own sensitivity shapes your aim - the Mac's pointer "
-                            + "acceleration stops stacking on top while the stream is focused, and is "
-                            + "restored the instant you leave. Mice only; the trackpad is untouched.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .help("Linearizes the system mouse acceleration (like `com.apple.mouse.scaling -1`) "
-                    + "for the duration of each focused stream.")
             }
         }
-        .formStyle(.grouped)
         .sheet(isPresented: $showChordCapture) {
             ChordCaptureSheet().environment(model)
         }

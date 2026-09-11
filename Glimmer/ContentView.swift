@@ -12,7 +12,9 @@ struct MainWindow: View {
     var body: some View {
         @Bindable var model = model
         return Group {
-            if model.hosts.isEmpty {
+            if model.showSettings {
+                SettingsPage()
+            } else if model.hosts.isEmpty {
                 EmptyPairingState()
             } else {
                 LibraryWindow()
@@ -103,12 +105,11 @@ struct MainWindow: View {
             if model.hosts.isEmpty {
                 ToolbarItem(placement: .navigation) {
                     Button {
-                        openSettings()
+                        model.showSettings = true
                     } label: {
                         Image(systemName: "gearshape")
                             .symbolRenderingMode(.hierarchical)
                     }
-                    .keyboardShortcut(",", modifiers: .command)
                     .help("Settings")
                 }
             }
@@ -402,7 +403,7 @@ private struct HostAndSettingsPill: View {
                 }
             }
             Button {
-                openSettings()
+                model.showSettings = true
             } label: {
                 Image(systemName: "gearshape")
                     .symbolRenderingMode(.hierarchical)

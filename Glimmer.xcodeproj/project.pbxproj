@@ -22,6 +22,7 @@
 		A1C0DE901000000000000000 /* AppArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE902000000000000000 /* AppArtworkStore.swift */; };
 		A10000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000014 /* Assets.xcassets */; };
 		A10000005 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* SettingsView.swift */; };
+		A1C0DE921000000000000000 /* SettingsChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE922000000000000000 /* SettingsChrome.swift */; };
 		A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE832000000000000000 /* SettingsAudioPane.swift */; };
 		A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE822000000000000000 /* SettingsVideoPane.swift */; };
 		A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE812000000000000000 /* SettingsStreamPane.swift */; };
@@ -334,6 +335,7 @@
 		A10000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000016 /* Glimmer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Glimmer.entitlements; sourceTree = "<group>"; };
 		A10000017 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1C0DE922000000000000000 /* SettingsChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsChrome.swift"; sourceTree = "<group>"; };
 		A1C0DE832000000000000000 /* SettingsAudioPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsAudioPane.swift"; sourceTree = "<group>"; };
 		A1C0DE822000000000000000 /* SettingsVideoPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsVideoPane.swift"; sourceTree = "<group>"; };
 		A1C0DE812000000000000000 /* SettingsStreamPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsStreamPane.swift"; sourceTree = "<group>"; };
@@ -675,6 +677,7 @@
 				A10000012 /* ContentView.swift */,
 				A1C0DE912000000000000000 /* LibraryWindow.swift */,
 				A10000017 /* SettingsView.swift */,
+				A1C0DE922000000000000000 /* SettingsChrome.swift */,
 				A1C0DE832000000000000000 /* SettingsAudioPane.swift */,
 				A1C0DE822000000000000000 /* SettingsVideoPane.swift */,
 				A1C0DE812000000000000000 /* SettingsStreamPane.swift */,
@@ -1092,6 +1095,7 @@
 				A10000002 /* ContentView.swift in Sources */,
 				A1C0DE911000000000000000 /* LibraryWindow.swift in Sources */,
 				A10000005 /* SettingsView.swift in Sources */,
+				A1C0DE921000000000000000 /* SettingsChrome.swift in Sources */,
 				A1C0DE831000000000000000 /* SettingsAudioPane.swift in Sources */,
 				A1C0DE821000000000000000 /* SettingsVideoPane.swift in Sources */,
 				A1C0DE811000000000000000 /* SettingsStreamPane.swift in Sources */,

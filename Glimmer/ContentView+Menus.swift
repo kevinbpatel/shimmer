@@ -16,7 +16,6 @@ import SwiftUI
 
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -106,7 +105,9 @@ struct MenuBarContent: View {
             Divider()
 
             Button {
-                openSettings()
+                AppDelegate.openMainWindow?()
+                NSApp.activate()
+                model.showSettings = true
                 activate()
             } label: {
                 Label("Settings…", systemImage: "gearshape")

@@ -3,8 +3,8 @@
 //
 //  The Video pane: the codec the selected PC is allowed to send (the same
 //  per-host preference the launcher's context menu edits), HDR, and the
-//  in-stream stats overlay. The size / rate / bitrate dials are the Stream
-//  pane's; this pane is about how the picture is encoded and annotated.
+//  in-stream stats overlay. Size / rate / bitrate belong to the Stream pane;
+//  this one is about how the picture is encoded and annotated.
 //
 
 import SwiftUI
@@ -13,8 +13,8 @@ struct VideoPane: View {
     @Environment(AppModel.self) private var model
 
     /// Mirror of the selected host's persisted codec preference. Loaded on
-    /// appear and whenever the selected host changes; writes go straight
-    /// back through `HostCodecPreference.save` and bump the launcher's chip.
+    /// appear and whenever the selected host changes; writes go straight back
+    /// through `HostCodecPreference.save` and bump the launcher's chip.
     @State private var codecPref: HostCodecPreference = .auto
 
     private var codecSelection: Binding<HostCodecPreference> {
@@ -30,70 +30,68 @@ struct VideoPane: View {
 
     var body: some View {
         @Bindable var model = model
-        Form {
-            Section {
+        SettingsPageBody {
+            SettingsField("Codec") {
                 if let host = model.selectedHost {
-                    Picker("Codec for \(host.displayName)", selection: codecSelection) {
+                    Picker("", selection: codecSelection) {
                         ForEach(HostCodecPreference.allCases) { pref in
                             Text(pref.displayName).tag(pref)
                         }
                     }
+                    .labelsHidden()
+                    .frame(width: 260)
+                    SettingsNote("Automatic negotiates the best both sides support - AV1, then HEVC, then "
+                        + "H.264 - and only advertises what this Mac decodes in hardware. Pick a lower one if "
+                        + "a PC's encoder misbehaves. Remembered per PC; this is \(host.displayName).")
                 } else {
                     Text("Pair a PC to choose the codec it streams with.")
                         .foregroundStyle(.secondary)
                 }
-            } header: {
-                Text("Codec")
-            } footer: {
-                Text("Automatic negotiates the best both sides support - AV1, then HEVC, then H.264 - "
-                    + "and only advertises what this Mac decodes in hardware. Pick a lower one if a PC's "
-                    + "encoder misbehaves. Remembered per PC.")
             }
 
-            Section {
-                Toggle("HDR (brighter highlights, deeper color)", isOn: $model.customHDR)
-                    .toggleStyle(.switch)
-            } header: {
-                Text("HDR")
-            } footer: {
-                Text("Needs HDR on the host and an HDR display here. The launcher's HDR badge lights "
+            SettingsField("HDR") {
+                Toggle("Brighter highlights, deeper colour", isOn: $model.customHDR)
+                SettingsNote("Needs HDR on the host and an HDR display here. The launcher's HDR badge lights "
                     + "up only once a PQ or HLG stream is actually running.")
             }
 
-            Section {
-                Toggle("Watch the stream's health while you play (small overlay over the picture)",
-                       isOn: $model.showStreamStats)
-                Text("Toggle it any time in-stream with \(model.statsHotkey.displayString).")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Picker("Overlay position", selection: $model.streamStatsCorner) {
+            SettingsRule()
+
+            SettingsField("Stats overlay") {
+                Toggle("Show stream health over the picture", isOn: $model.showStreamStats)
+                SettingsNote("Toggle it any time mid-stream with \(model.statsHotkey.displayString).")
+            }
+
+            SettingsField("Position") {
+                Picker("", selection: $model.streamStatsCorner) {
                     ForEach(StatsOverlayCorner.allCases, id: \.self) { corner in
                         Text(corner.displayName).tag(corner)
                     }
                 }
-                Picker("Overlay detail", selection: $model.statsOverlayPreset) {
+                .labelsHidden()
+                .frame(width: 200)
+            }
+
+            SettingsField("Detail") {
+                Picker("", selection: $model.statsOverlayPreset) {
                     ForEach(StatsOverlayPreset.allCases, id: \.self) { preset in
-                        VStack(alignment: .leading) {
-                            Text(preset.displayName).fontWeight(.medium)
-                            Text(Self.presetSubtitle(preset))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        .tag(preset)
+                        Text(preset.displayName).tag(preset)
                     }
                 }
-                .pickerStyle(.inline)
+                .labelsHidden()
+                .frame(width: 200)
+                SettingsNote(Self.presetSubtitle(model.statsOverlayPreset))
                 if model.statsOverlayPreset == .custom {
                     StatsCustomRowsPicker()
+                        .frame(maxWidth: 460, alignment: .leading)
                 }
                 DisclosureGroup("When numbers turn yellow or red") {
                     StatsThresholdsEditor()
+                        .frame(maxWidth: 460, alignment: .leading)
                 }
-            } header: {
-                Text("Stats overlay")
+                .frame(maxWidth: 460, alignment: .leading)
             }
         }
-        .formStyle(.grouped)
         .onAppear { reloadCodec() }
         .onChange(of: model.selectedHost?.id) { _, _ in reloadCodec() }
     }
@@ -107,11 +105,11 @@ struct VideoPane: View {
     static func presetSubtitle(_ preset: StatsOverlayPreset) -> String {
         switch preset {
         case .minimal:
-            return "\(StatsOverlayDefaults.minimalRows.count) metrics - render FPS, latency, bitrate"
+            return "\(StatsOverlayDefaults.minimalRows.count) metrics - render FPS, latency, bitrate."
         case .micro:
-            return "\(StatsOverlayDefaults.microRows.count) metrics - framerate, network, bitrate"
-        case .extended: return "All stream metrics (not audio or Mac vitals)"
-        case .custom: return "Pick rows individually below"
+            return "\(StatsOverlayDefaults.microRows.count) metrics - framerate, network, bitrate."
+        case .extended: return "All stream metrics (not audio or Mac vitals)."
+        case .custom: return "Pick rows individually below."
         }
     }
 }

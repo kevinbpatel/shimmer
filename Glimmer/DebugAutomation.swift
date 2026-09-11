@@ -60,20 +60,13 @@ extension AppModel {
         // on each pane in turn, 3s apart (a screenshot loop for UI work), then
         // quit after --debug-quit-after seconds if given.
         if let panes = Self.debugKnob("open-settings") {
-            let list = panes.split(separator: ",").compactMap { SettingsPane(rawValue: String($0)) }
+            let list = panes.split(separator: ",").compactMap { SettingsTab(rawValue: String($0)) }
             log.notice("DEBUG automation: opening Settings on \(list.map(\.rawValue), privacy: .public)")
             for (i, pane) in list.enumerated() {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(i) * 3.0) { [weak self] in
-                    self?.requestedSettingsPane = pane
                     NSApp.activate()
-                    // SwiftUI's Settings scene owns the app menu's "Settings…"
-                    // item; clicking it is the one reliable entry point.
-                    if let appMenu = NSApp.mainMenu?.items.first?.submenu,
-                       let item = appMenu.items.first(where: { $0.title.hasPrefix("Settings") }) {
-                        appMenu.performActionForItem(at: appMenu.index(of: item))
-                    } else {
-                        self?.log.error("DEBUG automation: no Settings… menu item found")
-                    }
+                    self?.settingsTab = pane
+                    self?.showSettings = true
                 }
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {

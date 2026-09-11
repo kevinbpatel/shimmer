@@ -20,7 +20,6 @@ import SwiftUI
 
 struct LibraryWindow: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
 
     @State private var showPairSheet = false
     @State private var search = ""
@@ -72,7 +71,7 @@ struct LibraryWindow: View {
                 .help("Pair another PC")
 
                 Button {
-                    openSettings()
+                    model.showSettings = true
                 } label: {
                     Label("Settings", systemImage: "gearshape")
                 }

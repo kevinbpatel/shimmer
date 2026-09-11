@@ -53,28 +53,17 @@ struct AppPane: View {
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("launchMinimized") private var launchMinimized: Bool = false
 
-    /// The privileged AWDL network helper (parks awdl0 during streams). Shared
-    /// singleton so this toggle and the stream lifecycle drive one instance.
-    @ObservedObject private var awdl = AWDLHelperManager.shared
-
-    /// Defer the helper register/unregister off the SwiftUI transaction - an
-    /// inline XPC-backed SMAppService call mid-update dismisses the Settings
-    /// window.
-    private func scheduleHelperToggle(_ enable: Bool) {
-        Task { @MainActor in
-            if enable { AWDLHelperManager.shared.enable() } else { AWDLHelperManager.shared.disable() }
-        }
-    }
-
-    /// True when macOS has the login item but it's pending the user's approval
-    /// in System Settings ▸ Login Items - surfaced inline so the user isn't left
-    /// with a toggle that silently does nothing at the next reboot.
+    /// True when macOS has the login item but it is pending the user's approval
+    /// in System Settings > Login Items - surfaced inline so the user is not
+    /// left with a toggle that silently does nothing at the next reboot.
     @State private var loginItemNeedsApproval = false
+
+    /// The privileged AWDL network helper (parks awdl0 during streams).
+    @ObservedObject private var awdl = AWDLHelperManager.shared
 
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
-    /// dismissed the Settings window. The @AppStorage write still happens
-    /// synchronously; only the side-effect hops to the next main-queue tick.
+    /// dismissed the window.
     private func scheduleLoginItemRegistration(launchAtLogin: Bool, minimized: Bool) {
         DispatchQueue.main.async {
             let status = LoginItemManager.apply(launchAtLogin: launchAtLogin, minimized: minimized)
@@ -82,7 +71,13 @@ struct AppPane: View {
         }
     }
 
-    /// Default-launch app options - host applist with "Desktop" pinned first.
+    private func scheduleHelperToggle(_ enable: Bool) {
+        Task { @MainActor in
+            if enable { AWDLHelperManager.shared.enable() } else { AWDLHelperManager.shared.disable() }
+        }
+    }
+
+    /// Default-launch options - the host applist with "Desktop" pinned first.
     private var launchAppOptions: [String] {
         var seen = Set<String>()
         var out: [String] = []
@@ -91,15 +86,12 @@ struct AppPane: View {
             out.append(name)
         }
         let current = model.defaultLaunchApp
-        if !current.isEmpty, seen.insert(current).inserted {
-            out.append(current)
-        }
+        if !current.isEmpty, seen.insert(current).inserted { out.append(current) }
         return out
     }
 
-    /// Display label for a launch option: a stored app that isn't on the selected
-    /// host (set on another PC) is annotated so the picker doesn't imply it'll
-    /// launch here. Display-only - the tag stays the raw name, so scoping is unchanged.
+    /// A stored app that is not on the selected host (set on another PC) is
+    /// annotated so the picker does not imply it will launch here.
     private func launchOptionLabel(_ name: String) -> String {
         guard name != "Desktop",
               let host = model.selectedHost,
@@ -108,98 +100,97 @@ struct AppPane: View {
     }
 
     var body: some View {
-        // @Bindable shim - surfaces $model.x bindings from an @Observable
-        // environment value (the macro replaces ObservableObject; @Environment
-        // alone exposes the value but not per-property Bindings).
         @Bindable var model = model
-        Form {
-            Section {
-                // Outcome-first labels: what the user feels, with the
-                // tradeoff in the parenthetical. The mechanism (login items,
-                // SMAppService) stays in code comments and help text.
-                Toggle("Be ready at login (starts automatically with your Mac)", isOn: $launchAtLogin)
-                    .help("Registers Shimmer as a macOS login item.")
+        SettingsPageBody {
+            SettingsField("General") {
+                Toggle("Be ready at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
                     }
-                Toggle("Stay hidden at login (menu bar only until you ask)", isOn: $launchMinimized)
+                Toggle("Stay hidden at login (menu bar only)", isOn: $launchMinimized)
                     .onChange(of: launchMinimized) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
                     }
                     .disabled(!launchAtLogin)
-                Text("When on, Shimmer launches into the menu bar at login without showing the "
-                    + "main window. Toggle it off to have the launcher open at login like a normal "
-                    + "app. Manual launches via Spotlight, Finder, or the Dock always open the window.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                SettingsNote("When hidden, Shimmer launches into the menu bar at login without showing the "
+                    + "window. Manual launches via Spotlight, Finder or the Dock always open it.")
                 if loginItemNeedsApproval {
                     HStack(spacing: 8) {
-                        Label("macOS needs you to approve Shimmer in Login Items, "
-                            + "or it won't start at the next reboot.",
+                        Label("macOS needs you to approve Shimmer in Login Items.",
                               systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
-                        Spacer()
+                            .font(.system(size: 12)).foregroundStyle(.orange)
                         Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }
             }
-            Section("Appearance") {
-                Picker("Appearance", selection: $model.appAppearance) {
+
+            SettingsField("Appearance") {
+                Picker("", selection: $model.appAppearance) {
                     ForEach(AppAppearance.allCases) { option in
                         Text(option.displayName).tag(option)
                     }
                 }
+                .labelsHidden()
                 .pickerStyle(.segmented)
+                .frame(width: 300)
             }
-            Section("Default action") {
-                // Picker sourced from the selected host's announced app
-                // list (Sunshine's `applist`). "Desktop" is always
-                // present as a baseline; a stored choice missing from
-                // the host's live applist (host offline at config time)
-                // is preserved in the list so we don't silently lose it.
-                Picker("On connect, launch", selection: $model.defaultLaunchApp) {
+
+            SettingsField("On connect, launch") {
+                Picker("", selection: $model.defaultLaunchApp) {
                     ForEach(launchAppOptions, id: \.self) { name in
                         Text(launchOptionLabel(name)).tag(name)
                     }
                 }
-                Text("Right-click the Stream button to pick a different app per connection.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                .labelsHidden()
+                .frame(width: 260)
+                SettingsNote("Right-click a PC in the library to pick a different app per connection.")
             }
-            Section("Wi-Fi") {
-                Toggle(isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) })) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Smooth out Wi-Fi stutter while streaming").fontWeight(.medium)
-                        Text("Parks AirDrop's radio (AWDL) for the length of a stream so it can't "
-                            + "grab the Wi-Fi channel and cause multi-second freezes. Restored the "
-                            + "instant you stop. Installs a small helper that needs a one-time approval.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .help("Holds awdl0 down for the duration of each stream via a privileged helper.")
+
+            SettingsRule()
+
+            SettingsField("Wi-Fi") {
+                Toggle("Smooth out Wi-Fi stutter while streaming",
+                       isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
+                SettingsNote("Parks AirDrop's radio (AWDL) for the length of a stream so it can't grab the "
+                    + "Wi-Fi channel and cause multi-second freezes. Restored the instant you stop. Installs a "
+                    + "small helper that needs a one-time approval.")
                 if case .requiresApproval = awdl.state {
                     HStack(spacing: 8) {
-                        Label("macOS needs you to approve the Shimmer network helper in Login Items.",
+                        Label("macOS needs you to approve the Shimmer network helper.",
                               systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote).foregroundStyle(.orange)
-                        Spacer()
+                            .font(.system(size: 12)).foregroundStyle(.orange)
                         Button("Open Login Items") { awdl.openSystemSettings() }
                     }
                 }
                 if case .unavailable(let why) = awdl.state {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Network helper unavailable: \(why)", systemImage: "xmark.octagon")
-                            .font(.footnote).foregroundStyle(.red)
+                            .font(.system(size: 12)).foregroundStyle(.red)
                         if let url = awdl.recoveryDocURL {
                             Link("How to manage login items (Apple Support)", destination: url)
-                                .font(.footnote)
+                                .font(.system(size: 12))
                         }
                     }
                 }
             }
+
+            if model.showDiagnostics {
+                SettingsRule()
+                SettingsField("Diagnostics") {
+                    Toggle("Performance telemetry", isOn: $model.telemetryEnabled)
+                    SettingsNote("Local only - writes per-frame traces under ~/Library/Logs/Shimmer. "
+                        + "Nothing leaves this Mac.")
+                    DisclosureGroup("Controller input test") {
+                        ControllerInputTest().frame(maxWidth: 460, alignment: .leading)
+                    }
+                    .frame(maxWidth: 460, alignment: .leading)
+                    DisclosureGroup("Logs") {
+                        LogViewer().frame(maxWidth: 560, alignment: .leading)
+                    }
+                    .frame(maxWidth: 560, alignment: .leading)
+                }
+            }
         }
-        .formStyle(.grouped)
         .onAppear {
             awdl.refresh()
             guard launchAtLogin else { loginItemNeedsApproval = false; return }
