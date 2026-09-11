@@ -12,6 +12,10 @@
 //                                    stream its default app.
 //    GLIMMER_DEBUG_PIP_AFTER=<sec>   once streaming, wait <sec> then ⌃⌥P.
 //    GLIMMER_DEBUG_QUIT_AFTER=<sec>  quit the app <sec> after streaming starts.
+//    GLIMMER_DEBUG_RETURN_AFTER=<sec> <sec> after the PiP entry, resume the
+//                                    window (the Dock / menu-bar path).
+//    GLIMMER_DEBUG_PIP_PROBE=1       log the whole PiP state machine once a
+//                                    second (`PIPPROBE` lines).
 //
 //  The same knobs are accepted as command-line arguments
 //  (`--debug-stream=<substr> --debug-pip-after=<sec> ...`) because a GUI app
@@ -100,6 +104,18 @@ extension AppModel {
             return
         }
         guard let hostMatch = Self.debugKnob("stream") else { return }
+        // `--debug-pip-probe=1`: once a second, log the whole PiP state
+        // machine (controller flags, adapter latches, window/panel state).
+        if Self.debugKnob("pip-probe") != nil {
+            let probe = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let session = self.nativeSession else { return }
+                    guard let win = await session.window else { return }
+                    self.log.notice("PIPPROBE \(win.debugPiPState(), privacy: .public)")
+                }
+            }
+            RunLoop.main.add(probe, forMode: .common)
+        }
         let pipAfter = Self.debugKnob("pip-after").flatMap(Double.init)
         let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init)
         let returnAfter = Self.debugKnob("return-after").flatMap(Double.init)

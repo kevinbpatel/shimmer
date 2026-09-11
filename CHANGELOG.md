@@ -20,6 +20,14 @@ HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
 longer requested at all on a display with no headroom, since it cannot help
 there and this is exactly how it hurts.
 
+Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
+instant Picture in Picture was still opening left the PiP window up for good,
+showing the bottom-left corner of the picture. The stop we issued from inside
+AVKit's own "started" callback was silently dropped - as was every later one -
+so the window's return and the PiP outlived each other. That stop is now
+issued a run-loop turn later, where AVKit honours it, and a watchdog keeps the
+PiP state machine honest should AVKit ever drop another.
+
 Fix: a white hairline down one edge of the Picture in Picture window, at
 some sizes and not others. The PiP window is sized in whole pixels and so is
 almost never exactly on the stream's aspect, and the source layer that macOS

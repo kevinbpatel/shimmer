@@ -50,6 +50,20 @@ public final class StreamPictureInPicture: NSObject {
     /// True from willStop (AVKit's, or our own `stop()`) until didStop, so a
     /// second stop request during the ~0.5s dismiss animation is a no-op.
     private var isStopping = false
+    /// Armed by `stop()`: AVKit can silently ignore `stopPictureInPicture()`,
+    /// and a latched `isStopping` with no willStop/didStop ever coming would
+    /// make every later stop a no-op forever - the PiP window then outlives
+    /// the stream window's return and mirrors the fullscreen source as a 1:1
+    /// crop. If nothing lands within `stopAckTimeout`, ask again, and after
+    /// `stopAttempts` unlatch so the state machine stays honest (the user's
+    /// own × / return still work). The one KNOWN way to provoke an ignored
+    /// stop - asking from inside AVKit's didStart callback - wedges the
+    /// controller for retries too (measured: 3 asks over 1.5s, all dropped),
+    /// which is why the owner defers that particular stop instead of relying
+    /// on this; the watchdog is the backstop for whatever else AVKit drops.
+    private var stopWatchdog: DispatchWorkItem?
+    private static let stopAckTimeout: TimeInterval = 0.75
+    private static let stopAttempts = 3
 
     /// PiP's play/pause state as the PiP controls last set it. Read by
     /// AVKit's `pictureInPictureControllerIsPlaybackPaused` off the main
@@ -66,6 +80,15 @@ public final class StreamPictureInPicture: NSObject {
     public var onFailedToStart: (@MainActor (Error) -> Void)?
 
     public private(set) var isActive = false
+
+    /// One line of controller + adapter state for the env-gated debug probe
+    /// (`--debug-pip-probe`); never read on a normal launch.
+    public var debugState: String {
+        let ctl = controller
+        return "ctl.active=\(ctl?.isPictureInPictureActive ?? false) ctl.possible=\(ctl?.isPictureInPicturePossible ?? false) "
+            + "ctl.suspended=\(ctl?.isPictureInPictureSuspended ?? false) isActive=\(isActive) isStopping=\(isStopping) "
+            + "stoppingProgrammatically=\(stoppingProgrammatically) restoreRequested=\(restoreRequested)"
+    }
 
     public init(layer: AVSampleBufferDisplayLayer) {
         super.init()
@@ -97,6 +120,7 @@ public final class StreamPictureInPicture: NSObject {
             stoppingProgrammatically = false
             isActive = false
             isStopping = false
+            disarmStopWatchdog()
         }
         build(on: newLayer)
         return wasActive
@@ -121,6 +145,35 @@ public final class StreamPictureInPicture: NSObject {
         stoppingProgrammatically = true
         isStopping = true
         controller.stopPictureInPicture()
+        armStopWatchdog(attempt: 1)
+    }
+
+    private func armStopWatchdog(attempt: Int) {
+        stopWatchdog?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.stopWatchdog = nil
+            // Acknowledged (willStop/didStop cleared the latch), or PiP is gone
+            // by some other route - nothing to do.
+            guard self.isStopping, let controller = self.controller,
+                  controller.isPictureInPictureActive else { return }
+            if attempt >= Self.stopAttempts {
+                self.log.error("Picture in Picture stop ignored by AVKit \(attempt) times - giving up; state unlatched")
+                self.isStopping = false
+                self.stoppingProgrammatically = false
+                return
+            }
+            self.log.error("Picture in Picture stop not acknowledged within \(Self.stopAckTimeout)s - asking again (attempt \(attempt + 1))")
+            controller.stopPictureInPicture()
+            self.armStopWatchdog(attempt: attempt + 1)
+        }
+        stopWatchdog = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.stopAckTimeout, execute: item)
+    }
+
+    private func disarmStopWatchdog() {
+        stopWatchdog?.cancel()
+        stopWatchdog = nil
     }
 
     /// Drop the controller without any callbacks - session teardown.
@@ -136,6 +189,7 @@ public final class StreamPictureInPicture: NSObject {
         contentSource = nil
         isActive = false
         isStopping = false
+        disarmStopWatchdog()
     }
 
     private func build(on newLayer: AVSampleBufferDisplayLayer) {
@@ -189,7 +243,10 @@ extension StreamPictureInPicture: AVPictureInPictureControllerDelegate {
     public nonisolated func pictureInPictureControllerWillStopPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        onMain { [self] in isStopping = true }
+        onMain { [self] in
+            isStopping = true
+            disarmStopWatchdog()
+        }
     }
 
     public nonisolated func pictureInPictureController(
@@ -198,6 +255,7 @@ extension StreamPictureInPicture: AVPictureInPictureControllerDelegate {
     ) {
         onMain { [self] in
             isStopping = true
+            disarmStopWatchdog()
             // AVKit asks for restore on EVERY stop, including ours. Only a stop
             // we did not initiate is the user asking to come back.
             if !stoppingProgrammatically {
@@ -220,6 +278,7 @@ extension StreamPictureInPicture: AVPictureInPictureControllerDelegate {
             isStopping = false
             restoreRequested = false
             stoppingProgrammatically = false
+            disarmStopWatchdog()
             log.info("Picture in Picture stopped (restoreRequested=\(restore, privacy: .public))")
             onDidStop?(restore)
         }

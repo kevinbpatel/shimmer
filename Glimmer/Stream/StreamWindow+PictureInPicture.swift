@@ -102,9 +102,19 @@ extension StreamWindow {
             // still screen-bound here (reengageForeground doesn't rebind it;
             // the view rebind lands in onDidStop below), which is harmless -
             // a screen link ticks whether the window is visible or not.
+            //
+            // NOT synchronously: we are inside AVKit's didStart callback, and
+            // a stopPictureInPicture() issued from there is silently dropped -
+            // and so is every later one (measured on macOS 26: three retries
+            // over 1.5s, all ignored). The PiP window then outlives the
+            // window's return, mirroring the restored fullscreen source as
+            // the 1:1 bottom-left crop. One run-loop turn later it is honoured.
             if !self.isBackgrounded {
                 self.log.info("Picture in Picture started after the window returned - stopping it")
-                self.pictureInPicture.stop()
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !self.didClose, !self.isBackgrounded else { return }
+                    self.pictureInPicture.stop()
+                }
                 return
             }
             self.enableBackgroundControllerEvents()
@@ -353,6 +363,20 @@ extension StreamWindow {
         // view back to its superview.
         if let superview = displayView.superview { displayView.frame = superview.bounds }
         window.alphaValue = 1
+    }
+
+    // MARK: - Debug probe
+
+    /// Everything the PiP state machine depends on, one line, for the
+    /// env-gated `--debug-pip-probe` timer in DebugAutomation.
+    public func debugPiPState() -> String {
+        let panelVisible = NSApp.windows.contains {
+            String(describing: type(of: $0)).contains("PIPPanel") && $0.isVisible
+        }
+        return "\(pictureInPicture.debugState) win.active=\(isPictureInPictureActive) pending=\(pictureInPicturePending) "
+            + "sourceMode=\(pipSourceMode) backgrounded=\(isBackgrounded) alpha=\(window.alphaValue) "
+            + "frame=\(Int(window.frame.width))x\(Int(window.frame.height)) visible=\(window.isVisible) key=\(window.isKeyWindow) "
+            + "appActive=\(NSApp.isActive) panelVisible=\(panelVisible)"
     }
 
     // MARK: - Present suppression
