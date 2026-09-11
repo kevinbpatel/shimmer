@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import AppKit
 import os.log
 
 extension AppModel {
@@ -160,7 +161,17 @@ extension AppModel {
         persistQualitySettings()
         var cfg = StreamConfig(width: effectiveWidth, height: effectiveHeight,
                                fps: effectiveFPS, bitrateKbps: effectiveBitrateKbps)
-        cfg.hdr = effectiveHDR
+        // HDR only when the display can actually show it. Asking for it on an
+        // SDR panel cannot improve anything and actively hurts: the host
+        // switches to 10-bit and advertises BT.2020, and that wide-gamut tag on
+        // Rec.709 content is what over-saturates the picture (see
+        // derivedColorSpaceKey). NSScreen reports 1.0 of EDR headroom on a
+        // panel with no HDR at all.
+        let displayCanShowHDR = (NSScreen.main?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1.0) > 1.0
+        cfg.hdr = effectiveHDR && displayCanShowHDR
+        if effectiveHDR && !displayCanShowHDR {
+            Diag.info("HDR requested but this display has no headroom (EDR 1.0) - streaming SDR", "Stream")
+        }
         // Always the richest layout this Mac's default output can take.
         cfg.audio = .bestForCurrentOutput()
         cfg.captureSysKeys = captureSysKeys

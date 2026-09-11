@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+Fix: colours were over-saturated on an SDR display - contrast and vibrancy
+visibly pushed. Asking for HDR makes Sunshine encode 10-bit and advertise
+BT.2020 primaries, but the desktop it captures is still Rec.709, so the stream
+arrived tagged BT.2020 with an SDR transfer and macOS gamut-mapped 709 content
+as if it were 2020. A BT.2020 tag with a non-PQ transfer while the host reports
+HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
+longer requested at all on a display with no headroom, since it cannot help
+there and this is exactly how it hurts.
+
+The Picture in Picture pause button no longer does anything. macOS draws that
+transport in its own process, so it cannot be removed, but a live game has
+nothing to pause - it only froze the picture and then jumped.
+
 Two pickers are gone. Audio channels are always the richest layout this Mac's
 default output can take, and there is no "default app" setting: the library
 shows a button per app, so the menu-bar item, the launch after pairing, and
