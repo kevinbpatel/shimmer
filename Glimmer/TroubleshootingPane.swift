@@ -75,8 +75,10 @@ struct RawHIDControl: View {
                               : "macOS applies Input Monitoring only when the app restarts")
                 } else {
                     Button("Open Input Monitoring") {
-                        sentToSettings = true
-                        Self.registerAndOpen()
+                        // Only advance to "Relaunch to finish" if we really did
+                        // hand the user to System Settings; if the system prompt
+                        // came up instead, answering it IS the step.
+                        Self.registerAndOpen { sentToSettings = $0 }
                     }
                 }
             }
@@ -132,11 +134,27 @@ struct RawHIDControl: View {
     /// ONE sanctioned entry point for the permission request + Settings deep
     /// link - it fires only from this explicit "Open Settings" button, never
     /// automatically on controller connect.
-    static func registerAndOpen() {
+    /// - Parameter done: called on the main actor with `true` only if we
+    ///   actually sent the user to System Settings.
+    static func registerAndOpen(done: @escaping @MainActor (Bool) -> Void = { _ in }) {
+        // WHY THIS IS TWO CASES. `IOHIDRequestAccess` presents the system
+        // Input Monitoring prompt when TCC has never been asked. Opening System
+        // Settings straight afterwards put a full-size window ON TOP of that
+        // prompt, so the thing the user had to answer was hidden behind the
+        // thing we had just opened - and the reported symptom was "it keeps
+        // telling me to enable it" while the prompt sat unanswered underneath.
+        //
+        // So: if TCC has no answer yet, request and STOP - the prompt is the
+        // whole interaction. Only when TCC already has an answer (the request
+        // no-ops) is System Settings the right place to send anyone.
+        let hasAnAnswer = DualSenseHID.accessGranted || DualSenseHID.accessDenied
         DispatchQueue.global(qos: .userInitiated).async {
             let granted = DualSenseHID.requestAccess()
-            guard !granted else { return } // granted → nothing to open
-            DispatchQueue.main.async { openInputMonitoring() }
+            DispatchQueue.main.async {
+                guard !granted, hasAnAnswer else { done(false); return }
+                openInputMonitoring()
+                done(true)
+            }
         }
     }
 
