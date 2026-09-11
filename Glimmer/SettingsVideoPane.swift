@@ -39,7 +39,7 @@ struct VideoPane: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 260)
+                    .settingsControl()
                 } else {
                     Text("Pair a PC to choose the codec it streams with.")
                         .foregroundStyle(.secondary)
@@ -63,7 +63,7 @@ struct VideoPane: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 200)
+                .settingsControl()
             }
 
             SettingsField("Detail") {
@@ -73,16 +73,16 @@ struct VideoPane: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 200)
+                .settingsControl()
                 if model.statsOverlayPreset == .custom {
                     StatsCustomRowsPicker()
-                        .frame(maxWidth: 460, alignment: .leading)
+                        .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 }
                 DisclosureGroup("When numbers turn yellow or red") {
                     StatsThresholdsEditor()
-                        .frame(maxWidth: 460, alignment: .leading)
+                        .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 }
-                .frame(maxWidth: 460, alignment: .leading)
+                .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
             }
         }
         .onAppear { reloadCodec() }

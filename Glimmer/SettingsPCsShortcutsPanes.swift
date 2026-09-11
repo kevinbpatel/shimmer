@@ -23,13 +23,13 @@ struct ShortcutsPane: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("In-stream keys") {
                 HotkeyRow(label: "Leave the stream", hotkey: $model.quitHotkey)
-                    .frame(maxWidth: 420)
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 HotkeyRow(label: "Show or hide stream stats", hotkey: $model.statsHotkey)
-                    .frame(maxWidth: 420)
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 HotkeyRow(label: "Pop out (Picture in Picture)", hotkey: $model.pipHotkey)
-                    .frame(maxWidth: 420)
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 HotkeyRow(label: "Capture or release the pointer", hotkey: $model.releasePointerHotkey)
-                    .frame(maxWidth: 420)
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
             }
 
             SettingsField("macOS keys") {
@@ -45,7 +45,7 @@ struct ShortcutsPane: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .settingsControl()
                 if model.controllerQuitChord == .custom {
                     HStack(spacing: 8) {
                         Text(model.customControllerChord.isEmpty
@@ -60,7 +60,7 @@ struct ShortcutsPane: View {
             if model.controllerConnected || model.rawHIDControllerEnabled {
                 SettingsField("DualSense") {
                     RawHIDControl()
-                        .frame(maxWidth: 460, alignment: .leading)
+                        .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                 }
             }
         }

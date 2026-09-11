@@ -100,9 +100,9 @@ struct AppPane: View {
                 SettingsField("Diagnostics") {
                     Toggle("Performance telemetry", isOn: $model.telemetryEnabled)
                     DisclosureGroup("Controller input test") {
-                        ControllerInputTest().frame(maxWidth: 460, alignment: .leading)
+                        ControllerInputTest().settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                     }
-                    .frame(maxWidth: 460, alignment: .leading)
+                    .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
                     DisclosureGroup("Logs") {
                         LogViewer().frame(maxWidth: 560, alignment: .leading)
                     }

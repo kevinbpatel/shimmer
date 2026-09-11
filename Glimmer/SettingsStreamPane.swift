@@ -108,7 +108,7 @@ struct StreamPane: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .settingsControl()
                 if resolutionSelection.wrappedValue == .custom {
                     HStack(spacing: 6) {
                         TextField("", value: $model.customWidth, format: .number)
@@ -129,7 +129,7 @@ struct StreamPane: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .settingsControl()
                 if frameRateSelection.wrappedValue == .custom {
                     HStack(spacing: 6) {
                         TextField("", value: $model.customFPS, format: .number)
@@ -145,7 +145,7 @@ struct StreamPane: View {
                 HStack(spacing: 10) {
                     Slider(value: bitrateSliderIndex,
                            in: 0...Double(BitrateScale.stepsMbps.count - 1), step: 1)
-                        .frame(width: 260)
+                        .settingsControl()
                         .disabled(model.bitrateAuto)
                     Text("\(model.effectiveBitrateKbps / 1000) Mbps")
                         .monospacedDigit()
@@ -161,7 +161,7 @@ struct StreamPane: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.segmented)
-                .frame(width: 260)
+                .settingsControl()
             }
 
             SettingsField("Picture in Picture") {

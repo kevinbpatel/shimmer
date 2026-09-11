@@ -145,6 +145,38 @@ enum SettingsMetrics {
     /// resizable - the zoom and minimise buttons are disabled - and the height
     /// changes with the tab rather than the user dragging it.
     static let windowWidth: CGFloat = 600
+    /// The box every popup / slider / segmented control is laid out in. ONE
+    /// width for the whole app: the panes used to mix 200 and 260, so the Video
+    /// pane's own rows didn't line up with each other, never mind with Stream's.
+    static let controlWidth: CGFloat = 260
+    /// The box for controls that need more room than a popup - hotkey
+    /// recorders, the stats row editor, the DualSense panel.
+    static let wideControlWidth: CGFloat = 460
+}
+
+extension View {
+    /// Lay a control out in the settings column's control box, flush with its
+    /// LEFT edge.
+    ///
+    /// Load-bearing `alignment:`. A bare `.frame(width:)` proposes that width to
+    /// the control but does NOT make it take it: AppKit-backed controls that
+    /// size to their content - a menu `Picker` (as wide as its longest item), a
+    /// `.segmented` picker - stay at their natural width and SwiftUI then
+    /// CENTRES them in the box. That is what put every popup on the Stream pane
+    /// at a different x: measured on the 600pt window, Resolution started at
+    /// 211, Frame rate at 231, the Show-the-stream segmented at 236, the Codec
+    /// popup at 203, while the checkboxes and the slider (which does stretch)
+    /// sat at 192. `.leading` pins them all to 192; widths stay ragged on the
+    /// right, the way macOS's own settings panes look.
+    func settingsControl(width: CGFloat = SettingsMetrics.controlWidth) -> some View {
+        frame(width: width, alignment: .leading)
+    }
+
+    /// The same flush-left rule for a control that should grow to a ceiling
+    /// rather than sit in a fixed box.
+    func settingsControl(maxWidth: CGFloat) -> some View {
+        frame(maxWidth: maxWidth, alignment: .leading)
+    }
 }
 
 /// One labelled group: the label sits in the right-aligned gutter, everything
