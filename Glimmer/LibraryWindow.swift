@@ -137,6 +137,18 @@ struct ComputersTab: View {
                             HStack(spacing: 7) {
                                 Circle().fill(statusColor).frame(width: 9, height: 9)
                                 Text(statusText)
+                                // The only part of the old streaming card worth
+                                // keeping: a way back to a running stream. The
+                                // rest of that card - a big "Streaming" plate
+                                // naming the app and the PC - said what this
+                                // row, the disabled app buttons and their help
+                                // text already say, while covering the pane it
+                                // was reporting on.
+                                if model.isStreaming {
+                                    Button("Show the stream") { model.resumeStreamWindow() }
+                                        .controlSize(.small)
+                                        .padding(.leading, 3)
+                                }
                             }
                         }
                         if let played = host.lastPlayedDescription {
@@ -153,7 +165,6 @@ struct ComputersTab: View {
                     .padding(.bottom, 20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .overlay { if model.isStreaming { streamingOverlay(host) } }
 
                 Divider()
                 HStack {
@@ -234,33 +245,6 @@ struct ComputersTab: View {
         .background(Color.primary.opacity(0.07), in: Capsule())
     }
 
-    /// Shown over the grid while a session is up, so the window says what is
-    /// happening instead of the grid just dimming.
-    private func streamingOverlay(_ host: Host) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "airplayvideo")
-                .font(.system(size: 32, weight: .regular))
-                .foregroundStyle(.tint)
-            Text("Streaming").font(.headline)
-            Text(model.runningAppName ?? model.heroTargetAppName)
-                .font(.subheadline).foregroundStyle(.secondary)
-            Text(host.displayName)
-                .font(.caption).foregroundStyle(.tertiary)
-            Button {
-                model.resumeStreamWindow()
-            } label: {
-                Label("Show the stream", systemImage: "arrow.up.left.and.arrow.down.right")
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 4)
-        }
-        .padding(28)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(.white.opacity(0.10), lineWidth: 1))
-        .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
-    }
 }
 
 // MARK: - Sidebar row
