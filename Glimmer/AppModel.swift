@@ -118,21 +118,12 @@ final class AppModel {
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
-    /// The refresh a stream asks for when `frameRateMatchesDisplay` is off.
-    /// Applies under every preset (the Stream pane's frame-rate picker), not
-    /// just Custom - the preset only decides the SIZE now.
+    /// The refresh a stream asks for - the Frame rate picker's number, and the
+    /// only source of it since "Match display" was removed. Applies under every
+    /// preset; the preset only decides the SIZE.
     var customFPS: Int = 60 {
         didSet {
             UserDefaults.standard.set(customFPS, forKey: "customFPS")
-            persistQualitySettings()
-        }
-    }
-    /// Frame rate follows the panel's refresh (the old preset behaviour) or
-    /// the picked `customFPS`. Loaded with a migration: absent → true unless
-    /// the user was already on Custom, whose typed Hz must survive.
-    var frameRateMatchesDisplay: Bool = true {
-        didSet {
-            UserDefaults.standard.set(frameRateMatchesDisplay, forKey: "frameRateMatchesDisplay")
             persistQualitySettings()
         }
     }
@@ -537,10 +528,24 @@ final class AppModel {
         customWidth = min(max(Self.persistedPositiveInt("customWidth") ?? customWidth, 640), 7680)
         customHeight = min(max(Self.persistedPositiveInt("customHeight") ?? customHeight, 480), 4320)
         customFPS = min(max(Self.persistedPositiveInt("customFPS") ?? customFPS, 30), 240)
-        // Migration for installs from before the frame-rate picker applied to
-        // every preset: a Custom user keeps their typed Hz, everyone else keeps
-        // the panel's refresh - exactly what each was getting.
-        frameRateMatchesDisplay = Self.persistedBool("frameRateMatchesDisplay") ?? (qualityPreset != .custom)
+        // "Match display" is gone from the Frame rate picker (see
+        // FrameRateChoice), so an install that was on it has no row to show:
+        // convert it to the fixed rate it was ALREADY streaming at, the panel's
+        // own refresh. Gated on its own one-shot marker, like the HDR widening
+        // above - clearing the old key is not enough, because "key absent +
+        // panel preset" is also how a pre-flag install reads, so every later
+        // launch would re-migrate and stamp over whatever the user had since
+        // picked.
+        if !UserDefaults.standard.bool(forKey: "didDropMatchDisplayFrameRate") {
+            UserDefaults.standard.set(true, forKey: "didDropMatchDisplayFrameRate")
+            let wasMatchingDisplay = UserDefaults.standard.object(forKey: "frameRateMatchesDisplay") == nil
+                ? qualityPreset != .custom
+                : UserDefaults.standard.bool(forKey: "frameRateMatchesDisplay")
+            if wasMatchingDisplay {
+                customFPS = FrameRateChoice.migratedRate(displayHz: currentDisplayMaxHz)
+            }
+            UserDefaults.standard.removeObject(forKey: "frameRateMatchesDisplay")
+        }
         bitrateAuto = Self.persistedBool("bitrateAuto") ?? bitrateAuto
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)

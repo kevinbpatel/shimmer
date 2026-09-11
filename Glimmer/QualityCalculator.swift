@@ -356,7 +356,7 @@ extension AppModel {
         // the mode the SESSION will actually take (StreamConfig reads the same
         // property), so the two can never disagree if the mode is ever re-gated.
         let fps = QualityResolution.frameRate(
-            matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
+            customFPS: customFPS,
             displayHz: display.fps, windowed: effectiveDisplayMode == .window)
         let recommended: Int
         switch preset {
@@ -385,7 +385,7 @@ extension AppModel {
 
     /// The row the Frame rate picker shows selected.
     var frameRateChoice: FrameRateChoice {
-        FrameRateChoice.from(matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS)
+        FrameRateChoice.from(customFPS: customFPS)
     }
 
     /// Adopt a resolution choice.
@@ -415,13 +415,10 @@ extension AppModel {
     /// number already stored, so picking it never changes the rate by itself.
     func apply(_ choice: FrameRateChoice) {
         switch choice {
-        case .matchDisplay:
-            frameRateMatchesDisplay = true
         case .fixed(let hz):
             customFPS = hz
-            frameRateMatchesDisplay = false
         case .custom:
-            frameRateMatchesDisplay = false
+            break   // keeps the stored number; the field takes over
         }
     }
 
@@ -431,7 +428,7 @@ extension AppModel {
     var recommendedBitrateMbpsNow: Int {
         let display = smartDefaultsForCurrentDisplay()
         let fps = QualityResolution.frameRate(
-            matchesDisplay: frameRateMatchesDisplay, customFPS: customFPS,
+            customFPS: customFPS,
             displayHz: display.fps, windowed: effectiveDisplayMode == .window)
         switch qualityPreset {
         case .matchDisplay:

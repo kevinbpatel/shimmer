@@ -41,7 +41,7 @@ struct StreamPane: View {
     private var frameRateSelection: Binding<FrameRateChoice> {
         Binding(
             get: {
-                if customFrameRateEntry, !model.frameRateMatchesDisplay { return .custom }
+                if customFrameRateEntry { return .custom }
                 return model.frameRateChoice
             },
             set: { choice in
@@ -78,7 +78,6 @@ struct StreamPane: View {
 
     private func frameRateLabel(_ choice: FrameRateChoice) -> String {
         switch choice {
-        case .matchDisplay: return "Match display (\(model.currentDisplayMaxHz) Hz)"
         case .fixed(let hz): return "\(hz) Hz"
         case .custom: return "Custom…"
         }

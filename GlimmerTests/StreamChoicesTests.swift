@@ -30,25 +30,36 @@ struct StreamChoicesTests {
 
     // MARK: Frame rate picker
 
-    @Test func frameRateRowsFollowTheFlagThenTheNumber() {
-        #expect(FrameRateChoice.from(matchesDisplay: true, customFPS: 60) == .matchDisplay)
-        #expect(FrameRateChoice.from(matchesDisplay: false, customFPS: 120) == .fixed(120))
-        #expect(FrameRateChoice.from(matchesDisplay: false, customFPS: 75) == .custom)
+    @Test func frameRateRowIsJustTheNumber() {
+        #expect(FrameRateChoice.from(customFPS: 120) == .fixed(120))
+        #expect(FrameRateChoice.from(customFPS: 75) == .custom)
+        #expect(!FrameRateChoice.all.isEmpty)
+    }
+
+    /// "Match display" left the picker, so an install that was on it has to
+    /// land on the rate it was ALREADY streaming at - the panel's refresh -
+    /// not on whatever `customFPS` happened to hold.
+    @Test func matchDisplayMigratesToThePanelsOwnRate() {
+        #expect(FrameRateChoice.migratedRate(displayHz: 120) == 120)
+        #expect(FrameRateChoice.migratedRate(displayHz: 75) == 75)
+        // A panel that can't say its refresh falls back, never 0.
+        #expect(FrameRateChoice.migratedRate(displayHz: 0) == 60)
+        // And an absurd reading is clamped like any other rate.
+        #expect(FrameRateChoice.migratedRate(displayHz: 1000) == 240)
+    }
+
+    /// A migrated 75Hz panel reads back as Custom showing 75 - the honest row,
+    /// since 75 isn't one of the standard offers.
+    @Test func aNonStandardMigratedRateReadsAsCustom() {
+        #expect(FrameRateChoice.from(customFPS: FrameRateChoice.migratedRate(displayHz: 75)) == .custom)
     }
 
     // MARK: Resolution rules
 
-    @Test func matchingTheDisplayTakesThePanelHz() {
-        #expect(QualityResolution.frameRate(matchesDisplay: true, customFPS: 30, displayHz: 120, windowed: false) == 120)
-        // A panel that can't say its refresh falls back, never 0.
-        #expect(QualityResolution.frameRate(matchesDisplay: true, customFPS: 30, displayHz: 0, windowed: false)
-            == StreamDisplayMode.fallbackDisplayMaxHz)
-    }
-
     @Test func aPickedRateIsVerbatimFullScreenAndCappedInAWindow() {
-        #expect(QualityResolution.frameRate(matchesDisplay: false, customFPS: 144, displayHz: 60, windowed: false) == 144)
-        #expect(QualityResolution.frameRate(matchesDisplay: false, customFPS: 144, displayHz: 60, windowed: true) == 60)
-        #expect(QualityResolution.frameRate(matchesDisplay: false, customFPS: 1000, displayHz: 60, windowed: false) == 240)
+        #expect(QualityResolution.frameRate(customFPS: 144, displayHz: 60, windowed: false) == 144)
+        #expect(QualityResolution.frameRate(customFPS: 144, displayHz: 60, windowed: true) == 60)
+        #expect(QualityResolution.frameRate(customFPS: 1000, displayHz: 60, windowed: false) == 240)
     }
 
     @Test func bitrateIsTheRecommendationOrTheUsersNumber() {
@@ -187,7 +198,6 @@ struct QualityRestoreTests {
             model.apply(.fixed(60))
             model.apply(.standard(.uhd4K))
             #expect(model.customFPS == 60)
-            #expect(model.frameRateMatchesDisplay == false)
             #expect(model.customWidth == 3840)
         }
     }
@@ -208,20 +218,43 @@ struct QualityRestoreTests {
         }
     }
 
-    /// The frame-rate flag's migration: absent means "whatever this install was
-    /// already getting" - the panel's refresh under a panel preset, the typed
-    /// Hz under Custom.
+    /// Dropping "Match display" must not change anyone's stream. An install
+    /// that had a typed rate keeps it verbatim; one that was matching the
+    /// display adopts that panel's refresh as a fixed number, and the old key
+    /// is cleared so the conversion can never re-fire over a later choice.
     @MainActor
-    @Test func theFrameRateFlagMigratesFromTheOldPreset() {
-        withSeededDefaults(["qualityPreset": "custom", "customFPS": 90]) {
-            UserDefaults.standard.removeObject(forKey: "frameRateMatchesDisplay")
+    @Test func matchDisplayInstallsConvertToAFixedRateOnce() {
+        withSeededDefaults(["qualityPreset": "custom", "customFPS": 90,
+                            "frameRateMatchesDisplay": false]) {
+            UserDefaults.standard.removeObject(forKey: "didDropMatchDisplayFrameRate")
             let model = AppModel()
-            #expect(model.frameRateMatchesDisplay == false)
             #expect(model.customFPS == 90)
+            #expect(UserDefaults.standard.object(forKey: "frameRateMatchesDisplay") == nil)
         }
-        withSeededDefaults(["qualityPreset": "matchDisplay"]) {
+        withSeededDefaults(["qualityPreset": "matchDisplay", "customFPS": 30,
+                            "frameRateMatchesDisplay": true]) {
+            UserDefaults.standard.removeObject(forKey: "didDropMatchDisplayFrameRate")
+            let model = AppModel()
+            // Whatever this machine's panel reports - never the stale 30.
+            #expect(model.customFPS == FrameRateChoice.migratedRate(
+                displayHz: model.currentDisplayMaxHz))
+            #expect(UserDefaults.standard.object(forKey: "frameRateMatchesDisplay") == nil)
+        }
+        // Key absent + a panel preset means the install was matching the
+        // display back when the flag defaulted that way.
+        withSeededDefaults(["qualityPreset": "matchDisplay", "customFPS": 30]) {
             UserDefaults.standard.removeObject(forKey: "frameRateMatchesDisplay")
-            #expect(AppModel().frameRateMatchesDisplay == true)
+            UserDefaults.standard.removeObject(forKey: "didDropMatchDisplayFrameRate")
+            #expect(AppModel().customFPS != 30)
+        }
+
+        // And it is genuinely ONE shot: a second launch leaves a later choice
+        // alone rather than re-stamping the panel rate over it.
+        withSeededDefaults(["qualityPreset": "matchDisplay", "customFPS": 30]) {
+            UserDefaults.standard.removeObject(forKey: "didDropMatchDisplayFrameRate")
+            _ = AppModel()
+            UserDefaults.standard.set(30, forKey: "customFPS")
+            #expect(AppModel().customFPS == 30)
         }
     }
 }
