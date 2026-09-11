@@ -266,6 +266,7 @@
 		DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */; };
 		A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE792000000000000000 /* StreamChoicesTests.swift */; };
 		A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */; };
+		A1C0HEROTST10000000000 /* HeroAppTargetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */; };
 		A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */; };
 		A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */; };
 		A1C0DE931000000000000000 /* AppSymbolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE932000000000000000 /* AppSymbolTests.swift */; };
@@ -579,6 +580,7 @@
 		DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamDisplayModeTests.swift; sourceTree = "<group>"; };
 		A1C0DE792000000000000000 /* StreamChoicesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamChoicesTests.swift"; sourceTree = "<group>"; };
 		A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamVolumeTests.swift"; sourceTree = "<group>"; };
+		A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HeroAppTargetTests.swift"; sourceTree = "<group>"; };
 		A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarBatteryGlyphTests.swift"; sourceTree = "<group>"; };
 		A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FrameRateRangeTests.swift"; sourceTree = "<group>"; };
 		A1C0DE932000000000000000 /* AppSymbolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppSymbolTests.swift"; sourceTree = "<group>"; };
@@ -948,6 +950,7 @@
 				DEC0DE840000000000000012 /* StreamDisplayModeTests.swift */,
 				A1C0DE792000000000000000 /* StreamChoicesTests.swift */,
 				A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */,
+				A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */,
 				A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
 				A1C0DE932000000000000000 /* AppSymbolTests.swift */,
@@ -1356,6 +1359,7 @@
 				DEC0DE840000000000000011 /* StreamDisplayModeTests.swift in Sources */,
 				A1C0DE791000000000000000 /* StreamChoicesTests.swift in Sources */,
 				A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */,
+				A1C0HEROTST10000000000 /* HeroAppTargetTests.swift in Sources */,
 				A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,
 				A1C0DE931000000000000000 /* AppSymbolTests.swift in Sources */,

@@ -315,8 +315,15 @@ private struct HostRow: View {
 
 /// An app's icon: a system symbol, or a bundled template mark for the few
 /// things SF Symbols has no glyph for. Sized to sit on a button's text line.
-private struct AppGlyphIcon: View {
+///
+/// Shared with the menu-bar dropdown, which names the same app on its stream
+/// button - the two surfaces have to agree, or the menu says "Stream Steam"
+/// beside a gamepad while the library shows the Valve mark.
+struct AppGlyphIcon: View {
     let app: LibraryApp
+    /// Cap height to match the symbols beside it. The library's rows are
+    /// roomier than an NSMenu's, so the dropdown asks for a smaller one.
+    var size: CGFloat = 14
 
     var body: some View {
         switch app.glyph {
@@ -329,7 +336,7 @@ private struct AppGlyphIcon: View {
                 .aspectRatio(contentMode: .fit)
                 // Matched to the cap height of the symbols beside it, so a
                 // bundled mark and an SF Symbol sit on the same line.
-                .frame(width: 14, height: 14)
+                .frame(width: size, height: size)
         }
     }
 }
