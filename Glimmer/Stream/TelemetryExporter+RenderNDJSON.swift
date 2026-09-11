@@ -209,6 +209,7 @@ extension TelemetryRenderer {
             builder.addString("screen", display.screenName)
             builder.addBool("promotion_capable", display.proMotionCapable)
             builder.addInt("max_refresh_hz", display.maxRefreshHz)
+            builder.addBool("vrr_capable", display.variableRefreshCapable)
             builder.addBool("pip_active", display.pipActive)
         }
     }

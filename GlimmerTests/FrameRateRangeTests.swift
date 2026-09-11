@@ -13,66 +13,56 @@ import QuartzCore
 
 struct FrameRateRangeTests {
 
-    private func range(fps: Double, panel: Double, vrr: Bool) -> CAFrameRateRange {
-        FramePacer.preferredRange(
-            forStreamIntervalSeconds: 1.0 / fps, panelMaxHz: panel, variableRefresh: vrr)
+    private func range(fps: Double, panel: Double) -> CAFrameRateRange {
+        FramePacer.preferredRange(forStreamIntervalSeconds: 1.0 / fps, panelMaxHz: panel)
     }
 
     // MARK: The floor (unchanged behaviour, guarded)
 
     @Test func floorIsTheStreamRateWhenThePanelCanReachIt() {
-        let r = range(fps: 60, panel: 120, vrr: false)
+        let r = range(fps: 60, panel: 120)
         #expect(r.minimum == 60)
     }
 
     /// A 60Hz panel physically cannot honour a 120Hz floor, so asking for one
     /// would be ignored or mis-honoured.
     @Test func floorNeverExceedsThePanel() {
-        let r = range(fps: 120, panel: 60, vrr: false)
+        let r = range(fps: 120, panel: 60)
         #expect(r.minimum == 60)
         #expect(r.maximum == 60)
     }
 
-    // MARK: Content matching
+    // MARK: `preferred` is always the panel max
 
-    /// A fixed-refresh panel gains nothing from being asked for the content
-    /// rate, and the 4K240 measurement says asking costs pacing headroom - so
-    /// it keeps asking for the full grid.
-    @Test func fixedPanelAsksForTheFullGrid() {
-        let r = range(fps: 60, panel: 120, vrr: false)
-        #expect(r.preferred == 120)
-        #expect(r.maximum == 120)
+    /// Content matching was tried and reverted - CAFrameRateRange schedules our
+    /// callbacks, it does not move the panel (see preferredRange's comment for
+    /// the two probes that show the panel holding 120.04Hz throughout). So
+    /// `preferred` asks for the full grid on every panel, variable or not, and
+    /// these guard against quietly reintroducing the stream rate there.
+    @Test func preferredIsAlwaysTheFullGrid() {
+        #expect(range(fps: 60, panel: 120).preferred == 120)
+        #expect(range(fps: 30, panel: 120).preferred == 120)
+        #expect(range(fps: 144, panel: 240).preferred == 240)
     }
 
-    /// A panel macOS will actually vary is asked for the CONTENT rate, which is
-    /// what lets the display drop to the stream's cadence instead of running
-    /// flat out. The floor and ceiling are untouched, so the anti-throttle
-    /// guarantee and the top of the range both survive.
-    @Test func variablePanelAsksForTheContentRate() {
-        let r = range(fps: 60, panel: 120, vrr: true)
-        #expect(r.preferred == 60)
-        #expect(r.minimum == 60)
+    @Test func theFloorStillTracksTheStreamUnderneathIt() {
+        let r = range(fps: 30, panel: 120)
+        #expect(r.minimum == 30)
         #expect(r.maximum == 120)
-    }
-
-    @Test func variablePanelStillClampsAnImpossibleRequest() {
-        let r = range(fps: 240, panel: 120, vrr: true)
-        #expect(r.preferred == 120)
-        #expect(r.minimum == 120)
     }
 
     // MARK: Degenerate inputs
 
     @Test func nonsenseIntervalsFallBackTo60() {
         #expect(FramePacer.preferredRange(
-            forStreamIntervalSeconds: 0, panelMaxHz: 120, variableRefresh: true).preferred == 60)
+            forStreamIntervalSeconds: 0, panelMaxHz: 120).minimum == 60)
         #expect(FramePacer.preferredRange(
-            forStreamIntervalSeconds: .nan, panelMaxHz: 120, variableRefresh: true).preferred == 60)
+            forStreamIntervalSeconds: .nan, panelMaxHz: 120).minimum == 60)
     }
 
     @Test func nonsensePanelFallsBackTo60() {
         let r = FramePacer.preferredRange(
-            forStreamIntervalSeconds: 1.0 / 60, panelMaxHz: 0, variableRefresh: false)
+            forStreamIntervalSeconds: 1.0 / 60, panelMaxHz: 0)
         #expect(r.maximum == 60)
     }
 }

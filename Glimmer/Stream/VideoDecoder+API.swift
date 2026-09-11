@@ -208,6 +208,7 @@ extension VideoDecoder {
             screenName: screen.localizedName,
             proMotionCapable: maxFps > 60,
             maxRefreshHz: maxFps,
+            variableRefreshCapable: screen.minimumRefreshInterval != screen.maximumRefreshInterval,
             // The PiP edge is the only thing that detaches pacing from the view
             // (StreamSession+StartSetup wires it to the PiP active callback), so
             // this flag IS "showing in the system PiP window".

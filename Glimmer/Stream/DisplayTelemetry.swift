@@ -49,6 +49,17 @@ struct DisplayProbe: Sendable {
     /// realized refresh well under it (the pacer's `refresh_min_hz`) reads as a
     /// genuine ramp-down rather than a slow panel.
     var maxRefreshHz: Int
+    /// True iff the screen can genuinely run at a VARIABLE rate right now.
+    /// Distinct from `proMotionCapable`, which only means "faster than 60Hz" -
+    /// a 120Hz panel pinned to a fixed mode is fast and not variable, and the
+    /// difference matters when reading a refresh trace. `NSScreen.h`:
+    /// "minimumRefreshInterval and maximumRefreshInterval will be the same for
+    /// displays that do not support variable refresh rates". Measured: a Studio
+    /// Display XDR in adaptive mode reports 46.9-120.04Hz, the same panel pinned
+    /// reports 120.0-120.0Hz, a MacBook Pro built-in 24.0-120.0Hz, a 75Hz
+    /// external 75.0-75.0Hz - so this also reflects the user's System Settings
+    /// choice, not just the hardware.
+    var variableRefreshCapable: Bool
     /// True while the stream is showing in the system Picture in Picture window
     /// rather than its own. Recorded because every present-side number above
     /// means something different in PiP - the stream window is ordered out, the

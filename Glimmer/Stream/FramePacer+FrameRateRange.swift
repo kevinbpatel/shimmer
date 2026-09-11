@@ -58,8 +58,7 @@ extension FramePacer {
             return
         }
         let range = Self.preferredRange(
-            forStreamIntervalSeconds: configuredFrameIntervalSeconds, panelMaxHz: panelMax,
-            variableRefresh: Self.panelSupportsVariableRefresh(for: view))
+            forStreamIntervalSeconds: configuredFrameIntervalSeconds, panelMaxHz: panelMax)
         link.preferredFrameRateRange = range
         appliedFloorHz = Double(range.minimum)
         // Mirror under the lock for the off-main floor-violation detector
@@ -135,65 +134,58 @@ extension FramePacer {
     /// change doubles as the battery-governor probe (AC vs battery on the
     /// internal panel): a governor that quantizes down from `preferred` may
     /// hold a higher callback rate when preferred reads the panel max.
-    /// CONTENT MATCHING (`variableRefresh`): on a panel macOS will actually vary
-    /// - ProMotion, or an Adaptive-Sync external - `preferred` becomes the
-    /// STREAM rate rather than the panel max, which is what lets the display
-    /// drop to the content's cadence instead of running the panel flat out.
-    /// MEASURED, both sides. Before: a 60fps stream held 120.04Hz realized for
-    /// 321 consecutive seconds - `preferred: panelMax` is exactly what we were
-    /// asking for and the compositor obliged. After: the same stream on the same
-    /// Studio Display XDR (46.9-120Hz, continuous) settles at 60.02Hz and stays
-    /// there - 265 samples in one run, 74 in another, not one excursion.
     ///
-    /// It works in the BORDERLESS COVER, which was the open question: full
-    /// screen here is a window at level 25, not a macOS Space, and the one
-    /// public report on macOS VRR says borderless-windowed pins to panel max.
-    /// It does not. Nothing about the window was the blocker; our own request
-    /// was.
+    /// CONTENT MATCHING WAS TRIED HERE AND DOES NOT WORK - recorded in full so
+    /// nobody spends another afternoon on it.
     ///
-    /// AND IT WORKS IN PICTURE IN PICTURE. Measured with `pip_active` in the
-    /// telemetry: the flag flips false→true at t=3s and the display holds
-    /// 60.02Hz for the next 108 consecutive samples, with the desktop visible
-    /// behind a floating PiP panel. The intuition that a live desktop forces the
-    /// compositor back to panel max is simply wrong - a static desktop asks for
-    /// nothing, so our range is the only one that matters and macOS honours it.
-    /// Do not re-derive that argument; it was wrong twice.
+    /// The idea: on a panel macOS will vary, set `preferred` to the STREAM rate
+    /// instead of the panel max, so the display drops to the content's cadence
+    /// (what NVIDIA sells as Cloud G-SYNC). The evidence looked conclusive - a
+    /// 60fps stream moved the realized-refresh window from 120.04Hz to 60.02Hz
+    /// and held it for hundreds of consecutive samples, in the borderless cover
+    /// AND in Picture in Picture.
     ///
-    /// FIXED-REFRESH PANELS KEEP THE OLD REQUEST. The EXPERIMENT above was run
-    /// on a wired 4K240 where asking for stream Hz quantized the CALLBACK grid
-    /// to panel divisors and cost pacing depth; a panel that cannot vary gains
-    /// nothing from content matching anyway, so the two findings don't collide -
-    /// each applies to the hardware it was measured on.
+    /// It was measuring the wrong thing. `refresh_*_hz` is the realized cadence
+    /// of OUR CADisplayLink, subdivided per-link from the panel's refresh - not
+    /// the panel's refresh. Two probes settle it, both run while a 60fps stream
+    /// was live in PiP on a Studio Display XDR advertising 46.9-120Hz with
+    /// `displayUpdateGranularity` 0:
+    ///
+    ///   * a second process asking for 120Hz measured 120.04Hz realized, and one
+    ///     asking for 24Hz measured 24.01Hz - concurrently, same display. Each
+    ///     link gets the rate IT asked for.
+    ///   * `NSScreen.lastDisplayUpdateTimestamp`, which requests nothing, showed
+    ///     the framebuffer updating every 8.330ms - p50 AND p95, 722 updates over
+    ///     6.01s - the whole time. 120.04Hz. The panel never moved.
+    ///
+    /// So `CAFrameRateRange` schedules YOUR callbacks; it does not drive the
+    /// physical refresh rate. No public macOS API does (tvOS gets
+    /// `AVDisplayManager.preferredDisplayCriteria`; AVKit imports that header
+    /// only under TARGET_OS_TV / TARGET_OS_VISION), which leaves
+    /// `CGDisplaySetDisplayMode` - a hard mode switch that flashes the display
+    /// and rearranges windows - as the only lever, and that is not one to pull
+    /// under a game stream.
+    ///
+    /// Asking for the stream rate also COSTS something with no upside: it halves
+    /// our callback rate, and the EXPERIMENT above is explicit that more
+    /// callbacks buy finer release alignment while the due gate caps releases at
+    /// one per stream interval regardless.
+    ///
+    /// Worth re-testing on a MacBook Pro's BUILT-IN ProMotion panel (24-120Hz),
+    /// the hardware NVIDIA's own documentation names; every run here was on the
+    /// external.
     static func preferredRange(
-        forStreamIntervalSeconds intervalSeconds: Double, panelMaxHz: Double,
-        variableRefresh: Bool = false
+        forStreamIntervalSeconds intervalSeconds: Double, panelMaxHz: Double
     ) -> CAFrameRateRange {
         let panel = panelMaxHz.isFinite && panelMaxHz > 0 ? panelMaxHz : 60.0
         let rawStreamHz = intervalSeconds.isFinite && intervalSeconds > 0
             ? 1.0 / intervalSeconds : 60.0
         // Floor never exceeds the panel max (a 60Hz panel can't honor a 120Hz
-        // floor); preferred asks for the full panel grid (see EXPERIMENT above)
-        // unless the panel can vary, in which case it asks for the content.
+        // floor); preferred asks for the full panel grid (see EXPERIMENT above).
         let floorHz = min(rawStreamHz, panel)
         let maxHz = max(panel, floorHz)
-        let preferredHz = variableRefresh ? floorHz : maxHz
         return CAFrameRateRange(
-            minimum: Float(floorHz), maximum: Float(maxHz), preferred: Float(preferredHz))
+            minimum: Float(floorHz), maximum: Float(maxHz), preferred: Float(maxHz))
     }
 
-    /// Whether the screen `view` sits on can actually run at a variable rate.
-    /// `NSScreen.h` is explicit: "minimumRefreshInterval and
-    /// maximumRefreshInterval will be the same for displays that do not support
-    /// variable refresh rates". Measured: a Studio Display XDR in its adaptive
-    /// mode reports 46.9-120.04Hz with `displayUpdateGranularity` 0 (the header:
-    /// "the display can update at any time between the minimum and maximum"),
-    /// the same panel pinned to a fixed rate reports 120.0-120.0Hz, a MacBook
-    /// Pro built-in panel 24.0-120.0Hz, a 75Hz external 75.0-75.0Hz. So this
-    /// also reads the user's System Settings choice, not just the hardware -
-    /// which is correct: a display the user has pinned should stay pinned.
-    @MainActor
-    static func panelSupportsVariableRefresh(for view: NSView) -> Bool {
-        guard let screen = view.window?.screen ?? NSScreen.main else { return false }
-        return screen.minimumRefreshInterval != screen.maximumRefreshInterval
-    }
 }

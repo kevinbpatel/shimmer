@@ -374,6 +374,9 @@ extension TelemetryRenderer {
         builder.emitLabeled("glimmer_display_max_refresh_hz",
                             "Compositing screen's advertised max refresh, Hz (ProMotion ceiling).",
                             Double(state.maxRefreshHz), labels: screenLabels)
+        builder.emitLabeled("glimmer_display_vrr_capable",
+                            "1 if the compositing screen can currently run at a variable refresh rate.",
+                            state.variableRefreshCapable ? 1 : 0, labels: screenLabels)
         builder.emitLabeled("glimmer_display_pip_active",
                             "1 while the stream is showing in the system Picture in Picture window.",
                             state.pipActive ? 1 : 0, labels: screenLabels)
