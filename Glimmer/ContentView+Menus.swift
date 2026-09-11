@@ -208,17 +208,10 @@ struct MenuBarContent: View {
             }
             .keyboardShortcut(",")
 
-            #if canImport(Sparkle)
-            // The menu-bar dropdown is the reliable surface for the accessory
-            // (no-window) case, where the app menu's "Check for Updates..." isn't
-            // visible. `activate()` brings Glimmer forward so Sparkle's panel shows.
-            Button {
-                UpdaterController.shared.updater.checkForUpdates()
-                activate()
-            } label: {
-                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
-            }
-            #endif
+            // No "Check for Updates…" here, by request. Sparkle still checks on
+            // its own (`checkForUpdatesInBackground` at launch), and the manual
+            // command stays in the app menu under Shimmer - so the only case
+            // this costs is checking by hand while running with no window open.
 
             Button {
                 NSApp.terminate(nil)
