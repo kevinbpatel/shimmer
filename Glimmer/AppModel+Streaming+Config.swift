@@ -1,9 +1,8 @@
 //
 //  AppModel+Streaming+Config.swift
 //
-//  The derived, read-only half of AppModel+Streaming.swift: the spec-surface
-//  accessors (chips, summary, codec-aware bitrate), the state-aware hero verb,
-//  and the Host → engine bridge (`nativeStreamConfig` / `nativeServerInfo` and
+//  The derived, read-only half of AppModel+Streaming.swift: the codec-aware
+//  wire bitrate, the state-aware hero verb, and the Host → engine bridge (`nativeStreamConfig` / `nativeServerInfo` and
 //  the authoritative TLS-pin resolution behind it). Split out of
 //  AppModel+Streaming.swift to keep each file under the length limit; the
 //  session lifecycle - stream(), its teardown, engine events, connect cancel -
@@ -16,42 +15,11 @@ import os.log
 
 extension AppModel {
 
-    // MARK: - Spec UI accessors
-
-    // Codec (AV1/HEVC/H.264) is deliberately omitted from every user-facing
-    // surface: it's an implementation detail the user never chose, and the codec
-    // actually negotiated can differ from what's requested (Intel Macs drop AV1
-    // → HEVC), so showing it risks displaying a value that's simply wrong. Users
-    // care that it looks good, not which encoder produced it.
-    var streamSpecSummary: String {
-        let mbps = displayBitrateKbps / 1000
-        let hdrTag = effectiveHDR ? " · HDR" : ""
-        return "\(effectiveWidth) × \(effectiveHeight) · \(effectiveFPS) Hz\(hdrTag) · \(mbps) Mbps"
-    }
-
-    var streamSpecChips: [String] {
-        let mbps = displayBitrateKbps / 1000
-        var chips = [Self.resolutionLabel(width: effectiveWidth, height: effectiveHeight),
-                     "\(effectiveFPS) Hz"]
-        if effectiveHDR { chips.append("HDR") }
-        chips.append("\(mbps) Mbps")
-        return chips
-    }
-
-    /// Codec-aware bitrate the spec surfaces show: what the engine actually sends
-    /// for the selected host (AV1/HEVC spend ~20% fewer bits), so the chip/summary
-    /// match the wire. Falls back to the H.264 dial when no host is selected.
-    var displayBitrateKbps: Int {
-        _ = displayInfoRevision  // codec override writes UserDefaults; bump re-evaluates the chip
-        guard let host = selectedHost else { return effectiveBitrateKbps }
-        let formats = HostCodecPreference.load(for: host.id).apply(to: .probedSupported)
-        return wireBitrateKbps(forFormats: formats)
-    }
-
     /// The H.264-anchored quality dial (`effectiveBitrateKbps`) scaled by the
-    /// negotiated codec's efficiency. The spec UI and `nativeStreamConfig` both read
-    /// this so the shown bitrate can't drift from what's sent. Custom is verbatim,
-    /// and so is a bitrate the user set by hand - they asked for that number.
+    /// negotiated codec's efficiency - AV1 and HEVC spend ~20% fewer bits for
+    /// the same picture, so the budget is discounted to match. Custom is
+    /// verbatim, and so is a bitrate the user set by hand: they asked for that
+    /// number.
     func wireBitrateKbps(forFormats formats: VideoFormats) -> Int {
         if case .custom = qualityPreset { return effectiveBitrateKbps }
         if !bitrateAuto { return effectiveBitrateKbps }

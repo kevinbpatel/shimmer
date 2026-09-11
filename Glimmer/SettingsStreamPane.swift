@@ -192,13 +192,6 @@ struct StreamPane: View {
                     + "\(model.pipHotkey.displayString) pops it out on demand either way.")
             }
 
-            SettingsRule()
-
-            SettingsField("Your next stream") {
-                Text(model.streamSpecSummary)
-                    .font(.system(size: 13).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 }
