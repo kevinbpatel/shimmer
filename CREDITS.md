@@ -29,12 +29,22 @@ Moonlight client shows the artwork the host serves for it. It was traced from
 the box art Sunshine itself returns for that app, flattened to a monochrome
 template so it tints like a system symbol.
 
-The PlayStation logo shown in the menu bar is Apple's `playstation.logo` SF
-Symbol, and the mark is a trademark of **Sony Interactive Entertainment Inc.**
-shimmer is not affiliated with or endorsed by Sony; the symbol appears only
-when a DualSense or DualShock 4 is actually connected, to name that controller
-and show its battery. Every other pad gets Apple's generic `gamecontroller`
-symbol instead.
+The DualSense mark in the menu bar (`Assets.xcassets/DualSenseGlyph`) is
+generated from `controller_playstation5.svg` in
+**[Kenney's Input Prompts](https://kenney.nl/assets/input-prompts)**, released
+into the public domain under **CC0 1.0**. The unmodified source SVG is kept at
+`scripts/assets/kenney-controller_playstation5.svg`; the trim-and-template pass
+that turns it into the menu-bar asset is `scripts/generate-dualsense-glyph.swift`.
+There is no PlayStation-controller SF Symbol to use instead - the system
+catalog has only `playstation.logo` (the PS letters mark, which Apple restricts
+to unmodified, referential use) and a generic `gamecontroller`.
+
+"DualSense" and the controller's design are trademarks / trade dress of **Sony
+Interactive Entertainment Inc.**, which CC0 does not and cannot waive. shimmer
+is not affiliated with or endorsed by Sony: the mark appears only while a
+DualSense or DualShock 4 is actually connected, to name that controller and
+show its battery, and never as an app icon or other branding. Every other pad
+gets Apple's generic `gamecontroller` symbol.
 
 shimmer's interface owes a debt to
 **[moonlight-macos-enhanced](https://github.com/skyhua0224/moonlight-macos-enhanced)**

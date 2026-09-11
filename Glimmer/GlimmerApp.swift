@@ -183,9 +183,9 @@ struct GlimmerApp: App {
             // The pad outranks `play.fill` deliberately: a live stream is
             // already obvious from the screen in front of you, whereas the
             // percentage is the one number you want mid-session and the one
-            // you'd have to open a menu to see. See `menuBarControllerSymbol`
-            // for why a PlayStation pad gets Sony's mark and everything else
-            // gets Apple's generic one.
+            // you'd have to open a menu to see. See `menuBarControllerGlyph`
+            // for why a PlayStation pad gets a bundled DualSense mark and
+            // everything else gets Apple's generic controller symbol.
             if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
                 Image(systemName: symbol)
             } else if let battery = model.menuBarControllerBattery {
@@ -195,7 +195,7 @@ struct GlimmerApp: App {
                 // as a Label drew the glyph and no percentage). Spelling out the
                 // Image + Text is what actually puts the number in the menu bar.
                 HStack(spacing: 3) {
-                    Image(systemName: model.menuBarControllerSymbol)
+                    model.menuBarControllerGlyph.image()
                     Text("\(battery.percent)%")
                 }
             } else if let symbol = model.menuBarSystemImageName {

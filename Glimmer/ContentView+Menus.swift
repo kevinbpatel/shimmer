@@ -12,6 +12,28 @@
 import AppKit
 import SwiftUI
 
+extension AppModel.ControllerGlyph {
+    /// The mark itself. The PlayStation body is bundled template art (see
+    /// `AppModel.menuBarControllerGlyph` for why it isn't an SF Symbol); it is
+    /// authored at 20x14pt, which is the menu bar's size, so the dropdown asks
+    /// for a smaller frame to sit level with the SF Symbols around it.
+    func image(height: CGFloat? = nil) -> some View {
+        Group {
+            switch self {
+            case .playStation:
+                if let height {
+                    Image("DualSenseGlyph").resizable().scaledToFit()
+                        .frame(height: height)
+                } else {
+                    Image("DualSenseGlyph")
+                }
+            case .generic:
+                Image(systemName: "gamecontroller.fill")
+            }
+        }
+    }
+}
+
 // MARK: - Menu bar content
 
 struct MenuBarContent: View {
@@ -149,10 +171,15 @@ struct MenuBarContent: View {
             // the one in the menu-bar label so the two read as one thing.
             if let battery = model.menuBarControllerBattery {
                 Section("Controller") {
-                    Label(
-                        "\(battery.percent)% battery\(battery.charging ? " · charging" : "")",
-                        systemImage: battery.charging ? "battery.100.bolt" : model.menuBarControllerSymbol
-                    )
+                    Label {
+                        Text("\(battery.percent)% battery\(battery.charging ? " · charging" : "")")
+                    } icon: {
+                        if battery.charging {
+                            Image(systemName: "battery.100.bolt")
+                        } else {
+                            model.menuBarControllerGlyph.image(height: 11)
+                        }
+                    }
                 }
             }
 

@@ -258,30 +258,37 @@ extension AppModel {
         return nil
     }
 
-    /// SF Symbol naming the connected pad, for the menu-bar charm and its
-    /// battery readout.
+    /// Which mark names the connected pad, for the menu-bar charm and its
+    /// battery readout. Rendered by `ControllerGlyph.image` (ContentView+Menus).
     ///
-    /// `playstation.logo` is Sony's own mark, shipped in SF Symbols. It is used
-    /// ONLY when the pad genuinely is a PlayStation one - a DualSense (the raw
-    /// HID reader only ever opens those) or a DualShock 4 - which is the
-    /// referential use the symbol exists for: it says "this is your PlayStation
-    /// controller", never "this app is a Sony product". Every other pad gets
-    /// Apple's generic `gamecontroller.fill`, which is also the fallback when
-    /// the battery came from somewhere we can't attribute to a category.
-    /// Attribution is in CREDITS.md alongside the Steam glyph's.
-    var menuBarControllerSymbol: String {
+    /// There is no PlayStation-controller SF Symbol - the system catalog has
+    /// `playstation.logo` (the PS letters mark, and restricted: "may not be
+    /// modified and may only be used to refer to Sony's PlayStation") and
+    /// `gamecontroller.fill` (a generic pad), and nothing shaped like a
+    /// DualSense. So the DualSense body is bundled art, from Kenney's CC0
+    /// input-prompt set; see CREDITS.md and scripts/generate-dualsense-glyph.swift.
+    ///
+    /// It is used ONLY when the pad genuinely is a PlayStation one - a DualSense
+    /// (the raw HID reader opens nothing else) or a DualShock 4. That's
+    /// referential use: it says "this is your PlayStation controller", never
+    /// "this app is a Sony product". CC0 waives Kenney's copyright but cannot
+    /// waive Sony's trade dress, and referential is the whole basis for showing
+    /// it - so it must never become an app icon or a piece of branding.
+    enum ControllerGlyph { case playStation, generic }
+
+    var menuBarControllerGlyph: ControllerGlyph {
         _ = controllerConnected
         // A live raw-HID battery decode means a DualSense by construction:
         // DualSenseHID opens nothing else.
-        if DualSenseHID.shared.battery != nil { return "playstation.logo" }
+        if DualSenseHID.shared.battery != nil { return .playStation }
         for controller in GCController.controllers() {
             switch controller.productCategory {
             case GCProductCategoryDualSense, GCProductCategoryDualShock4:
-                return "playstation.logo"
+                return .playStation
             default:
                 continue
             }
         }
-        return "gamecontroller.fill"
+        return .generic
     }
 }
