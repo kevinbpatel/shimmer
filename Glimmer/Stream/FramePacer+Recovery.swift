@@ -147,7 +147,8 @@ extension FramePacer {
         let panelMax = Self.panelMaxHz(for: view)
         let range = Self.preferredRange(
             forStreamIntervalSeconds: self.configuredFrameIntervalSeconds,
-            panelMaxHz: panelMax)
+            panelMaxHz: panelMax,
+            variableRefresh: Self.panelSupportsVariableRefresh(for: view))
         link.preferredFrameRateRange = range
         // Record the floor we just pinned so the per-tick re-apply only
         // re-pins on a real cadence drift past the hysteresis, not on every tick.

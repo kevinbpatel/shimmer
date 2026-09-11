@@ -58,7 +58,8 @@ extension FramePacer {
             return
         }
         let range = Self.preferredRange(
-            forStreamIntervalSeconds: configuredFrameIntervalSeconds, panelMaxHz: panelMax)
+            forStreamIntervalSeconds: configuredFrameIntervalSeconds, panelMaxHz: panelMax,
+            variableRefresh: Self.panelSupportsVariableRefresh(for: view))
         link.preferredFrameRateRange = range
         appliedFloorHz = Double(range.minimum)
         // Mirror under the lock for the off-main floor-violation detector
@@ -134,17 +135,45 @@ extension FramePacer {
     /// change doubles as the battery-governor probe (AC vs battery on the
     /// internal panel): a governor that quantizes down from `preferred` may
     /// hold a higher callback rate when preferred reads the panel max.
+    /// CONTENT MATCHING (`variableRefresh`): on a panel macOS will actually vary
+    /// - ProMotion, or an Adaptive-Sync external - `preferred` becomes the
+    /// STREAM rate rather than the panel max, which is what lets the display
+    /// drop to the content's cadence instead of running the panel flat out.
+    /// Measured before this existed: a 60fps stream on a 24-120Hz MacBook Pro
+    /// panel held 120.04Hz realized for 321 consecutive seconds, because
+    /// `preferred: panelMax` is exactly what we were asking for and the
+    /// compositor obliged.
+    ///
+    /// FIXED-REFRESH PANELS KEEP THE OLD REQUEST. The EXPERIMENT above was run
+    /// on a wired 4K240 where asking for stream Hz quantized the CALLBACK grid
+    /// to panel divisors and cost pacing depth; a panel that cannot vary gains
+    /// nothing from content matching anyway, so the two findings don't collide -
+    /// each applies to the hardware it was measured on.
     static func preferredRange(
-        forStreamIntervalSeconds intervalSeconds: Double, panelMaxHz: Double
+        forStreamIntervalSeconds intervalSeconds: Double, panelMaxHz: Double,
+        variableRefresh: Bool = false
     ) -> CAFrameRateRange {
         let panel = panelMaxHz.isFinite && panelMaxHz > 0 ? panelMaxHz : 60.0
         let rawStreamHz = intervalSeconds.isFinite && intervalSeconds > 0
             ? 1.0 / intervalSeconds : 60.0
         // Floor never exceeds the panel max (a 60Hz panel can't honor a 120Hz
-        // floor); preferred asks for the full panel grid (see EXPERIMENT above).
+        // floor); preferred asks for the full panel grid (see EXPERIMENT above)
+        // unless the panel can vary, in which case it asks for the content.
         let floorHz = min(rawStreamHz, panel)
         let maxHz = max(panel, floorHz)
+        let preferredHz = variableRefresh ? floorHz : maxHz
         return CAFrameRateRange(
-            minimum: Float(floorHz), maximum: Float(maxHz), preferred: Float(maxHz))
+            minimum: Float(floorHz), maximum: Float(maxHz), preferred: Float(preferredHz))
+    }
+
+    /// Whether the screen `view` sits on can actually run at a variable rate.
+    /// `NSScreen.h` is explicit: "minimumRefreshInterval and
+    /// maximumRefreshInterval will be the same for displays that do not support
+    /// variable refresh rates". Measured: the MacBook Pro's built-in panel
+    /// reports 24.0-120.0Hz, a fixed 75Hz external reports 75.0-75.0Hz.
+    @MainActor
+    static func panelSupportsVariableRefresh(for view: NSView) -> Bool {
+        guard let screen = view.window?.screen ?? NSScreen.main else { return false }
+        return screen.minimumRefreshInterval != screen.maximumRefreshInterval
     }
 }
