@@ -104,12 +104,26 @@ struct ComputersTab: View {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        // The name is the heading, centred, with no badge above
-                        // it - the round glyph read as decoration.
-                        Text(host.displayName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 4)
+                        // Apps lead: they are what the page is FOR. The PC's
+                        // name is not repeated here - the row selected in the
+                        // sidebar already says which machine this is.
+                        field("Apps") {
+                            if host.apps.count > 8 { searchField.padding(.bottom, 2) }
+                            ForEach(apps) { app in
+                                Button {
+                                    model.requestStream(app: app, on: host)
+                                } label: {
+                                    Label(app.name, systemImage: app.systemImage)
+                                        .frame(minWidth: 150, alignment: .leading)
+                                }
+                                .disabled(model.isStreaming)
+                                .help(model.isStreaming
+                                      ? "Finish the current stream first" : "Stream \(app.name)")
+                            }
+                            if apps.isEmpty {
+                                Text("No apps to show.").foregroundStyle(.secondary)
+                            }
+                        }
 
                         field("Address") {
                             Text(host.localAddress ?? host.manualAddress ?? host.name)
@@ -128,23 +142,6 @@ struct ComputersTab: View {
                                 ? String(played.dropFirst("last played ".count))
                                 : played
                             field("Last played") { Text(trimmed).foregroundStyle(.secondary) }
-                        }
-                        field("Apps") {
-                            if host.apps.count > 8 { searchField.padding(.bottom, 2) }
-                            ForEach(apps) { app in
-                                Button {
-                                    model.requestStream(app: app, on: host)
-                                } label: {
-                                    Label(app.name, systemImage: app.systemImage)
-                                        .frame(minWidth: 150, alignment: .leading)
-                                }
-                                .disabled(model.isStreaming)
-                                .help(model.isStreaming
-                                      ? "Finish the current stream first" : "Stream \(app.name)")
-                            }
-                            if apps.isEmpty {
-                                Text("No apps to show.").foregroundStyle(.secondary)
-                            }
                         }
                     }
                     .padding(.top, 22)

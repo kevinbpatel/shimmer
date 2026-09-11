@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+A PC's apps lead its page, as buttons with a native symbol: a Mac for the
+desktop, a plain display for a low-res desktop, a gamepad for Steam. The PC's
+name isn't repeated above them - the row selected in the list already says
+which machine you're looking at.
+
 Each PC's page is a field list - Address, Status (with a live dot), Last
 played - and its apps are plain macOS buttons with a system symbol, the way a
 Mac app states facts and offers actions. The round badge above the name is

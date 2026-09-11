@@ -79,15 +79,21 @@ struct LibraryApp: Identifiable, Hashable {
         let n = name.lowercased()
         func has(_ needles: String...) -> Bool { needles.contains { n.contains($0) } }
 
-        // Desktops and remote shells
-        if has("big picture") { return "tv" }
-        if has("low res", "lowres") { return "rectangle.on.rectangle" }
-        if has("desktop") { return "macwindow" }
+        // Desktops and remote shells. `desktopcomputer` is the Mac's own
+        // machine glyph; `display` is a plainer panel, so a low-res desktop is
+        // distinguishable from the full one at a glance without implying
+        // something is wrong with it.
+        if has("big picture") { return "gamecontroller.fill" }
+        if has("low res", "lowres") { return "display" }
+        if has("desktop") { return "desktopcomputer" }
         if has("terminal", "shell", "command prompt", "powershell") { return "terminal" }
         if has("remote", "rdp", "vnc") { return "display.and.arrow.down" }
 
         // Stores and launchers
         if has("steamvr", "oculus", "virtual desktop", " vr") { return "visionpro" }
+        // No SF Symbol exists for Steam, and shipping a traced Valve mark is a
+        // trademark decision rather than a design one - the native gamepad
+        // glyph says "this launches games" and looks like the rest of macOS.
         if has("steam") { return "gamecontroller.fill" }
         if has("xbox", "game pass", "gamepass") { return "logo.xbox" }
         if has("playstation", "ps5", "ps4", "chiaki") { return "logo.playstation" }

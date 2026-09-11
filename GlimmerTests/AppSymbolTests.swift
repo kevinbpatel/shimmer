@@ -44,10 +44,13 @@ struct AppSymbolTests {
     @Test func theMostSpecificNameWins() {
         // Big Picture before Steam, Low Res before Desktop - otherwise the
         // broader branch would swallow them.
-        #expect(LibraryApp.symbol(forName: "Steam Big Picture") == "tv")
+        #expect(LibraryApp.symbol(forName: "Steam Big Picture") == "gamecontroller.fill")
         #expect(LibraryApp.symbol(forName: "Steam") == "gamecontroller.fill")
-        #expect(LibraryApp.symbol(forName: "Low Res Desktop") == "rectangle.on.rectangle")
-        #expect(LibraryApp.symbol(forName: "Desktop") == "macwindow")
+        // A low-res desktop must not share the full desktop's glyph.
+        #expect(LibraryApp.symbol(forName: "Low Res Desktop") == "display")
+        #expect(LibraryApp.symbol(forName: "Desktop") == "desktopcomputer")
+        #expect(LibraryApp.symbol(forName: "Low Res Desktop")
+                != LibraryApp.symbol(forName: "Desktop"))
         #expect(LibraryApp.symbol(forName: "SteamVR") == "visionpro")
     }
 

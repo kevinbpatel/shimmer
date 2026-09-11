@@ -67,7 +67,7 @@ struct SettingsTabBar: View {
     @Environment(\.controlActiveState) private var activeState
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             Spacer(minLength: 0)
             ForEach(SettingsTab.allCases) { tab in
                 Button {
@@ -75,15 +75,17 @@ struct SettingsTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 17, weight: .regular))
-                            .frame(height: 19)
+                            .font(.system(size: 18, weight: .regular))
+                            .frame(height: 20)
                         Text(tab.title)
                             .font(.system(size: 11))
                     }
                     .foregroundStyle(tint(for: tab))
-                    .frame(minWidth: 58)
+                    // No minimum width: each tab is as wide as its own label
+                    // plus 7pt, which is what puts them 56-63pt apart like the
+                    // reference app instead of a uniform 78.
                     .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 7)
                     .background {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(selection == tab ? plateFill : .clear)
