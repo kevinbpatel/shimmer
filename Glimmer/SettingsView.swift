@@ -44,7 +44,10 @@ struct AppShell: View {
             case .about: AboutPane()
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Fixed, not resizable - the window follows the tab.
+        .frame(width: SettingsMetrics.windowWidth,
+               height: model.settingsTab.windowHeight,
+               alignment: .top)
     }
 }
 

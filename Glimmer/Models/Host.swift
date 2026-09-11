@@ -60,13 +60,69 @@ struct LibraryApp: Identifiable, Hashable {
     let hdr: Bool
     let hidden: Bool
 
-    var systemImage: String {
-        switch name.lowercased() {
-        case "desktop": return "macwindow"
-        case let lowered where lowered.contains("steam"): return "gamecontroller.fill"
-        case let lowered where lowered.contains("big picture"): return "tv"
-        default: return "app"
+    /// The SF Symbol that stands in for this app in the library.
+    ///
+    /// Hosts serve box art through `/appasset`, but Sunshine's defaults are
+    /// generic plates with the word DESKTOP or STEAM on them - which read as
+    /// cheap cards rather than app icons. A system symbol chosen from the name
+    /// looks native and says more. Every symbol named here is asserted to
+    /// resolve on the running OS by GlimmerTests/AppSymbolTests.swift, so a
+    /// typo or a symbol that needs a newer macOS fails the build's tests
+    /// rather than rendering as a blank tile.
+    ///
+    /// Order matters: the most specific match wins, so "Steam Big Picture"
+    /// resolves as Big Picture rather than Steam, and "Low Res Desktop" is
+    /// distinguishable from "Desktop".
+    var systemImage: String { Self.symbol(forName: name) }
+
+    static func symbol(forName name: String) -> String {
+        let n = name.lowercased()
+        func has(_ needles: String...) -> Bool { needles.contains { n.contains($0) } }
+
+        // Desktops and remote shells
+        if has("big picture") { return "tv" }
+        if has("low res", "lowres") { return "rectangle.on.rectangle" }
+        if has("desktop") { return "macwindow" }
+        if has("terminal", "shell", "command prompt", "powershell") { return "terminal" }
+        if has("remote", "rdp", "vnc") { return "display.and.arrow.down" }
+
+        // Stores and launchers
+        if has("steamvr", "oculus", "virtual desktop", " vr") { return "visionpro" }
+        if has("steam") { return "gamecontroller.fill" }
+        if has("xbox", "game pass", "gamepass") { return "logo.xbox" }
+        if has("playstation", "ps5", "ps4", "chiaki") { return "logo.playstation" }
+        if has("epic", "gog", "battle.net", "battlenet", "ubisoft", "origin", "ea app") { return "bag.fill" }
+        if has("emulat", "retroarch", "dolphin", "yuzu", "rpcs3", "citra") { return "memorychip" }
+
+        // Media and browsing
+        if has("plex", "netflix", "jellyfin", "youtube", "movie", "video") { return "play.rectangle.fill" }
+        if has("spotify", "music", "audio") { return "music.note" }
+        if has("photo", "image", "lightroom") { return "photo" }
+        if has("chrome", "firefox", "edge", "safari", "browser", "web") { return "globe" }
+        if has("discord", "chat", "slack", "teams") { return "bubble.left.and.bubble.right.fill" }
+        if has("obs", "broadcast", "capture") { return "dot.radiowaves.left.and.right" }
+
+        // Tools
+        if has("code", "visual studio", "xcode", "ide") { return "chevron.left.forwardslash.chevron.right" }
+        if has("blender", "paint", "draw", "krita", "photoshop") { return "paintbrush.fill" }
+        if has("word", "excel", "office", "docs", "pdf") { return "doc.text.fill" }
+        if has("explorer", "finder", "files", "folder") { return "folder.fill" }
+        if has("setting", "config", "control panel") { return "gearshape.fill" }
+
+        // This is a game-streaming client: a game is the right default.
+        return "gamecontroller.fill"
+    }
+
+    /// A stable hue for the app's icon plate, so two apps are told apart at a
+    /// glance the way real app icons are. FNV-1a over the name, same trick the
+    /// PC monogram uses.
+    var iconHue: Double {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in name.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
         }
+        return Double(hash % 360) / 360.0
     }
 }
 

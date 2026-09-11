@@ -183,6 +183,16 @@ final class AppModel {
             appAppearance.apply()
         }
     }
+    /// Draw the host's `/appasset` box art on the app tiles instead of an SF
+    /// Symbol. Off by default: Sunshine's stock art is a generic plate with
+    /// the app's name printed on it, which looks worse than a native icon.
+    /// Worth turning on for a host whose library has real cover art.
+    var showCoverArt: Bool = false {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(showCoverArt, forKey: "showCoverArt")
+        }
+    }
     /// Audio channel layout asked of the host: follow the Mac's output device
     /// or force a layout (a stereo headset on a Mac whose default output is a
     /// 7.1 receiver, and vice versa).
@@ -654,6 +664,7 @@ final class AppModel {
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
         audioLayout = Self.persistedRawValue("audioLayout", AudioLayout.self) ?? audioLayout
+        showCoverArt = Self.persistedBool("showCoverArt") ?? showCoverArt
         appAppearance = Self.persistedRawValue("appAppearance", AppAppearance.self) ?? appAppearance
         // One-shot: HDR was hard-coded ON for the panel presets and only asked
         // under Custom, so an install that turned it off under Custom and then

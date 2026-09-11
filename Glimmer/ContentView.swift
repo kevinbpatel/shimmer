@@ -27,6 +27,10 @@ private struct WindowChromeTweak: NSViewRepresentable {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
+        // Not resizable, and no zoom or minimise - the reference app's window
+        // shows those two buttons greyed out.
+        window.styleMask.remove(.resizable)
+        window.styleMask.remove(.miniaturizable)
         window.isMovableByWindowBackground = true
     }
 

@@ -40,6 +40,19 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .about: return "info.circle"
         }
     }
+
+    /// Window height for this tab, matching the reference app's behaviour of
+    /// resizing itself to the page rather than being dragged.
+    /// The CONTENT height. The window is `.fullSizeContentView` but macOS
+    /// still adds its 32pt title bar on top, so these are the reference app's
+    /// window heights (528 / 588 / 540) minus that.
+    var windowHeight: CGFloat {
+        switch self {
+        case .computers: return 528 - 32
+        case .settings: return 588 - 32
+        case .about: return 540 - 32
+        }
+    }
 }
 
 /// The centred icon-over-label tab strip. Tailscale draws the selected tab as
@@ -111,6 +124,10 @@ enum SettingsMetrics {
     /// columns fill it; letting ours stretch across a library-sized window
     /// left the gutter stranded with an acre of dead space to the right.
     static let columnWidth: CGFloat = 560
+    /// The reference window's exact width, and its per-tab heights. It is not
+    /// resizable - the zoom and minimise buttons are disabled - and the height
+    /// changes with the tab rather than the user dragging it.
+    static let windowWidth: CGFloat = 600
 }
 
 /// One labelled group: the label sits in the right-aligned gutter, everything

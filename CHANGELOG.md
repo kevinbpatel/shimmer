@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+App tiles are macOS icons, not cover cards. Each app gets an SF Symbol chosen
+from its name on a rounded-square plate tinted by a hue derived from that name
+- the way real app icons are told apart. Hosts do serve box art, but
+Sunshine's stock art is a generic plate with DESKTOP or STEAM printed on it,
+which reads as a cheap card; the artwork is still there behind Settings >
+"Show cover art from the PC" for a library that has real covers.
+
+The window is a fixed 600pt wide and cannot be dragged, and its height follows
+the tab - like the app it is modelled on.
+
 One window, three tabs - Computers, Settings, About - with the title centred
 above them. Computers mirrors the reference app's account tab: a 200pt list of
 PCs with a round glyph, a status dot and the address under the name, a

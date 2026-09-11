@@ -120,7 +120,6 @@ struct GlimmerApp: App {
                 // with the margins squeezed flat - which is exactly what a stale
                 // 584 here did. A floor equal to the content leaves nothing to
                 // drag.
-                .frame(minWidth: 640, minHeight: 540)
                 // Liquid Glass: on macOS 26 `.regularMaterial` resolves to
                 // the system material; future SDKs may expose a dedicated
                 // `.glassBackground` shape style for window containers.
@@ -134,8 +133,9 @@ struct GlimmerApp: App {
         // reflows and a sidebar - so bigger genuinely shows more, which is
         // exactly the opposite of the fixed hero card this replaced (it could
         // only ever have gained empty space, which is why it was pinned).
-        .windowResizability(.contentMinSize)
-        .defaultSize(width: 720, height: 600)
+        // The content states an exact size per tab and the window takes it;
+        // the reference app's window cannot be dragged bigger either.
+        .windowResizability(.contentSize)
         // Opt OUT of window state restoration so a previously-X-closed
         // launcher always re-spawns fresh next launch (the bug that made
         // first Dock click do nothing pre-restoration-fix).

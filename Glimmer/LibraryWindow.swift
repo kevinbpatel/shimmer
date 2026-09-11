@@ -66,18 +66,23 @@ struct ComputersTab: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            // No section header: the reference app's account list has none, and
-            // the tab is already called Computers.
-            List(selection: hostSelection) {
-                ForEach(model.hosts) { host in
-                    HostRow(host: host)
-                        .tag(host.id)
-                        .hostContextMenu(host)
+            // Hand-rolled rather than a `List`: a sidebar List paints its
+            // selection in the ACCENT colour, and the reference app's selected
+            // row is a neutral grey plate. No section header either - its
+            // account list has none and the tab is already called Computers.
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(model.hosts) { host in
+                        HostRow(host: host, selected: host.id == model.selectedHost?.id)
+                            .contentShape(Rectangle())
+                            .onTapGesture { model.selectHost(host) }
+                            .hostContextMenu(host)
+                    }
                 }
+                .padding(.horizontal, 6)
+                .padding(.top, 6)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 42)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
             // A full-width button on a 39pt bar, like "Add Account…".
@@ -102,15 +107,15 @@ struct ComputersTab: View {
                         hostHeader(host)
                         if host.apps.count > 8 { searchField.padding(.bottom, 14) }
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 128, maximum: 150), spacing: 18, alignment: .top)],
+                            columns: [GridItem(.adaptive(minimum: 84, maximum: 92), spacing: 14, alignment: .top)],
                             alignment: .center, spacing: 24
                         ) {
                             ForEach(apps) { app in
                                 AppCoverTile(app: app, host: host)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 20)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -211,6 +216,7 @@ struct ComputersTab: View {
 /// the shape of the reference app's account rows (41.5pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
+    let selected: Bool
     @Environment(AppModel.self) private var model
 
     /// Liveness is only ever polled for the SELECTED host (HostStatusPoller),
@@ -257,40 +263,79 @@ private struct HostRow: View {
             }
             Spacer(minLength: 0)
         }
+        .padding(.horizontal, 8)
         .padding(.vertical, 5)
+        // 41.5pt plate, 6pt inset, neutral grey when selected - measured off
+        // the reference app.
+        .frame(minHeight: 41.5)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(selected ? Color.primary.opacity(0.13) : Color.clear))
     }
 }
 
-// MARK: - Cover tile
+// MARK: - App tile
 
+/// One launchable app, drawn as a macOS-style icon: a rounded-square plate in
+/// a hue derived from the name, with an SF Symbol on it and the title beneath.
+///
+/// NOT the host's box art. Sunshine serves `/appasset` for every app, but its
+/// defaults are generic plates with DESKTOP or STEAM printed on them, which
+/// read as cheap cards rather than app icons. Real artwork is still available
+/// behind Settings > "Show cover art from the PC" for hosts that have it.
 private struct AppCoverTile: View {
     let app: LibraryApp
     let host: Host
     @Environment(AppModel.self) private var model
     @State private var hovered = false
 
-    /// 3:4, the shape every GameStream host serves (`/appasset` answers
-    /// 600x800). 128pt wide is close to the reference app's default tile.
-    private static let art = CGSize(width: 128, height: 171)
+    private static let plate: CGFloat = 64
+
+    private var plateColor: Color {
+        Color(hue: app.iconHue, saturation: 0.42, brightness: 0.62)
+    }
 
     var body: some View {
-        VStack(spacing: 8) {
-            cover
-                .frame(width: Self.art.width, height: Self.art.height)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(alignment: .topTrailing) {
-                    if app.name == model.runningAppName { runningBadge }
+        VStack(spacing: 7) {
+            Group {
+                if model.showCoverArt, let image = model.artwork.image(for: app, on: host) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        LinearGradient(
+                            colors: [plateColor.opacity(0.95), plateColor.opacity(0.70)],
+                            startPoint: .top, endPoint: .bottom)
+                        Image(systemName: app.systemImage)
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+                    }
                 }
-                .shadow(color: .black.opacity(0.35), radius: 5, y: 5)
-                .scaleEffect(hovered ? 1.06 : 1.0)
-                .animation(.easeOut(duration: 0.2), value: hovered)
+            }
+            .frame(width: Self.plate, height: Self.plate)
+            // The macOS app-icon squircle.
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+            .overlay(alignment: .topTrailing) {
+                if app.name == model.runningAppName { runningBadge }
+            }
+            .shadow(color: .black.opacity(0.30), radius: 4, y: 2)
+            .scaleEffect(hovered ? 1.07 : 1.0)
+            .animation(.easeOut(duration: 0.18), value: hovered)
+
             Text(app.name)
-                .font(.system(size: 12))
-                .lineLimit(1)
+                .font(.system(size: 11))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .truncationMode(.middle)
-                .foregroundStyle(.primary)
+                .frame(height: 28, alignment: .top)
         }
-        .frame(width: Self.art.width)
+        .frame(width: 84)
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
         .onTapGesture { model.requestStream(app: app, on: host) }
@@ -301,34 +346,14 @@ private struct AppCoverTile: View {
         .accessibilityLabel("Stream \(app.name)")
     }
 
-    @ViewBuilder
-    private var cover: some View {
-        if let image = model.artwork.image(for: app, on: host) {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .aspectRatio(contentMode: .fill)
-        } else {
-            // The host has no art (or it is still arriving): a flat plate with
-            // the app's symbol, rather than a spinner that flickers into a
-            // picture a moment later.
-            ZStack {
-                Rectangle().fill(.quaternary)
-                Image(systemName: app.systemImage)
-                    .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     private var runningBadge: some View {
         Image(systemName: "figure.run")
-            .font(.system(size: 12, weight: .bold))
+            .font(.system(size: 9, weight: .bold))
             .foregroundStyle(.white)
-            .frame(width: 24, height: 24)
+            .frame(width: 18, height: 18)
             .background(Circle().fill(Color.accentColor))
-            .shadow(color: Color.accentColor.opacity(0.6), radius: 3)
-            .offset(x: 6, y: -6)
+            .overlay(Circle().strokeBorder(.black.opacity(0.35), lineWidth: 1))
+            .offset(x: 5, y: -5)
             .help("Running on this PC now")
     }
 }
