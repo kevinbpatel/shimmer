@@ -151,6 +151,14 @@ extension FramePacer {
     /// It does not. Nothing about the window was the blocker; our own request
     /// was.
     ///
+    /// AND IT WORKS IN PICTURE IN PICTURE. Measured with `pip_active` in the
+    /// telemetry: the flag flips false→true at t=3s and the display holds
+    /// 60.02Hz for the next 108 consecutive samples, with the desktop visible
+    /// behind a floating PiP panel. The intuition that a live desktop forces the
+    /// compositor back to panel max is simply wrong - a static desktop asks for
+    /// nothing, so our range is the only one that matters and macOS honours it.
+    /// Do not re-derive that argument; it was wrong twice.
+    ///
     /// FIXED-REFRESH PANELS KEEP THE OLD REQUEST. The EXPERIMENT above was run
     /// on a wired 4K240 where asking for stream Hz quantized the CALLBACK grid
     /// to panel divisors and cost pacing depth; a panel that cannot vary gains
