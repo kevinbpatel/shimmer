@@ -20,6 +20,15 @@ HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
 longer requested at all on a display with no headroom, since it cannot help
 there and this is exactly how it hurts.
 
+Fix: a white hairline down one edge of the Picture in Picture window, at
+some sizes and not others. The PiP window is sized in whole pixels and so is
+almost never exactly on the stream's aspect, and the source layer that macOS
+mirrors 1:1 into it was sized to the window - so `.resizeAspect` left a
+sub-pixel pillarbox that showed through as the panel's white backing. The
+source now sits exactly on the stream's aspect line (fractional on one axis,
+overhanging the window by under a pixel where the mirror clips it), so the
+video fills it edge to edge at every size.
+
 The Picture in Picture pause button no longer does anything. macOS draws that
 transport in its own process, so it cannot be removed, but a live game has
 nothing to pause - it only froze the picture and then jumped.

@@ -16,7 +16,7 @@ you to drive Glimmer against your own Sunshine.
 
 ## Setup
 
-1. `cd ~/Developer/glimmer-pip && make` (installs to /Applications). Or `make
+1. `cd ~/Developer/shimmer && make` (installs to /Applications). Or `make
    open` to build + launch.
 2. Pair Glimmer with your Sunshine from Glimmer's "Pair a PC" (enter the PIN in
    the Sunshine web UI). This is the step the sandbox wouldn't let me do for you.

@@ -202,6 +202,9 @@ extension StreamSession {
             // reconnect at a new resolution would otherwise keep mapping
             // window points onto the old stream's pixel grid.
             inp.streamPixelSize = CGSize(width: config.width, height: config.height)
+            // ...and for the PiP mirror source, which is sized on the stream's
+            // aspect line.
+            win.streamPixelSize = inp.streamPixelSize
         }
 
         // 3. Fresh NetworkClient + full handshake against the restarted host.

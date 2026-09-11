@@ -207,6 +207,13 @@ extension StreamWindow {
     // ordered-out window) but invisible (alpha 0, click-through), and size it
     // to the PiP window's content so 1:1 == the whole frame. Track PiP resizes
     // to stay matched.
+    //
+    // "Matched" is on the stream's aspect line, not the panel's integer size:
+    // the panel is whole pixels and almost never exactly 16:9, and a source
+    // layer sized to it would leave `.resizeAspect` a sub-pixel pillarbox that
+    // the 1:1 mirror paints as a white hairline down one edge (see
+    // `StreamWindowGeometry.pipSourceSize`). So the display VIEW takes the
+    // exact-aspect (fractional) size and the window rounds up around it.
 
     /// Enter mirror-source mode: hide the fullscreen content (alpha 0) but keep
     /// the window on screen and pass-through. Called from the PiP hide path
@@ -233,18 +240,27 @@ extension StreamWindow {
         // Pre-shrink to a typical PiP size so the first ~200ms (before
         // matchSourceWindowToPiPPanel runs on didStart) don't mirror the
         // fullscreen source 1:1 - which would flash the bottom-left crop. The
-        // exact size is applied the moment the PiP window exists.
+        // exact size is applied the moment the PiP window exists. AVKit takes
+        // the PiP window's aspect from the layer it starts on, so this goes
+        // through the same aspect conformance as every later size.
         setSourceContent(origin: window.frame.origin, size: NSSize(width: 480, height: 270), display: false)
     }
 
-    /// Place the mirror source so its CONTENT rect (what the display layer
-    /// fills) sits at `origin` with `size`. For the borderless fullscreen cover
-    /// the content rect is the frame; for a titled window (window mode) the
-    /// frame is taller by the title bar, and sizing the frame instead would
-    /// leave the content - and so the 1:1 mirror - short by that much.
+    /// Place the mirror source so the display layer covers a `size` panel at
+    /// `origin`. The layer (via `displayView`) takes the smallest rect on the
+    /// stream's exact aspect that covers `size` - fractional on one axis - and
+    /// the window's content is that rounded up to whole points so the view
+    /// stays inside it. For the borderless fullscreen cover the content rect
+    /// is the frame; for a titled window (window mode) the frame is taller by
+    /// the title bar, and sizing the frame instead would leave the content -
+    /// and so the 1:1 mirror - short by that much.
     func setSourceContent(origin: NSPoint, size: NSSize, display: Bool) {
-        window.setFrame(window.frameRect(forContentRect: NSRect(origin: origin, size: size)),
+        let exact = StreamWindowGeometry.pipSourceSize(covering: size, aspect: streamPixelSize)
+        let content = NSSize(width: ceil(exact.width), height: ceil(exact.height))
+        window.setFrame(window.frameRect(forContentRect: NSRect(origin: origin, size: content)),
                         display: display)
+        // After the window's autoresizing pass, so it is the final word.
+        displayView.frame = NSRect(origin: .zero, size: exact)
     }
 
     /// Size the alpha-0 source window to the system PiP window's content, and
@@ -332,6 +348,10 @@ extension StreamWindow {
             window.setFrame(saved, display: false)
             savedFrameBeforePiP = nil
         }
+        // Autoresizing carries the source mode's fractional margin through the
+        // frame restore (a 0.4pt-short layer at the top of the screen); pin the
+        // view back to its superview.
+        if let superview = displayView.superview { displayView.frame = superview.bounds }
         window.alphaValue = 1
     }
 

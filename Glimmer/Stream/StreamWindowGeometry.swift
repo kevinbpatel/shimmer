@@ -1,11 +1,12 @@
 //
 //  StreamWindowGeometry.swift
 //
-//  Pure sizing math for the Window-mode stream window: the pixel-mapped
-//  opening size, the fit-to-screen clamp, and the aspect conformance applied to
-//  a restored autosaved frame. No AppKit types beyond CGSize so the rules are
-//  unit-tested without a window or a screen; StreamWindow+Windowed.swift feeds
-//  them the live scale factor and visible frame.
+//  Pure sizing math for the stream window: the Window-mode pixel-mapped
+//  opening size, the fit-to-screen clamp, the aspect conformance applied to a
+//  restored autosaved frame, and the Picture in Picture mirror-source size. No
+//  AppKit types beyond CGSize so the rules are unit-tested without a window or
+//  a screen; StreamWindow+Windowed.swift and +PictureInPicture.swift feed them
+//  the live scale factor, visible frame, and PiP panel size.
 //
 
 import CoreGraphics
@@ -61,5 +62,30 @@ enum StreamWindowGeometry {
             return CGSize(width: minimumContentWidth, height: minimumContentWidth * 9 / 16)
         }
         return CGSize(width: minimumContentWidth, height: minimumContentWidth * aspect.height / aspect.width)
+    }
+
+    /// The Picture in Picture mirror-source size: the smallest rect at the
+    /// stream's EXACT aspect that covers `panel` (the PiP window's content).
+    ///
+    /// macOS PiP mirrors the source layer 1:1, and the PiP window is sized in
+    /// whole pixels - so it is almost never exactly on the stream's aspect
+    /// line (577x324 for a 16:9 stream, where 16:9 wants 324.56). A source
+    /// layer sized to the panel would have `.resizeAspect` leave a sub-pixel
+    /// pillarbox, which the mirror paints as a full white hairline down one
+    /// edge (measured: any slack ≳ 0.5pt on an axis). Keeping the layer on the
+    /// aspect line means the video fills it edge to edge; the < 1pt of excess
+    /// is a fractional size on one axis, and hangs off the panel's top/right
+    /// where the mirror clips it. (`.resizeAspectFill` is NOT an alternative:
+    /// AVKit locks the panel's aspect to the visible video rect, which under
+    /// fill is the panel's own rounded size - it then drifts on every resize.)
+    /// A degenerate aspect or panel returns `panel` unchanged.
+    static func pipSourceSize(covering panel: CGSize, aspect: CGSize) -> CGSize {
+        guard aspect.width > 0, aspect.height > 0, panel.width > 0, panel.height > 0 else { return panel }
+        if panel.width * aspect.height >= panel.height * aspect.width {
+            // Wider than the stream: keep the width, take the aspect's height.
+            return CGSize(width: panel.width, height: panel.width * aspect.height / aspect.width)
+        }
+        // Taller than the stream: keep the height, take the aspect's width.
+        return CGSize(width: panel.height * aspect.width / aspect.height, height: panel.height)
     }
 }
