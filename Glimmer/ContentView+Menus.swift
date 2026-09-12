@@ -207,7 +207,7 @@ struct MenuBarContent: View {
                 model.settingsTab = .settings
                 activate()
             } label: {
-                Label("Settings…", systemImage: "gearshape")
+                Text("Settings…")
             }
             .keyboardShortcut(",")
 
@@ -218,7 +218,7 @@ struct MenuBarContent: View {
                 openWindow(id: "main")
                 activate()
             } label: {
-                Label("Open Shimmer", systemImage: "macwindow")
+                Text("Open Shimmer")
             }
 
             Divider()
