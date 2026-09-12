@@ -20,7 +20,6 @@ import SwiftUI
 struct AppPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
-    @AppStorage("launchMinimized") private var launchMinimized: Bool = false
 
     /// True when macOS has the login item but it is pending the user's approval
     /// in System Settings > Login Items - surfaced inline so the user is not
@@ -33,9 +32,9 @@ struct AppPane: View {
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
     /// dismissed the window.
-    private func scheduleLoginItemRegistration(launchAtLogin: Bool, minimized: Bool) {
+    private func scheduleLoginItemRegistration(launchAtLogin: Bool) {
         DispatchQueue.main.async {
-            let status = LoginItemManager.apply(launchAtLogin: launchAtLogin, minimized: minimized)
+            let status = LoginItemManager.apply(launchAtLogin: launchAtLogin)
             loginItemNeedsApproval = (status == .requiresApproval)
         }
     }
@@ -50,16 +49,11 @@ struct AppPane: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("General") {
+                // Login launches come up in the menu bar like every other
+                // launch (the helper relaunches the app suppressed).
                 Toggle("Be ready at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
-                        scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
-                    }
-                // Every launch, not just login: the window stays closed and
-                // the app lives in the menu bar ("Open Shimmer" brings it up).
-                // The same key picks the suppressed-relaunch helper for login.
-                Toggle("Start in the menu bar only", isOn: $launchMinimized)
-                    .onChange(of: launchMinimized) { _, on in
-                        scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
+                        scheduleLoginItemRegistration(launchAtLogin: on)
                     }
                 if loginItemNeedsApproval {
                     HStack(spacing: 8) {
@@ -134,9 +128,7 @@ struct AppPane: View {
         .onAppear {
             awdl.refresh()
             guard launchAtLogin else { loginItemNeedsApproval = false; return }
-            let service = launchMinimized
-                ? SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
-                : SMAppService.mainApp
+            let service = SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
             loginItemNeedsApproval = (service.status == .requiresApproval)
         }
     }

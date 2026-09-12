@@ -283,6 +283,13 @@ final class AppModel {
     var autoPictureInPicture: Bool = true {
         didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
     }
+    /// The menu bar's launch row starts the stream popped out in Picture in
+    /// Picture instead of showing the stream window; ⌥ on the row gives the
+    /// other one either way. Off by default - a launch is expected to show
+    /// the picture; this is for the "game in the corner" habit.
+    var menuBarStreamsPopOut: Bool = false {
+        didSet { UserDefaults.standard.set(menuBarStreamsPopOut, forKey: "menuBarStreamsPopOut") }
+    }
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
@@ -598,6 +605,7 @@ final class AppModel {
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
+        menuBarStreamsPopOut = Self.persistedBool("menuBarStreamsPopOut") ?? menuBarStreamsPopOut
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 

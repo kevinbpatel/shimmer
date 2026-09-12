@@ -165,6 +165,7 @@ struct StreamPane: View {
 
             SettingsField("Picture in Picture") {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
+                Toggle("Menu bar streams start popped out", isOn: $model.menuBarStreamsPopOut)
             }
 
         }

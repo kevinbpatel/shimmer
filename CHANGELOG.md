@@ -2,15 +2,19 @@
 
 ## Unreleased
 
-"Stay hidden at login (menu bar only)" is now "Start in the menu bar only",
-and it means every launch, not just login: the window stays closed and the
-Dock icon stays away until you pick "Open Shimmer" from the menu bar. It no
-longer needs "Be ready at login" to be on.
+Shimmer starts in the menu bar. Every launch - Dock, Spotlight, login - comes
+up with no window and no Dock icon; "Open Shimmer" in the menu bar brings the
+window up when you want it. The one exception is a first run with no PC
+paired, where the window opens so there is something to pair from. The "Stay
+hidden at login" toggle is gone with it: login launches behave like every
+other launch, and "Be ready at login" no longer needs a second decision.
 
-Hold ⌥ on the menu bar's "Stream <app>" and it reads "Stream <app> in Picture
-in Picture": the stream opens straight into the corner window on its first
-frame, the fullscreen window never shows, and the app you were in stays in
-front.
+The menu bar's launch row comes in two forms: "Stream <app>" shows the stream
+as usual, and "Pop out <app>" starts it straight in Picture in Picture - the
+window never shows, the picture lands in the corner on its first frame, and
+the app you were in stays in front. A new setting under Picture in Picture,
+"Menu bar streams start popped out", picks which form the row is; holding ⌥
+gives the other.
 
 The menu bar's live-session rows are one row now, named and iconed off the
 app: "Streaming <app>" while the window is up, "Back to <app>" whenever it is

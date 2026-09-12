@@ -27,12 +27,13 @@ struct OpenWindowCapture: View {
 /// we control both sides of the launch.
 private let launchedAtLogin = ProcessInfo.processInfo.arguments.contains("--launched-at-login")
 
-/// Start as a menu bar item with no window: every login launch (the helper
-/// relaunches us suppressed), and every launch at all when the user asked for
-/// it in Settings ("Start in the menu bar only" - the `launchMinimized` key
-/// the login helper registration also reads). A lazy global, so the read
-/// lands after ContainerMigration has moved the defaults into place.
-private let startsInMenuBar = launchedAtLogin || UserDefaults.standard.bool(forKey: "launchMinimized")
+/// Shimmer lives in the menu bar: every launch starts with no window and no
+/// Dock icon, and "Open Shimmer" brings the window up on demand. The one
+/// exception is a first run with no PC paired yet - a bare menu bar icon
+/// would leave the pairing flow undiscoverable, so the window opens then.
+/// A lazy global, so the read lands after ContainerMigration has moved the
+/// defaults into place.
+private let startsInMenuBar = launchedAtLogin || UserDefaults.standard.integer(forKey: "hosts.size") > 0
 
 @main
 struct GlimmerApp: App {
@@ -147,9 +148,9 @@ struct GlimmerApp: App {
         // launcher always re-spawns fresh next launch (the bug that made
         // first Dock click do nothing pre-restoration-fix).
         .restorationBehavior(.disabled)
-        // Suppress the auto-shown window when we were launched by the
-        // login helper, or whenever the user wants the app to live in the
-        // menu bar ("Open Shimmer" brings the window up on demand).
+        // No auto-shown window: Shimmer starts in the menu bar ("Open
+        // Shimmer" brings the window up on demand) - except on a first run
+        // with nothing paired, where the window is the way to pair.
         .defaultLaunchBehavior(startsInMenuBar ? .suppressed : .automatic)
         .commands {
             CommandGroup(replacing: .newItem) {}
@@ -275,10 +276,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await mgr.bootstrap() }
         }
 
-        // Starting in the menu bar (login launch, or the Settings choice)?
-        // Begin as `.accessory` so the Dock icon never appears alongside an
-        // invisible window. didBecomeKey on a subsequent user-triggered
-        // window open flips us back to `.regular` via the recheck observer.
+        // Starting in the menu bar (every launch but a first run)? Begin as
+        // `.accessory` so the Dock icon never appears alongside an invisible
+        // window. didBecomeKey on a subsequent user-triggered window open
+        // flips us back to `.regular` via the recheck observer.
         if startsInMenuBar {
             NSApp.setActivationPolicy(.accessory)
             Diag.info("menu-bar start (launchedAtLogin=\(launchedAtLogin)) → activation policy .accessory", "Launch")
@@ -366,7 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return false
         }
         NSApp.activate()
-        // 1. Hidden-but-alive window: orderFront it (covers the launchMinimized
+        // 1. Hidden-but-alive window: orderFront it (covers the menu-bar-start
         //    path where we orderOut'd a still-living window object).
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
             window.makeKeyAndOrderFront(nil)

@@ -53,9 +53,10 @@ extension AppModel {
         return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
     }
 
-    /// The ⌥-alternate of the hero row: same app, straight into PiP.
+    /// The hero row's Picture in Picture form: same app, straight into the
+    /// corner window. "Pop out" is the verb the PiP settings already use.
     var heroPictureInPictureLabel: String {
-        "\(heroActionLabel) in Picture in Picture"
+        "Pop out \(heroTargetApp?.name ?? defaultAppName)"
     }
 
     // MARK: - Hero verb (state-aware primary action)
