@@ -307,6 +307,13 @@ final class AppModel {
     /// `effectiveDisplayMode`); snapshotted into the StreamConfig at session
     /// start, like `streamCoversNotch`. A windowed stream caps the refresh at
     /// the display, so a flip recomputes the "Your next stream" summary.
+    /// Settings › "Quit the game when the stream ends". Off (the default,
+    /// and Moonlight's): ending a stream disconnects and the host keeps the
+    /// app running, so the next Stream click resumes it. On: every stop
+    /// sends /cancel, which terminates the app Sunshine launched.
+    var quitAppWhenStreamEnds: Bool = false {
+        didSet { UserDefaults.standard.set(quitAppWhenStreamEnds, forKey: "quitAppWhenStreamEnds") }
+    }
     /// Whether a live stream keeps the Mac and its display awake - always,
     /// only while the stream window is up, or never. Pushed to the running
     /// session so a change lands mid-stream.
@@ -599,6 +606,7 @@ final class AppModel {
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
+        quitAppWhenStreamEnds = Self.persistedBool("quitAppWhenStreamEnds") ?? quitAppWhenStreamEnds
         keepAwakePolicy = KeepAwakePolicy.persisted(
             rawValue: UserDefaults.standard.string(forKey: KeepAwakePolicy.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats

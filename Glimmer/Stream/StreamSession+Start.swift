@@ -52,6 +52,7 @@ extension StreamSession {
         pipHotkeyProvider: @escaping @MainActor () -> HotkeyChord = { .defaultPiP },
         autoPictureInPictureProvider: @escaping @MainActor () -> Bool = { false },
         keepAwakeProvider: @escaping @MainActor () -> KeepAwakePolicy = { .always },
+        quitAppOnStopProvider: @escaping @MainActor () -> Bool = { false },
         onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil,
         pipPointerProvider: @escaping @MainActor () -> Bool = { true }
     ) async throws -> AsyncStream<StreamEvent> {
@@ -74,6 +75,8 @@ extension StreamSession {
         // never stack assertions.
         beginPowerAssertion()
         self.keepAwakeProvider = keepAwakeProvider
+        self.quitAppOnStopProvider = quitAppOnStopProvider
+        quitAppRequested = false
         windowBackgrounded = false
         await reconcileKeepAwake()
         // Release the assertion on any UNSUCCESSFUL exit from start() - an early
@@ -131,7 +134,8 @@ extension StreamSession {
         // the total (attempt cap + window).
         let launch: LaunchResponse = try await launchWithDeadline(
             network: network, appID: appID, config: config,
-            hintCurrentGame: serverInfo.currentGameID
+            hintCurrentGame: serverInfo.currentGameID,
+            allowResume: !serverInfo.isRealGFE
         )
 
         // --- 3) Build the backend stream config -------------------------

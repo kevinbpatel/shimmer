@@ -24,6 +24,14 @@ extension StreamSession {
         await stop(cause: .userStopped)
     }
 
+    /// End the stream AND the app on the host: the explicit "Quit <app>"
+    /// action. Latches /cancel for the stop that follows, whatever the
+    /// "Quit the game when the stream ends" setting says.
+    public func stopAndQuitApp() async {
+        quitAppRequested = true
+        await stop(cause: .userStopped)
+    }
+
     /// Tear down the session.
     ///
     /// - Parameter cause: why the teardown was initiated. The P2 disconnect-
@@ -142,15 +150,29 @@ extension StreamSession {
         //    its own state internally).
         backend.stopConnection()
 
-        // 2. Tell the host the session is over so the next /launch isn't
-        //    blocked by an orphan session record. Best-effort; the host can
-        //    be unreachable here if the network just dropped.
+        // 2. Tell the host what this stop means. A plain stop is a
+        //    DISCONNECT - the RTSP/ENet teardown above already ended the
+        //    session on the host, and the app keeps running for the next
+        //    Stream click to /resume. Only an explicit "Quit <app>" or the
+        //    "Quit the game when the stream ends" setting sends /cancel,
+        //    which terminates the app Sunshine launched (a detached app,
+        //    like a Steam Big Picture entry, is not Sunshine's to kill).
+        //    Best-effort; the host can be unreachable if the network dropped.
         if let net = network {
-            try? await net.cancel()
+            let provider = quitAppOnStopProvider
+            let settingSaysQuit = await MainActor.run { provider() }
+            let quitApp = quitAppRequested || settingSaysQuit
+            if quitApp {
+                log.info("Stop: /cancel - ending the host's app")
+                try? await net.cancel()
+            } else {
+                log.info("Stop: disconnect only - the host keeps the app running for a later resume")
+            }
             // shutdown() is a no-op now (the control channel is per-request) -
             // kept for symmetry with the rest of the teardown.
             await net.shutdown()
         }
+        quitAppRequested = false
         network = nil
 
         // 3. MainActor-bound teardowns. Capture references first so we don't
@@ -218,23 +240,42 @@ extension StreamSession {
 
     // MARK: - Launch with busy recovery
     //
-    // Always renegotiate via `/cancel + /launch` on a user-initiated Stream
-    // click. Calling `/resume` on `currentgame == ourAppID` preserves the
-    // host-side STREAM_CONFIGURATION (resolution, FPS, HDR mode, codec
-    // set) - which breaks the multi-device flow: start a 4K@240 stream
-    // from the desktop, walk to the laptop, hit Stream → host /resumes
-    // 4K@240, ignoring the 1920x1200@120 the laptop requested.
-    //
-    // If the host was idle, `/cancel` is a no-op. If it had a stale
-    // session of ours, `/cancel` clears it. One-session-at-a-time is a
-    // host-side constraint. A future "Resume Game" affordance would need
-    // its own code path that explicitly calls /resume.
+    // Which endpoint a Stream click uses depends on what the host says is
+    // running. Idle → /launch. Our own app → /resume: a stop is a disconnect
+    // now, so this is the common "pick the game back up" case. On Sunshine
+    // /resume takes the mode from the request and reconfigures the display
+    // when no session is active (nvhttp.cpp resume()), so the multi-device
+    // flow - 4K@240 from the desktop, then 1920x1200@120 from the laptop -
+    // is honoured. NVIDIA's host reuses the OLD stream configuration on
+    // /resume, ignoring the second device; there (`allowResume == false`)
+    // we keep /cancel + /launch. Another app → /cancel + /launch (the
+    // takeover the launcher confirmed). A failed /resume falls back to
+    // /cancel + /launch, so a stale host record can't strand the click.
+    enum LaunchPlan: Equatable { case launch, resume, cancelThenLaunch }
+
+    nonisolated static func launchPlan(hintCurrentGame: Int, appID: Int, allowResume: Bool) -> LaunchPlan {
+        if hintCurrentGame == 0 { return .launch }
+        if hintCurrentGame == appID && allowResume { return .resume }
+        return .cancelThenLaunch
+    }
+
     func launchWithBusyRecovery(
         network: NetworkClient,
         appID: Int,
         config: StreamConfig,
-        hintCurrentGame: Int
+        hintCurrentGame: Int,
+        allowResume: Bool
     ) async throws -> LaunchResponse {
+
+        func tryResume() async throws -> LaunchResponse {
+            log.info("→ /resume (appID=\(appID) is running on the host)")
+            let t0 = Date().timeIntervalSinceReferenceDate
+            defer {
+                ConnectTimingTelemetry.shared.recordLaunchLeg(
+                    launchMs: (Date().timeIntervalSinceReferenceDate - t0) * 1000.0)
+            }
+            return try await network.resume(config: config)
+        }
 
         func tryLaunch() async throws -> LaunchResponse {
             log.info("→ /launch (appID=\(appID))")
@@ -295,13 +336,12 @@ extension StreamSession {
             return try await network.launch(appID: appID, config: config)
         }
 
-        // Primary: idle host → /launch directly (no point cancelling nothing).
-        // Anything else → /cancel + /launch to force a fresh session config.
+        // Primary: the plan from the host's own report.
         do {
-            if hintCurrentGame == 0 {
-                return try await tryLaunch()
-            } else {
-                return try await tryCancelThenLaunch()
+            switch Self.launchPlan(hintCurrentGame: hintCurrentGame, appID: appID, allowResume: allowResume) {
+            case .launch: return try await tryLaunch()
+            case .resume: return try await tryResume()
+            case .cancelThenLaunch: return try await tryCancelThenLaunch()
             }
         } catch let first as StreamError {
             log.error("primary launch path failed: \(String(describing: first), privacy: .public)")
@@ -342,7 +382,8 @@ extension StreamSession {
         network: NetworkClient,
         appID: Int,
         config: StreamConfig,
-        hintCurrentGame: Int
+        hintCurrentGame: Int,
+        allowResume: Bool
     ) async throws -> LaunchResponse {
         let deadline = Self.launchOverallDeadlineSeconds
         let box = FirstResultBox<LaunchResponse>()
@@ -350,7 +391,7 @@ extension StreamSession {
             do {
                 let r = try await launchWithBusyRecovery(
                     network: network, appID: appID, config: config,
-                    hintCurrentGame: hintCurrentGame)
+                    hintCurrentGame: hintCurrentGame, allowResume: allowResume)
                 await box.offer(.success(r))
             } catch {
                 await box.offer(.failure(error))

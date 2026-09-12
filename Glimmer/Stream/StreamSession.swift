@@ -411,6 +411,13 @@ public actor StreamSession {
     /// The user's keep-awake choice, read live so a Settings change lands on
     /// the running session.
     var keepAwakeProvider: @MainActor () -> KeepAwakePolicy = { .always }
+    /// Settings › "Quit the game when the stream ends". Off, a stop is a
+    /// DISCONNECT: the host keeps the app running and the next Stream click
+    /// resumes it. On, every stop sends /cancel as every build before did.
+    var quitAppOnStopProvider: @MainActor () -> Bool = { false }
+    /// Latched by an explicit "Quit <app>" so the stop that follows sends
+    /// /cancel regardless of the setting.
+    var quitAppRequested = false
     /// Mirrors StreamWindow.isBackgrounded: false while the stream window is
     /// up, true once it is hidden or parked in Picture in Picture.
     var windowBackgrounded = false

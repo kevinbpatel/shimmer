@@ -167,6 +167,13 @@ struct StreamPane: View {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
             }
 
+            // Off, ending a stream just disconnects: the game stays up on the
+            // PC and the next Stream click resumes it. "Quit <app>" in the
+            // menu bar ends it deliberately. On, every stop ends it.
+            SettingsField("When the stream ends") {
+                Toggle("Quit the game on the PC", isOn: $model.quitAppWhenStreamEnds)
+            }
+
             // A pad doesn't reset the Mac's idle timer, so a stream being
             // played would dim and sleep without this - but a stream parked
             // in a corner while you read is no reason to hold the display

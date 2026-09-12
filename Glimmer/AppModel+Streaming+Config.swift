@@ -54,13 +54,38 @@ extension AppModel {
               Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
             return "Checking…"
         }
+        // Sunshine reports BUSY whenever an app is running, streamed or not -
+        // after our own disconnect the game is simply still up on the host.
         switch live.state {
         case .idle: return "Online"
-        case .streamingApp(let name): return "Streaming \(name)"
-        case .streamingUnknownApp: return "Streaming"
+        case .streamingApp(let name): return "\(name) running"
+        case .streamingUnknownApp: return "An app is running"
         case .asleep: return "Asleep or offline"
         case .certMismatch: return "Trust needed - pair again"
         case .unknown: return "Checking…"
+        }
+    }
+
+    /// "Quit <app>" while streaming: end the stream and the app on the host.
+    func quitStreamAndApp() {
+        guard let session = nativeSession else { return }
+        Diag.notice("User asked to quit the app on the host - stopping with /cancel", "Stream")
+        Task { await session.stopAndQuitApp() }
+    }
+
+    /// "Quit <app>" while NOT streaming: the host still reports the app we
+    /// disconnected from as running. One /cancel, then a fresh status poll so
+    /// the menu and library stop offering to resume it.
+    func quitRunningApp(on host: Host) {
+        Diag.notice("User asked to quit \(host.displayName)'s running app - sending /cancel", "Stream")
+        Task { [weak self] in
+            guard let self else { return }
+            let client = NetworkClient(server: self.nativeServerInfo(for: host))
+            do { try await client.cancel() } catch {
+                Diag.error("/cancel failed: \(error.localizedDescription)", "Stream")
+            }
+            await client.shutdown()
+            await MainActor.run { self.restartHostStatusPolling() }
         }
     }
 

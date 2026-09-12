@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Ending a stream no longer quits the game. A stop is a disconnect: the PC keeps
+the app running, the menu bar and library say "<app> running", and the next
+Stream click resumes it where it was (the host takes the new resolution and
+refresh on resume). "Quit <app>" in the menu bar ends the game deliberately -
+while streaming, or afterwards while the PC still has it up. Settings › "When
+the stream ends › Quit the game on the PC" restores the old behaviour. Apps a
+PC launches detached (a Steam Big Picture entry, say) were never Sunshine's to
+end and are unaffected either way.
+
 Whether a stream keeps the Mac awake is a choice now - Settings › "Keep the
 Mac awake": Always (what every build so far did), Only while showing, or
 Never. "Only while showing" follows the stream window: up and being played,

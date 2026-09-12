@@ -214,7 +214,7 @@ extension StreamSession {
             let serverInfo = try await net.fetchServerInfo()
             let launch = try await launchWithBusyRecovery(
                 network: net, appID: appID, config: config,
-                hintCurrentGame: serverInfo.currentGameID)
+                hintCurrentGame: serverInfo.currentGameID, allowResume: !serverInfo.isRealGFE)
             // Re-probe the path on reconnect: the route may have moved (the
             // tunnel-flap case this whole clamp exists for), so remoteness and
             // the advertised packet size are resolved fresh, never inherited.
