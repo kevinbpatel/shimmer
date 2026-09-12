@@ -143,7 +143,9 @@ extension TelemetryExporter {
         prevCaptureTime = now
 
         latestPrometheus = TelemetryRenderer.prometheus(snap, extras: extras)
-        appendNDJSON(TelemetryRenderer.ndjson(snap, extras: extras))
+        let line = TelemetryRenderer.ndjson(snap, extras: extras)
+        latestNDJSON = line
+        appendNDJSON(line)
     }
 
     /// Fill the core video block: the fps triple, the decode-time EMA (the raw

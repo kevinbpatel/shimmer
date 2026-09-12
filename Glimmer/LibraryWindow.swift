@@ -137,6 +137,18 @@ struct ComputersTab: View {
                             HStack(spacing: 7) {
                                 Circle().fill(statusColor).frame(width: 9, height: 9)
                                 Text(statusText)
+                                // The only part of the old streaming card worth
+                                // keeping: a way back to a running stream. The
+                                // rest of that card - a big "Streaming" plate
+                                // naming the app and the PC - said what this
+                                // row, the disabled app buttons and their help
+                                // text already say, while covering the pane it
+                                // was reporting on.
+                                if model.isStreaming {
+                                    Button("Show the stream") { model.resumeStreamWindow() }
+                                        .controlSize(.small)
+                                        .padding(.leading, 3)
+                                }
                             }
                         }
                         if let played = host.lastPlayedDescription {
@@ -153,7 +165,6 @@ struct ComputersTab: View {
                     .padding(.bottom, 20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .overlay { if model.isStreaming { streamingOverlay(host) } }
 
                 Divider()
                 HStack {
@@ -200,20 +211,7 @@ struct ComputersTab: View {
         }
     }
 
-    private var statusText: String {
-        guard let live = model.hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return "Checking…"
-        }
-        switch live.state {
-        case .idle: return "Online"
-        case .streamingApp(let name): return "Streaming \(name)"
-        case .streamingUnknownApp: return "Streaming"
-        case .asleep: return "Asleep or offline"
-        case .certMismatch: return "Trust needed - pair again"
-        case .unknown: return "Checking…"
-        }
-    }
+    private var statusText: String { model.selectedHostStatusLine }
 
     private var searchField: some View {
         HStack(spacing: 6) {
@@ -234,33 +232,6 @@ struct ComputersTab: View {
         .background(Color.primary.opacity(0.07), in: Capsule())
     }
 
-    /// Shown over the grid while a session is up, so the window says what is
-    /// happening instead of the grid just dimming.
-    private func streamingOverlay(_ host: Host) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: "airplayvideo")
-                .font(.system(size: 32, weight: .regular))
-                .foregroundStyle(.tint)
-            Text("Streaming").font(.headline)
-            Text(model.runningAppName ?? model.heroTargetAppName)
-                .font(.subheadline).foregroundStyle(.secondary)
-            Text(host.displayName)
-                .font(.caption).foregroundStyle(.tertiary)
-            Button {
-                model.resumeStreamWindow()
-            } label: {
-                Label("Show the stream", systemImage: "arrow.up.left.and.arrow.down.right")
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.top, 4)
-        }
-        .padding(28)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(.white.opacity(0.10), lineWidth: 1))
-        .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
-    }
 }
 
 // MARK: - Sidebar row
@@ -331,8 +302,15 @@ private struct HostRow: View {
 
 /// An app's icon: a system symbol, or a bundled template mark for the few
 /// things SF Symbols has no glyph for. Sized to sit on a button's text line.
-private struct AppGlyphIcon: View {
+///
+/// Shared with the menu-bar dropdown, which names the same app on its stream
+/// button - the two surfaces have to agree, or the menu says "Stream Steam"
+/// beside a gamepad while the library shows the Valve mark.
+struct AppGlyphIcon: View {
     let app: LibraryApp
+    /// Cap height to match the symbols beside it. The library's rows are
+    /// roomier than an NSMenu's, so the dropdown asks for a smaller one.
+    var size: CGFloat = 14
 
     var body: some View {
         switch app.glyph {
@@ -345,7 +323,7 @@ private struct AppGlyphIcon: View {
                 .aspectRatio(contentMode: .fit)
                 // Matched to the cap height of the symbols beside it, so a
                 // bundled mark and an SF Symbol sit on the same line.
-                .frame(width: 14, height: 14)
+                .frame(width: size, height: size)
         }
     }
 }

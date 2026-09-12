@@ -55,35 +55,6 @@ struct VideoPane: View {
             SettingsField("Stats overlay") {
                 Toggle("Show stream health over the picture", isOn: $model.showStreamStats)
             }
-
-            SettingsField("Position") {
-                Picker("", selection: $model.streamStatsCorner) {
-                    ForEach(StatsOverlayCorner.allCases, id: \.self) { corner in
-                        Text(corner.displayName).tag(corner)
-                    }
-                }
-                .labelsHidden()
-                .settingsControl()
-            }
-
-            SettingsField("Detail") {
-                Picker("", selection: $model.statsOverlayPreset) {
-                    ForEach(StatsOverlayPreset.allCases, id: \.self) { preset in
-                        Text(preset.displayName).tag(preset)
-                    }
-                }
-                .labelsHidden()
-                .settingsControl()
-                if model.statsOverlayPreset == .custom {
-                    StatsCustomRowsPicker()
-                        .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
-                }
-                DisclosureGroup("When numbers turn yellow or red") {
-                    StatsThresholdsEditor()
-                        .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
-                }
-                .settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
-            }
         }
         .onAppear { reloadCodec() }
         .onChange(of: model.selectedHost?.id) { _, _ in reloadCodec() }
@@ -91,18 +62,5 @@ struct VideoPane: View {
 
     private func reloadCodec() {
         codecPref = model.selectedHost.map { HostCodecPreference.load(for: $0.id) } ?? .auto
-    }
-
-    /// Per-preset hint. Counts derive from the row-set constants so the copy
-    /// can't drift when a preset gains a row.
-    static func presetSubtitle(_ preset: StatsOverlayPreset) -> String {
-        switch preset {
-        case .minimal:
-            return "\(StatsOverlayDefaults.minimalRows.count) metrics - render FPS, latency, bitrate."
-        case .micro:
-            return "\(StatsOverlayDefaults.microRows.count) metrics - framerate, network, bitrate."
-        case .extended: return "All stream metrics (not audio or Mac vitals)."
-        case .custom: return "Pick rows individually below."
-        }
     }
 }

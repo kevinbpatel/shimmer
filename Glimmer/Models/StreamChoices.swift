@@ -73,19 +73,32 @@ enum ResolutionChoice: Hashable {
     }
 }
 
-/// The Frame rate picker's rows. `matchDisplay` is the panel's refresh;
-/// `custom` reveals a field.
+/// The Frame rate picker's rows: a fixed rate, or `custom` which reveals a
+/// field.
+///
+/// There is deliberately no "Match display" row. It read as the safe default
+/// while actually being the least predictable option - the rate changed when a
+/// display was plugged in, when the laptop was undocked, or when a panel's
+/// refresh setting was touched, and a stream silently renegotiated with it. A
+/// stream asks for a NUMBER; the picker should show which one.
 enum FrameRateChoice: Hashable {
-    case matchDisplay
     case fixed(Int)
     case custom
 
     static let standardRates = [30, 60, 90, 120, 144, 165, 240]
-    static let all: [FrameRateChoice] = [.matchDisplay] + standardRates.map { .fixed($0) } + [.custom]
+    static let all: [FrameRateChoice] = standardRates.map { .fixed($0) } + [.custom]
 
-    static func from(matchesDisplay: Bool, customFPS: Int) -> FrameRateChoice {
-        if matchesDisplay { return .matchDisplay }
-        return standardRates.contains(customFPS) ? .fixed(customFPS) : .custom
+    static func from(customFPS: Int) -> FrameRateChoice {
+        standardRates.contains(customFPS) ? .fixed(customFPS) : .custom
+    }
+
+    /// The fixed rate a "Match display" install migrates to: the panel's own
+    /// refresh, so nobody's stream changes speed the day the row disappears.
+    /// Clamped to the engine's bounds; a panel whose rate isn't one of the
+    /// standard rows (a 75Hz monitor) lands on Custom showing 75, which is
+    /// exactly what it was already streaming at.
+    static func migratedRate(displayHz: Int) -> Int {
+        StreamSizeBounds.clampFPS(displayHz > 0 ? displayHz : 60)
     }
 }
 
@@ -118,9 +131,8 @@ enum QualityResolution {
 
     /// The refresh a stream asks for. Window mode caps at the panel (it can't
     /// present more); full screen sends the choice verbatim.
-    static func frameRate(matchesDisplay: Bool, customFPS: Int, displayHz: Int, windowed: Bool) -> Int {
-        if matchesDisplay { return displayHz > 0 ? displayHz : StreamDisplayMode.fallbackDisplayMaxHz }
-        return windowed
+    static func frameRate(customFPS: Int, displayHz: Int, windowed: Bool) -> Int {
+        windowed
             ? StreamDisplayMode.windowedRefresh(customFPS: customFPS, displayMaxHz: displayHz)
             : StreamSizeBounds.clampFPS(customFPS)
     }

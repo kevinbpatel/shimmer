@@ -6,8 +6,6 @@
 
 import Foundation
 import AppKit
-import AudioToolbox
-import CoreAudio
 import GameController
 import SwiftUI
 import Observation
@@ -15,24 +13,6 @@ import ServiceManagement
 import os.log
 
 extension AppModel {
-
-    // MARK: Stream lifecycle hooks
-
-    func beforeStreamStart() {
-        if muteMacWhileStreaming { muteMac() }
-    }
-
-    func afterStreamEnd() {
-        // Keyed off the did-mute latch inside restoreMac() (prePausedMacVolume
-        // non-nil), NOT the live muteMacWhileStreaming flag: the toggle can be
-        // flipped OFF mid-stream, and the old flag-gated restore then left the
-        // Mac stuck at volume 0 - with the saved level destroyed by the next
-        // muted stream's re-capture of that 0. Unconditional restore keeps
-        // teardown symmetric with whatever beforeStreamStart() / the live
-        // toggle (applyMutePreferenceMidStream) actually did, and is a no-op
-        // when nothing was muted.
-        restoreMac()
-    }
 
     /// String-typed read shim for UI code that hasn't migrated to
     /// switching on `pairingPhase`. Existing `.contains("✓")` checks keep
@@ -250,6 +230,14 @@ extension AppModel {
     /// a give-up: the next menu open re-reads, so the charm reappears the
     /// moment the OS reports data.
     var menuBarControllerBattery: (percent: Int, charging: Bool)? {
+        // Observation dependencies. Neither GameController's registry nor the
+        // raw-HID reader is @Observable, so without touching these the menu-bar
+        // LABEL (which, unlike the dropdown, is never rebuilt on open) would
+        // show whatever the battery read at launch, forever. `controllerConnected`
+        // covers pads arriving and leaving; `controllerBatteryTick` is the slow
+        // timer that covers the pad draining while connected.
+        _ = controllerConnected
+        _ = controllerBatteryTick
         // Prefer the HID-decoded battery: opening the DualSense over raw HID
         // makes gamecontrollerd drop the enhanced-report battery, so
         // GCController.battery reads nil while the reader is live. The HID
@@ -268,5 +256,39 @@ extension AppModel {
             return (reading.percent, reading.charging == true)
         }
         return nil
+    }
+
+    /// Which mark names the connected pad, for the menu-bar charm and its
+    /// battery readout. Rendered by `ControllerGlyph.image` (ContentView+Menus).
+    ///
+    /// There is no PlayStation-controller SF Symbol - the system catalog has
+    /// `playstation.logo` (the PS letters mark, and restricted: "may not be
+    /// modified and may only be used to refer to Sony's PlayStation") and
+    /// `gamecontroller.fill` (a generic pad), and nothing shaped like a
+    /// DualSense. So the DualSense body is bundled art, from Kenney's CC0
+    /// input-prompt set; see CREDITS.md and scripts/generate-dualsense-glyph.swift.
+    ///
+    /// It is used ONLY when the pad genuinely is a PlayStation one - a DualSense
+    /// (the raw HID reader opens nothing else) or a DualShock 4. That's
+    /// referential use: it says "this is your PlayStation controller", never
+    /// "this app is a Sony product". CC0 waives Kenney's copyright but cannot
+    /// waive Sony's trade dress, and referential is the whole basis for showing
+    /// it - so it must never become an app icon or a piece of branding.
+    enum ControllerGlyph { case playStation, generic }
+
+    var menuBarControllerGlyph: ControllerGlyph {
+        _ = controllerConnected
+        // A live raw-HID battery decode means a DualSense by construction:
+        // DualSenseHID opens nothing else.
+        if DualSenseHID.shared.battery != nil { return .playStation }
+        for controller in GCController.controllers() {
+            switch controller.productCategory {
+            case GCProductCategoryDualSense, GCProductCategoryDualShock4:
+                return .playStation
+            default:
+                continue
+            }
+        }
+        return .generic
     }
 }

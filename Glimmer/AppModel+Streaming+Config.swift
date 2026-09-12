@@ -40,11 +40,37 @@ extension AppModel {
     }
 
     func streamDefaultApp() {
-        guard let host = selectedHost else { return }
-        let app = host.apps.first(where: { $0.name == heroTargetAppName })
-            ?? host.apps.first(where: { $0.name == "Desktop" })
-            ?? host.apps.first
-        if let app { requestStream(app: app, on: host) }
+        guard let host = selectedHost, let app = heroTargetApp else { return }
+        requestStream(app: app, on: host)
+    }
+
+    /// One line on the selected PC, for the menu bar header and the library's
+    /// readiness chip: what the last fresh /serverinfo said, or "Connected"
+    /// while THIS Mac is streaming it (the poller is paused then, so the
+    /// snapshot would only age out to "Checking…").
+    var selectedHostStatusLine: String {
+        if isStreaming { return "Connected" }
+        guard let live = hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
+            return "Checking…"
+        }
+        switch live.state {
+        case .idle: return "Online"
+        case .streamingApp(let name): return "Streaming \(name)"
+        case .streamingUnknownApp: return "Streaming"
+        case .asleep: return "Asleep or offline"
+        case .certMismatch: return "Trust needed - pair again"
+        case .unknown: return "Checking…"
+        }
+    }
+
+    /// The menu bar's row for a LIVE session: what is streaming, and - when
+    /// the window is hidden or in Picture in Picture - the way back to it.
+    /// One row instead of a greyed-out "Stream X" plus a separate "Back to
+    /// stream", so the verb and the app name sit together.
+    var liveStreamRowTitle: String {
+        let name = heroTargetApp?.name ?? defaultAppName
+        return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
     }
 
     // MARK: - Hero verb (state-aware primary action)
@@ -102,12 +128,36 @@ extension AppModel {
         resumableAppName ?? defaultAppName
     }
 
+    /// The same target as a library entry, so a surface naming it can also draw
+    /// its icon. Resolved through the SAME fallback chain `streamDefaultApp()`
+    /// uses - name match, then Desktop, then whatever the host published first
+    /// - because a button whose icon and verb come from different lookups will
+    /// eventually show one app and launch another. nil only when the host has
+    /// no apps at all, which is the case the caller draws a bare play arrow for.
+    var heroTargetApp: LibraryApp? {
+        guard let host = selectedHost else { return nil }
+        return Self.resolveHeroApp(in: host.apps, named: heroTargetAppName)
+    }
+
+    /// The lookup itself, pure so the invariant "the verb, the icon and the
+    /// launch all name one app" is checkable without an AppModel.
+    nonisolated static func resolveHeroApp(in apps: [LibraryApp], named name: String) -> LibraryApp? {
+        apps.first(where: { $0.name == name })
+            ?? apps.first(where: { $0.name == "Desktop" })
+            ?? apps.first
+    }
+
     /// Primary-button copy. Always "Stream <app>" - this button only shows on the
     /// launcher (never mid-stream), so "Resume" read as confusing. The verb is the
     /// same whether we resume the host's running session or launch fresh;
     /// `streamHeroApp()` still picks /resume vs /launch under the hood.
+    ///
+    /// Named off the RESOLVED app rather than `heroTargetAppName`, so the two
+    /// can't disagree: the name is a guess that may not be in the applist (a
+    /// game uninstalled on the host, or a brand-new pairing), and in that case
+    /// the button falls back to a real app and has to say which.
     var heroActionLabel: String {
-        "Stream \(heroTargetAppName)"
+        "Stream \(heroTargetApp?.name ?? defaultAppName)"
     }
 
     /// Launch the hero target (the primary click / Return-key action).

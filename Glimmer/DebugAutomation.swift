@@ -12,6 +12,14 @@
 //                                    stream its default app.
 //    GLIMMER_DEBUG_PIP_AFTER=<sec>   once streaming, wait <sec> then ⌃⌥P.
 //    GLIMMER_DEBUG_QUIT_AFTER=<sec>  quit the app <sec> after streaming starts.
+//    GLIMMER_DEBUG_RETURN_AFTER=<sec> <sec> after the PiP entry, resume the
+//                                    window (the Dock / menu-bar path).
+//    GLIMMER_DEBUG_PIP_PROBE=1       log the whole PiP state machine once a
+//                                    second (`PIPPROBE` lines).
+//    GLIMMER_DEBUG_PIP_CLOSE_AFTER=<sec>  <sec> after the PiP entry, stop PiP
+//                                    with the window left hidden (the × path).
+//    GLIMMER_DEBUG_PIP_AGAIN_AFTER=<sec>  <sec> after the PiP entry, enter PiP
+//                                    again (the menu-bar path from hidden).
 //
 //  The same knobs are accepted as command-line arguments
 //  (`--debug-stream=<substr> --debug-pip-after=<sec> ...`) because a GUI app
@@ -39,6 +47,18 @@ extension AppModel {
             .first { $0.hasPrefix(prefix) }
             .map { String($0.dropFirst(prefix.count)) }
             .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// `NSApp.terminate` from the RUN LOOP, never from inside a GCD main-queue
+    /// block. With a live session, applicationShouldTerminate answers
+    /// `.terminateLater` and stops the session in a `@MainActor` task; AppKit
+    /// then spins a nested event loop waiting for the reply. Inside a
+    /// main-queue callout that task can never run (the queue is serial and we
+    /// are still in it), so the app sits in `-[NSApplication terminate:]`
+    /// forever with the stream still up. A run-loop-invoked terminate spins a
+    /// loop that drains the main queue normally - the Cmd-Q path.
+    static func terminateFromRunLoop() {
+        RunLoop.main.perform { NSApp.terminate(nil) }
     }
 
     /// First loaded host whose name or address contains `match`.
@@ -69,7 +89,7 @@ extension AppModel {
                 }
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { NSApp.terminate(nil) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { Self.terminateFromRunLoop() }
             }
             return
         }
@@ -94,15 +114,29 @@ extension AppModel {
                         }
                     }
                     await client.shutdown()
-                    NSApp.terminate(nil)
+                    Self.terminateFromRunLoop()
                 }
             }
             return
         }
         guard let hostMatch = Self.debugKnob("stream") else { return }
+        // `--debug-pip-probe=1`: once a second, log the whole PiP state
+        // machine (controller flags, adapter latches, window/panel state).
+        if Self.debugKnob("pip-probe") != nil {
+            let probe = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let session = self.nativeSession else { return }
+                    guard let win = await session.window else { return }
+                    self.log.notice("PIPPROBE \(win.debugPiPState(), privacy: .public)")
+                }
+            }
+            RunLoop.main.add(probe, forMode: .common)
+        }
         let pipAfter = Self.debugKnob("pip-after").flatMap(Double.init)
         let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init)
         let returnAfter = Self.debugKnob("return-after").flatMap(Double.init)
+        let closeAfter = Self.debugKnob("pip-close-after").flatMap(Double.init)
+        let againAfter = Self.debugKnob("pip-again-after").flatMap(Double.init)
         log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .public) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
 
         // Give discovery/host-load a beat, then select + stream.
@@ -120,13 +154,16 @@ extension AppModel {
             self.log.notice("DEBUG automation: selecting \(host.name, privacy: .public) (\(host.apps.count) apps) and streaming default")
             self.selectHost(host)
             self.streamDefaultApp()
-            self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, quitAfter: quitAfter)
+            self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, closeAfter: closeAfter,
+                                    againAfter: againAfter, quitAfter: quitAfter)
         }
     }
 
     /// Poll for the stream to go live, then schedule the PiP + return + quit
     /// actions relative to that moment (connect time is variable).
-    private func armDebugPiPAndQuit(pipAfter: Double?, returnAfter: Double?, quitAfter: Double?) {
+    private func armDebugPiPAndQuit(
+        pipAfter: Double?, returnAfter: Double?, closeAfter: Double?, againAfter: Double?, quitAfter: Double?
+    ) {
         var fired = false
         let start = Date()
         let poll = Timer(timeInterval: 0.25, repeats: true) { [weak self] t in
@@ -151,11 +188,24 @@ extension AppModel {
                         self?.resumeStreamWindow()
                     }
                 }
+                if let closeAfter {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + closeAfter) { [weak self] in
+                        self?.log.notice("DEBUG automation: closing Picture in Picture (window stays hidden)")
+                        Task { @MainActor [weak self] in
+                            guard let win = await self?.nativeSession?.window else { return }
+                            win.pictureInPicture.stop()
+                        }
+                    }
+                }
+                if let againAfter {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + againAfter) { [weak self] in
+                        self?.log.notice("DEBUG automation: entering Picture in Picture again")
+                        self?.enterPictureInPicture()
+                    }
+                }
             }
             if let quitAfter {
-                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) {
-                    NSApp.terminate(nil)
-                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { Self.terminateFromRunLoop() }
             }
         }
         RunLoop.main.add(poll, forMode: .common)

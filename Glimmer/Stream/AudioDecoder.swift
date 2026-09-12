@@ -52,6 +52,30 @@ public final class AudioDecoder: @unchecked Sendable {
     /// lock and would deadlock against teardown's `playerNode.stop()`. Non-private:
     /// `applyVarispeedRate` (the resampler extension) writes through it.
     let varispeedRateQueue = DispatchQueue(label: "io.ugfugl.Glimmer.audio.varispeed-rate")
+    /// The stream's output volume (0...1), applied to `mainMixerNode.outputVolume`.
+    ///
+    /// The MIXER's output, not `playerNode.volume`. Both work - measured
+    /// 2026-09-11 by offline-rendering this exact graph, where a player at 0.25
+    /// came out at a quarter RMS even through the varispeed - so this is a
+    /// choice, not a constraint. The mixer wins on two counts: its attenuation
+    /// doesn't depend on how the graph happens to be wired (the player's does,
+    /// via `AVAudioMixing` and whatever it is connected through), and this
+    /// engine is private to the decoder and carries nothing but stream audio, so
+    /// its main mixer's output IS the stream, with no second path around it.
+    ///
+    /// Stored here rather than written once onto the node because the setting
+    /// does NOT survive the rebuilds this decoder performs on its own - engine
+    /// start, and the `AVAudioEngineConfigurationChange` reconnect that fires
+    /// whenever the output device moves (AirPods connect, HDMI unplug, DAC
+    /// removal). A one-shot write from the menu bar would be silently lost at
+    /// the user's next device change, so every place that (re)builds the graph
+    /// calls `applyOutputVolumeLocked()`, which re-reads this.
+    ///
+    /// Guarded by `stateLock` - the same discipline every other AVAudio call in
+    /// this class follows, and for the same reason: a write racing
+    /// `handleEngineConfigurationChange`'s `engine.connect` is exactly the
+    /// unserialized-node-mutation shape that froze this decoder before.
+    var outputVolume: Float = 1.0
     var inputFormat: AVAudioFormat?
     /// Last-known engine OUTPUT (hardware) format, captured when the engine
     /// starts. The config-change handler (H3) compares against this to decide

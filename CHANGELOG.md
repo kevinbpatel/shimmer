@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+Shimmer starts in the menu bar. Every launch - Dock, Spotlight, login - comes
+up with no window and no Dock icon; "Open Shimmer" in the menu bar brings the
+window up when you want it. The one exception is a first run with no PC
+paired, where the window opens so there is something to pair from. The "Stay
+hidden at login" toggle is gone with it: login launches behave like every
+other launch, and "Be ready at login" no longer needs a second decision.
+
+The menu bar opens with a header like Tailscale's: the PC's name, and under
+it what the PC is doing - Online, Asleep or offline, Streaming <app> from
+another device, Connected while this Mac is streaming it. It is a plain
+header, not a row: it doesn't highlight or do anything. The small "bazzite" /
+"Connected to bazzite" section title it replaces is gone. (Under the hood
+the dropdown is a native AppKit menu now rather than SwiftUI's, which is what
+makes an inert header possible - and gives Switch PC and the volume ladder
+real checkmarks.)
+
+The menu bar's window rows moved to the bottom, the way Tailscale's menu is
+laid out: the stream first, then "Settings…" and "Open Shimmer" together, and
+"Quit Shimmer" on its own.
+
+The menu bar's live-session rows are one row now, named and iconed off the
+app: "Streaming <app>" while the window is up, "Back to <app>" whenever it is
+hidden or in Picture in Picture. It used to be a greyed-out "Stream <app>"
+plus a separate "Back to stream".
+
 Settings is labels and controls only - every explanatory paragraph under a
 control is gone, and so is the Appearance picker: the app follows the system
 the way a Mac app should.
@@ -19,6 +44,42 @@ as if it were 2020. A BT.2020 tag with a non-PQ transfer while the host reports
 HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
 longer requested at all on a display with no headroom, since it cannot help
 there and this is exactly how it hurts.
+
+Fix: Picture in Picture chosen from the menu bar while the stream window was
+already hidden - after closing an earlier PiP with ×, or a switch-away
+without auto-PiP - opened a PiP window showing only the bottom-left corner of
+the picture. The entry path relied on the hide step to set up the mirror
+source, and the hide step does nothing for a window that is already hidden,
+so PiP started on the off-screen full-size layer. A hidden window is now put
+back on screen invisibly (alpha 0, click-through, pre-shrunk) before PiP
+starts, exactly as a visible one is. (In window mode on macOS 26.6 the first
+cut of this crashed on the way back in: suspending the window's aspect lock
+had left it with resize increments of zero, which AppKit's order-in frame
+standardization divided by. The lock is now cleared the documented way, and
+the window is ordered in before its chrome is touched.)
+
+Fix: Troubleshooting's relaunch could hang the app with the stream still up.
+Quitting with a live session stops it first, on the main actor - and a quit
+requested from inside a Grand Central Dispatch block can never get there
+(AppKit waits in a nested loop that the still-running block starves). Every
+programmatic quit now goes through the run loop, as Cmd-Q always did.
+
+Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
+instant Picture in Picture was still opening left the PiP window up for good,
+showing the bottom-left corner of the picture. The stop we issued from inside
+AVKit's own "started" callback was silently dropped - as was every later one -
+so the window's return and the PiP outlived each other. That stop is now
+issued a run-loop turn later, where AVKit honours it, and a watchdog keeps the
+PiP state machine honest should AVKit ever drop another.
+
+Fix: a white hairline down one edge of the Picture in Picture window, at
+some sizes and not others. The PiP window is sized in whole pixels and so is
+almost never exactly on the stream's aspect, and the source layer that macOS
+mirrors 1:1 into it was sized to the window - so `.resizeAspect` left a
+sub-pixel pillarbox that showed through as the panel's white backing. The
+source now sits exactly on the stream's aspect line (fractional on one axis,
+overhanging the window by under a pixel where the mirror clips it), so the
+video fills it edge to edge at every size.
 
 The Picture in Picture pause button no longer does anything. macOS draws that
 transport in its own process, so it cannot be removed, but a live game has

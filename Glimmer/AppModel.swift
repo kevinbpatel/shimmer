@@ -17,8 +17,6 @@
 
 import Foundation
 import AppKit
-import AudioToolbox
-import CoreAudio
 import GameController
 import SwiftUI
 import Observation
@@ -120,21 +118,12 @@ final class AppModel {
             if qualityPreset == .custom { persistQualitySettings() }
         }
     }
-    /// The refresh a stream asks for when `frameRateMatchesDisplay` is off.
-    /// Applies under every preset (the Stream pane's frame-rate picker), not
-    /// just Custom - the preset only decides the SIZE now.
+    /// The refresh a stream asks for - the Frame rate picker's number, and the
+    /// only source of it since "Match display" was removed. Applies under every
+    /// preset; the preset only decides the SIZE.
     var customFPS: Int = 60 {
         didSet {
             UserDefaults.standard.set(customFPS, forKey: "customFPS")
-            persistQualitySettings()
-        }
-    }
-    /// Frame rate follows the panel's refresh (the old preset behaviour) or
-    /// the picked `customFPS`. Loaded with a migration: absent → true unless
-    /// the user was already on Custom, whose typed Hz must survive.
-    var frameRateMatchesDisplay: Bool = true {
-        didSet {
-            UserDefaults.standard.set(frameRateMatchesDisplay, forKey: "frameRateMatchesDisplay")
             persistQualitySettings()
         }
     }
@@ -172,15 +161,6 @@ final class AppModel {
         didSet {
             UserDefaults.standard.set(customHDR, forKey: "customHDR")
             persistQualitySettings()
-        }
-    }
-
-    // Defaults
-    var muteMacWhileStreaming: Bool = false {
-        didSet {
-            UserDefaults.standard.set(muteMacWhileStreaming, forKey: "muteMacWhileStreaming")
-            // Mid-stream flips act immediately - doc on applyMutePreferenceMidStream().
-            applyMutePreferenceMidStream()
         }
     }
 
@@ -254,95 +234,47 @@ final class AppModel {
         didSet { UserDefaults.standard.set(showStreamStats, forKey: "showStreamStats") }
     }
 
-    /// Which screen corner the in-stream stats overlay anchors to.
-    /// Persisted to UserDefaults so the choice survives launches and is
-    /// applied from frame zero of the next stream. The default of
-    /// `.topLeft` matches the historical hardcoded position so existing
-    /// users don't see the panel jump on first launch with this field.
-    var streamStatsCorner: StatsOverlayCorner = .topLeft {
+    /// The STREAM's own output volume (0...1) and mute - not the Mac's: they
+    /// scale decoded game audio at our player node and nothing else. Both
+    /// persist. AppModel+StreamAudio.swift owns the rest of this feature.
+    var streamVolume: Double = AppModel.loadStreamVolume() {
         didSet {
-            UserDefaults.standard.set(streamStatsCorner.rawValue, forKey: "streamStatsCorner")
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(streamVolume, forKey: "streamVolume")
+            applyStreamVolume()
+        }
+    }
+    var streamMuted: Bool = UserDefaults.standard.bool(forKey: "streamMuted") {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(streamMuted, forKey: "streamMuted")
+            applyStreamVolume()
         }
     }
 
-    /// Curated row set for the stats overlay. Fresh installs default to
-    /// `.minimal` (render fps / latency / bitrate - the three-row
-    /// "is my stream OK" check). UserDefaults persistence happens in didSet.
-    var statsOverlayPreset: StatsOverlayPreset = .minimal {
-        didSet {
-            UserDefaults.standard.set(
-                statsOverlayPreset.rawValue, forKey: "statsOverlayPreset")
-        }
-    }
+    /// The overlay's shape, fixed rather than configured. It answers one
+    /// question - "is my stream OK right now" - and a corner picker, a row-set
+    /// picker and eight threshold steppers were a preferences panel bolted to
+    /// a three-line readout. The real diagnostic surface is the telemetry
+    /// exporter (TelemetryExporter.swift), which records far more than the
+    /// overlay can show and is meant to be read by a machine.
+    ///
+    /// Top-left is where the overlay has always sat; Minimal is render fps,
+    /// latency and bitrate; the thresholds are the shipped defaults.
+    let streamStatsCorner = StatsOverlayCorner.topLeft
+    let effectiveStatsRows = StatsOverlayDefaults.minimalRows
+    let statsThresholds = StatsThresholds.default
 
-    /// Per-row visibility set used only when `statsOverlayPreset == .custom`.
-    /// Persisted as the array of `StatsRow.Kind.rawValue` strings - Codable
-    /// + JSON would work but a `[String]` is what
-    /// `UserDefaults.set(_:forKey:)` natively handles, so we stay on the
-    /// stringly-typed path used by every other preference here.
-    var statsOverlayCustomRows: Set<StatsRow.Kind> = StatsOverlayDefaults.initialCustomRows {
-        didSet {
-            let raw = statsOverlayCustomRows.map(\.rawValue)
-            UserDefaults.standard.set(raw, forKey: "statsOverlayCustomRows")
-        }
-    }
-
-    /// The row set the overlay should actually render, resolved against
-    /// the current preset. Custom mode reaches into `statsOverlayCustomRows`;
-    /// the curated presets resolve to their static sets in
-    /// `StatsOverlayDefaults`. Computed property so the resolution is
-    /// always in sync with the preset - no caching, no invalidation.
-    var effectiveStatsRows: Set<StatsRow.Kind> {
-        switch statsOverlayPreset {
-        case .minimal:  return StatsOverlayDefaults.minimalRows
-        case .micro:    return StatsOverlayDefaults.microRows
-        case .extended: return StatsOverlayDefaults.extendedRows
-        case .custom:   return statsOverlayCustomRows
-        }
-    }
-
-    /// User-tunable warn / critical thresholds for the stats overlay's
-    /// row health colors. Persisted as JSON because the struct has 8
-    /// fields and a single Data blob beats 8 separate UserDefaults keys
-    /// for atomicity (a partial write under a crash leaves the prefs in
-    /// a coherent state - either old defaults or fully new values).
-    var statsThresholds: StatsThresholds = .default {
-        didSet {
-            if let data = try? JSONEncoder().encode(statsThresholds) {
-                UserDefaults.standard.set(data, forKey: "statsThresholds")
-            }
-        }
-    }
-
-    var quitHotkey: HotkeyChord = .defaultQuit {
-        didSet {
-            // Historical UserDefaults key - previously-stored chords still decode.
-            if let data = try? JSONEncoder().encode(quitHotkey) {
-                UserDefaults.standard.set(data, forKey: "quitHotkey")
-            }
-        }
-    }
-    var statsHotkey: HotkeyChord = .defaultStats {
-        didSet {
-            // The in-stream toggle of `showStreamStats` deliberately does
-            // NOT round-trip back to UserDefaults - the hotkey is a
-            // session-scope override, the defaults checkbox is the
-            // persistent surface.
-            if let data = try? JSONEncoder().encode(statsHotkey) {
-                UserDefaults.standard.set(data, forKey: "statsHotkey")
-            }
-        }
-    }
-
-    /// In-stream chord that pops the stream out into the system Picture in
-    /// Picture window. Read live via a provider like the quit/stats chords.
-    var pipHotkey: HotkeyChord = .defaultPiP {
-        didSet {
-            if let data = try? JSONEncoder().encode(pipHotkey) {
-                UserDefaults.standard.set(data, forKey: "pipHotkey")
-            }
-        }
-    }
+    /// The in-stream chords: leave (\u2303\u2325Q), stats overlay (\u2303\u2325S), Picture in
+    /// Picture (\u2303\u2325P). Fixed rather than rebindable - the four recorder rows in
+    /// Settings were their only writers, and a capsule apiece to re-spell
+    /// chords nobody re-spells was more interface than the feature earned.
+    /// The engine still reads them through providers (see
+    /// AppModel+Streaming.swift), so moving one is a one-line edit to the
+    /// `HotkeyChord.default*` constant it names.
+    let quitHotkey = HotkeyChord.defaultQuit
+    let statsHotkey = HotkeyChord.defaultStats
+    let pipHotkey = HotkeyChord.defaultPiP
     /// Pop the stream out to Picture in Picture automatically when the user
     /// switches away from the stream window (Cmd-Tab, Dock click, ...)
     /// instead of just hiding it. Read live at the switch-away edge.
@@ -386,14 +318,7 @@ final class AppModel {
     /// grabbed by being over the window and freed by a held Esc; this is how
     /// you re-grab without moving the mouse off and back, and how you release
     /// without reaching for Esc. Read live via a provider, like the quit/stats
-    /// chords. The persisted key keeps its original name.
-    var releasePointerHotkey: HotkeyChord = .defaultReleasePointer {
-        didSet {
-            if let data = try? JSONEncoder().encode(releasePointerHotkey) {
-                UserDefaults.standard.set(data, forKey: "releasePointerHotkey")
-            }
-        }
-    }
+    let releasePointerHotkey = HotkeyChord.defaultReleasePointer
     /// Controller-side quit chord - fires the same path as `quitHotkey`
     /// from the keyboard, but driven by a multi-button hold on the
     /// gamepad. Defaults to L3 + R3 (click both sticks): native on every pad (no
@@ -429,6 +354,12 @@ final class AppModel {
     /// stored property, SwiftUI views that read it rebuild as controllers come
     /// and go - used to show/hide the controller-permission UI without polling.
     var controllerConnected: Bool = !GCController.controllers().isEmpty
+
+    /// Bumped on a slow timer (`startControllerBatteryPolling`) so the menu-bar
+    /// charm's battery READING refreshes while the menu is closed - it comes
+    /// from GameController / raw HID, neither observable. Same sentinel trick
+    /// as `displayInfoRevision`.
+    var controllerBatteryTick: Int = 0
 
     /// Opt-in raw-HID DualSense reading (Options / Create / Mute buttons that
     /// macOS's GameController framework hides). Requires the Input Monitoring
@@ -613,7 +544,6 @@ final class AppModel {
         // Host → ServerInfo bridge the stream path uses (authoritative cert
         // pin included), rather than letting it reach into AppModel.
         artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
-        muteMacWhileStreaming = UserDefaults.standard.bool(forKey: "muteMacWhileStreaming")
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
@@ -622,10 +552,24 @@ final class AppModel {
         customWidth = min(max(Self.persistedPositiveInt("customWidth") ?? customWidth, 640), 7680)
         customHeight = min(max(Self.persistedPositiveInt("customHeight") ?? customHeight, 480), 4320)
         customFPS = min(max(Self.persistedPositiveInt("customFPS") ?? customFPS, 30), 240)
-        // Migration for installs from before the frame-rate picker applied to
-        // every preset: a Custom user keeps their typed Hz, everyone else keeps
-        // the panel's refresh - exactly what each was getting.
-        frameRateMatchesDisplay = Self.persistedBool("frameRateMatchesDisplay") ?? (qualityPreset != .custom)
+        // "Match display" is gone from the Frame rate picker (see
+        // FrameRateChoice), so an install that was on it has no row to show:
+        // convert it to the fixed rate it was ALREADY streaming at, the panel's
+        // own refresh. Gated on its own one-shot marker, like the HDR widening
+        // above - clearing the old key is not enough, because "key absent +
+        // panel preset" is also how a pre-flag install reads, so every later
+        // launch would re-migrate and stamp over whatever the user had since
+        // picked.
+        if !UserDefaults.standard.bool(forKey: "didDropMatchDisplayFrameRate") {
+            UserDefaults.standard.set(true, forKey: "didDropMatchDisplayFrameRate")
+            let wasMatchingDisplay = UserDefaults.standard.object(forKey: "frameRateMatchesDisplay") == nil
+                ? qualityPreset != .custom
+                : UserDefaults.standard.bool(forKey: "frameRateMatchesDisplay")
+            if wasMatchingDisplay {
+                customFPS = FrameRateChoice.migratedRate(displayHz: currentDisplayMaxHz)
+            }
+            UserDefaults.standard.removeObject(forKey: "frameRateMatchesDisplay")
+        }
         bitrateAuto = Self.persistedBool("bitrateAuto") ?? bitrateAuto
         manualBitrateMbps = StreamSizeBounds.clampBitrateMbps(
             Self.persistedPositiveInt("manualBitrateMbps") ?? manualBitrateMbps)
@@ -646,35 +590,11 @@ final class AppModel {
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
-        releasePointerHotkey = Self.persistedDecoded("releasePointerHotkey", HotkeyChord.self) ?? releasePointerHotkey
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
-        streamStatsCorner = Self.persistedRawValue("streamStatsCorner", StatsOverlayCorner.self) ?? streamStatsCorner
-        // Stats overlay preset. Key-absence means the user never touched
-        // the Settings picker (didSet is suppressed here and the picker is
-        // the only post-init writer), so absent keeps the .minimal default
-        // declared above - deliberately no migration shim. Existing
-        // installs decode their saved choice; an unrecognised raw value
-        // (downgrade from a build that added a preset) falls back to
-        // .minimal silently.
-        statsOverlayPreset = Self.persistedRawValue("statsOverlayPreset", StatsOverlayPreset.self) ?? statsOverlayPreset
-        // Custom-row set. Decode each persisted string back to a
-        // StatsRow.Kind; an unknown kind (downgrade from a future build)
-        // gets silently dropped rather than aborting the load. Empty /
-        // missing → keep the default initial set already set on the
-        // property.
-        statsOverlayCustomRows = Self.persistedCustomRows() ?? statsOverlayCustomRows
-        statsThresholds = Self.persistedDecoded("statsThresholds", StatsThresholds.self) ?? statsThresholds
-        quitHotkey = Self.persistedDecoded("quitHotkey", HotkeyChord.self) ?? quitHotkey
-        statsHotkey = Self.persistedDecoded("statsHotkey", HotkeyChord.self) ?? statsHotkey
-        pipHotkey = Self.persistedDecoded("pipHotkey", HotkeyChord.self) ?? pipHotkey
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 
     // MARK: Mute/restore Mac audio
 
-    /// Pre-mute capture of the system output level. Non-nil doubles as the
-    /// did-mute LATCH: the stream-end restore keys off THIS, never the live
-    /// toggle - see AppModel+Audio.swift for the full contract.
-    @ObservationIgnored var prePausedMacVolume: Float?
 }

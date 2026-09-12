@@ -50,7 +50,27 @@ extension StreamWindow {
         // Any resign-debounce teardown in flight is superseded by this
         // explicit hide (same token discipline as the becomeKey observer).
         resignGeneration &+= 1
-        hideStreamWindow(forPictureInPicture: true)
+        if isBackgrounded {
+            // Already hidden - a × close of an earlier PiP, or a switch-away
+            // without auto-PiP - so the window is ordered OUT, and
+            // hideStreamWindow would be a no-op: PiP would then start on an
+            // off-screen fullscreen layer and mirror it 1:1 as the bottom-left
+            // crop. Enter mirror-source mode directly (alpha 0, click-through,
+            // pre-shrunk) and put the window back on screen without any of
+            // the foreground re-engage - it stays invisible and non-key.
+            // Order in FIRST, on the window's normal chrome and frame - the
+            // same call the return path makes - and only then mutate it. An
+            // order-in standardizes the frame against the window's aspect /
+            // resize increments; doing that after source mode had touched them
+            // trapped inside AppKit on macOS 26.6 (window mode). Alpha 0 goes
+            // on before the order-in so nothing flashes.
+            window.alphaValue = 0
+            window.orderFront(nil)
+            enterPiPSourceMode()
+            log.info("Picture in Picture from the hidden window - source put back on screen at alpha 0")
+        } else {
+            hideStreamWindow(forPictureInPicture: true)
+        }
         startPictureInPictureNow()
         publishPresentSuppression()
     }
@@ -102,9 +122,19 @@ extension StreamWindow {
             // still screen-bound here (reengageForeground doesn't rebind it;
             // the view rebind lands in onDidStop below), which is harmless -
             // a screen link ticks whether the window is visible or not.
+            //
+            // NOT synchronously: we are inside AVKit's didStart callback, and
+            // a stopPictureInPicture() issued from there is silently dropped -
+            // and so is every later one (measured on macOS 26: three retries
+            // over 1.5s, all ignored). The PiP window then outlives the
+            // window's return, mirroring the restored fullscreen source as
+            // the 1:1 bottom-left crop. One run-loop turn later it is honoured.
             if !self.isBackgrounded {
                 self.log.info("Picture in Picture started after the window returned - stopping it")
-                self.pictureInPicture.stop()
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !self.didClose, !self.isBackgrounded else { return }
+                    self.pictureInPicture.stop()
+                }
                 return
             }
             self.enableBackgroundControllerEvents()
@@ -207,6 +237,13 @@ extension StreamWindow {
     // ordered-out window) but invisible (alpha 0, click-through), and size it
     // to the PiP window's content so 1:1 == the whole frame. Track PiP resizes
     // to stay matched.
+    //
+    // "Matched" is on the stream's aspect line, not the panel's integer size:
+    // the panel is whole pixels and almost never exactly 16:9, and a source
+    // layer sized to it would leave `.resizeAspect` a sub-pixel pillarbox that
+    // the 1:1 mirror paints as a white hairline down one edge (see
+    // `StreamWindowGeometry.pipSourceSize`). So the display VIEW takes the
+    // exact-aspect (fractional) size and the window rounds up around it.
 
     /// Enter mirror-source mode: hide the fullscreen content (alpha 0) but keep
     /// the window on screen and pass-through. Called from the PiP hide path
@@ -225,7 +262,12 @@ extension StreamWindow {
         // fullscreen cover has none of these set, so this is a no-op there.
         savedChromeBeforePiP = (window.contentAspectRatio, window.contentMinSize,
                                 window.frameAutosaveName)
-        window.contentAspectRatio = .zero
+        // Aspect ratio and resize increments share one slot in NSWindow: an
+        // aspect lock stores increments of (0,0), and `contentAspectRatio =
+        // .zero` LEAVES them at zero - an aspect-less window that AppKit's
+        // order-in frame standardization then divides by (a trap on macOS
+        // 26.6). Increments of (1,1) is the documented way to clear the lock.
+        window.contentResizeIncrements = NSSize(width: 1, height: 1)
         window.contentMinSize = .zero
         if !window.frameAutosaveName.isEmpty { window.setFrameAutosaveName("") }
         window.alphaValue = 0
@@ -233,18 +275,27 @@ extension StreamWindow {
         // Pre-shrink to a typical PiP size so the first ~200ms (before
         // matchSourceWindowToPiPPanel runs on didStart) don't mirror the
         // fullscreen source 1:1 - which would flash the bottom-left crop. The
-        // exact size is applied the moment the PiP window exists.
+        // exact size is applied the moment the PiP window exists. AVKit takes
+        // the PiP window's aspect from the layer it starts on, so this goes
+        // through the same aspect conformance as every later size.
         setSourceContent(origin: window.frame.origin, size: NSSize(width: 480, height: 270), display: false)
     }
 
-    /// Place the mirror source so its CONTENT rect (what the display layer
-    /// fills) sits at `origin` with `size`. For the borderless fullscreen cover
-    /// the content rect is the frame; for a titled window (window mode) the
-    /// frame is taller by the title bar, and sizing the frame instead would
-    /// leave the content - and so the 1:1 mirror - short by that much.
+    /// Place the mirror source so the display layer covers a `size` panel at
+    /// `origin`. The layer (via `displayView`) takes the smallest rect on the
+    /// stream's exact aspect that covers `size` - fractional on one axis - and
+    /// the window's content is that rounded up to whole points so the view
+    /// stays inside it. For the borderless fullscreen cover the content rect
+    /// is the frame; for a titled window (window mode) the frame is taller by
+    /// the title bar, and sizing the frame instead would leave the content -
+    /// and so the 1:1 mirror - short by that much.
     func setSourceContent(origin: NSPoint, size: NSSize, display: Bool) {
-        window.setFrame(window.frameRect(forContentRect: NSRect(origin: origin, size: size)),
+        let exact = StreamWindowGeometry.pipSourceSize(covering: size, aspect: streamPixelSize)
+        let content = NSSize(width: ceil(exact.width), height: ceil(exact.height))
+        window.setFrame(window.frameRect(forContentRect: NSRect(origin: origin, size: content)),
                         display: display)
+        // After the window's autoresizing pass, so it is the final word.
+        displayView.frame = NSRect(origin: .zero, size: exact)
     }
 
     /// Size the alpha-0 source window to the system PiP window's content, and
@@ -332,7 +383,25 @@ extension StreamWindow {
             window.setFrame(saved, display: false)
             savedFrameBeforePiP = nil
         }
+        // Autoresizing carries the source mode's fractional margin through the
+        // frame restore (a 0.4pt-short layer at the top of the screen); pin the
+        // view back to its superview.
+        if let superview = displayView.superview { displayView.frame = superview.bounds }
         window.alphaValue = 1
+    }
+
+    // MARK: - Debug probe
+
+    /// Everything the PiP state machine depends on, one line, for the
+    /// env-gated `--debug-pip-probe` timer in DebugAutomation.
+    public func debugPiPState() -> String {
+        let panelVisible = NSApp.windows.contains {
+            String(describing: type(of: $0)).contains("PIPPanel") && $0.isVisible
+        }
+        return "\(pictureInPicture.debugState) win.active=\(isPictureInPictureActive) pending=\(pictureInPicturePending) "
+            + "sourceMode=\(pipSourceMode) backgrounded=\(isBackgrounded) alpha=\(window.alphaValue) "
+            + "frame=\(Int(window.frame.width))x\(Int(window.frame.height)) visible=\(window.isVisible) key=\(window.isKeyWindow) "
+            + "appActive=\(NSApp.isActive) panelVisible=\(panelVisible)"
     }
 
     // MARK: - Present suppression

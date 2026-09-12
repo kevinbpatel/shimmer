@@ -221,7 +221,37 @@ extension AudioDecoder {
             Diag.error("audio engine start FAILED: \(error.localizedDescription)", "Stream.Audio")
             return false
         }
+        applyOutputVolumeLocked()
         return true
+    }
+
+    // MARK: - Stream volume
+
+    /// Set the stream's output volume, 0...1 (mute is simply 0). Safe from any
+    /// thread at any time - before the engine exists, mid-stream, or after
+    /// shutdown. Takes `stateLock`, which is what makes the node write safe
+    /// against a concurrent `engine.connect` in the config-change handler; the
+    /// wait is at most one 5ms packet, which no menu-bar click can feel.
+    public func setOutputVolume(_ volume: Float) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        outputVolume = min(max(volume, 0), 1)
+        applyOutputVolumeLocked()
+    }
+
+    /// Push the stored volume onto the main mixer. Called on every write AND
+    /// from every graph (re)build - see `outputVolume` for the why of both the
+    /// mixer and the repetition.
+    ///
+    /// CALLER HOLDS `stateLock`. It has to be spelled this way round:
+    /// `startEngineGraph` already runs with the lock held and `NSLock` is not
+    /// recursive, so a self-locking version would deadlock the decoder at init.
+    /// The `inputFormat` guard keeps a pre-session write from touching
+    /// `mainMixerNode` at all (reading it instantiates and connects the mixer);
+    /// the value is held and `startEngineGraph` applies it.
+    func applyOutputVolumeLocked() {
+        guard !isShutdown, inputFormat != nil else { return }
+        engine.mainMixerNode.outputVolume = outputVolume
     }
 
     private func layoutTag(forChannels channels: Int) -> AudioChannelLayoutTag {
@@ -473,6 +503,10 @@ extension AudioDecoder {
                 scheduleEngineRestartRetry()
             }
         }
+        // A reconnect can hand back a main mixer at its default 1.0 - so a
+        // muted stream would come back at full blast the moment the user's
+        // AirPods connect. Re-assert it here.
+        applyOutputVolumeLocked()
         // H4: re-sample the engine-running gauge here (the same hop), and RE-ARM
         // the pre-roll so the cushion rebuilds from the restart rather than the
         // player resuming on the under-run floor. A plain Bool + state-machine

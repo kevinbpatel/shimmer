@@ -134,6 +134,46 @@ extension FramePacer {
     /// change doubles as the battery-governor probe (AC vs battery on the
     /// internal panel): a governor that quantizes down from `preferred` may
     /// hold a higher callback rate when preferred reads the panel max.
+    ///
+    /// CONTENT MATCHING WAS TRIED HERE AND DOES NOT WORK - recorded in full so
+    /// nobody spends another afternoon on it.
+    ///
+    /// The idea: on a panel macOS will vary, set `preferred` to the STREAM rate
+    /// instead of the panel max, so the display drops to the content's cadence
+    /// (what NVIDIA sells as Cloud G-SYNC). The evidence looked conclusive - a
+    /// 60fps stream moved the realized-refresh window from 120.04Hz to 60.02Hz
+    /// and held it for hundreds of consecutive samples, in the borderless cover
+    /// AND in Picture in Picture.
+    ///
+    /// It was measuring the wrong thing. `refresh_*_hz` is the realized cadence
+    /// of OUR CADisplayLink, subdivided per-link from the panel's refresh - not
+    /// the panel's refresh. Two probes settle it, both run while a 60fps stream
+    /// was live in PiP on a Studio Display XDR advertising 46.9-120Hz with
+    /// `displayUpdateGranularity` 0:
+    ///
+    ///   * a second process asking for 120Hz measured 120.04Hz realized, and one
+    ///     asking for 24Hz measured 24.01Hz - concurrently, same display. Each
+    ///     link gets the rate IT asked for.
+    ///   * `NSScreen.lastDisplayUpdateTimestamp`, which requests nothing, showed
+    ///     the framebuffer updating every 8.330ms - p50 AND p95, 722 updates over
+    ///     6.01s - the whole time. 120.04Hz. The panel never moved.
+    ///
+    /// So `CAFrameRateRange` schedules YOUR callbacks; it does not drive the
+    /// physical refresh rate. No public macOS API does (tvOS gets
+    /// `AVDisplayManager.preferredDisplayCriteria`; AVKit imports that header
+    /// only under TARGET_OS_TV / TARGET_OS_VISION), which leaves
+    /// `CGDisplaySetDisplayMode` - a hard mode switch that flashes the display
+    /// and rearranges windows - as the only lever, and that is not one to pull
+    /// under a game stream.
+    ///
+    /// Asking for the stream rate also COSTS something with no upside: it halves
+    /// our callback rate, and the EXPERIMENT above is explicit that more
+    /// callbacks buy finer release alignment while the due gate caps releases at
+    /// one per stream interval regardless.
+    ///
+    /// Worth re-testing on a MacBook Pro's BUILT-IN ProMotion panel (24-120Hz),
+    /// the hardware NVIDIA's own documentation names; every run here was on the
+    /// external.
     static func preferredRange(
         forStreamIntervalSeconds intervalSeconds: Double, panelMaxHz: Double
     ) -> CAFrameRateRange {
@@ -147,4 +187,5 @@ extension FramePacer {
         return CAFrameRateRange(
             minimum: Float(floorHz), maximum: Float(maxHz), preferred: Float(maxHz))
     }
+
 }

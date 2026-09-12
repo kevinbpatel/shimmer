@@ -122,6 +122,25 @@ sudo tccutil reset All io.ugfugl.Glimmer
 service name `tccutil` accepts. `All` is the working form, and it also clears
 Input Monitoring (the DualSense raw-HID grant), so expect to re-approve that.
 
+### Input Monitoring on an adhoc build
+
+Without a Developer ID certificate - the default after a fresh clone -
+`make install` produces an **adhoc-signed** app, and TCC pins a privacy grant to
+the exact **cdhash**, which changes on every single build. The grant you gave
+the last build survives as a row in System Settings whose switch is **ON** while
+`IOHIDCheckAccess` correctly answers *denied*, because the row points at a
+binary that no longer exists.
+
+That state is unfalsifiable from inside the app - a stale grant and no grant
+produce the same answer - so the DualSense row can only keep asking you to turn
+it on. `make install` therefore runs `reset-stale-tcc`, which clears **this
+bundle id's** `ListenEvent` entry after every adhoc install so the list stays
+honest and the app re-registers with its current requirement. A Developer ID
+build is detected and skipped, and keeps its grant across rebuilds.
+
+If you ever see the switch on and the app still asking, that is the symptom:
+remove Shimmer from the list with **−**, then let the app add itself again.
+
 ## UI changes
 
 The launcher window is **sized to its content and not resizable**

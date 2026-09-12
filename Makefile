@@ -108,7 +108,7 @@ HELPER_SDK    := $(shell xcrun --sdk macosx --show-sdk-path)
 HELPER_TARGET := arm64-apple-macos26.0
 
 .PHONY: all release install reinstall uninstall clean app sign embed open \
-        helper-build embed-helper \
+        helper-build embed-helper reset-stale-tcc \
         profile profile-signposts setup-notary notarize dmg dmg-background dist preflight \
         codesign-setup codesign-teardown ensure-signing dev test \
         creds-init enable-telem disable-telem release-publish sparkle-keys \
@@ -257,6 +257,29 @@ install: release
 	if pgrep -x Shimmer >/dev/null 2>&1; then \
 		echo "  ⚠ Shimmer is RUNNING an older build - it will NOT load $$COMMIT until you"; \
 		echo "    fully QUIT (⌘Q) and relaunch. Run 'make reinstall' to do it automatically."; \
+	fi; \
+	$(MAKE) --no-print-directory reset-stale-tcc
+
+# TCC pins a privacy grant to the app's code requirement. With a Developer ID
+# signature that is a stable Team ID and a grant survives forever - but an ADHOC
+# build (no cert, the default for anyone who just cloned this repo) is pinned to
+# the exact cdhash, which changes on EVERY build. The old grant then survives as
+# a row in System Settings whose switch is ON while `IOHIDCheckAccess` correctly
+# answers denied, because the row points at a binary that no longer exists.
+#
+# That state is unfalsifiable from inside the app - a stale grant and no grant
+# are the same answer - so the app can only keep saying "turn it on", which is
+# exactly how this was found. Clearing OUR OWN entry on each adhoc install keeps
+# the list honest: the app re-registers with its current requirement the next
+# time it asks. Narrow on purpose - one service, one bundle id, never anyone
+# else's grants. A Developer ID build skips it entirely and keeps its grant.
+reset-stale-tcc:
+	@if [ -d "$(GLIMMER_APP_DST)" ] && \
+	   ! codesign -dvv "$(GLIMMER_APP_DST)" 2>&1 | grep -q "Authority=Developer ID"; then \
+		BID=$$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$(GLIMMER_APP_DST)/Contents/Info.plist" 2>/dev/null); \
+		if [ -n "$$BID" ] && tccutil reset ListenEvent "$$BID" >/dev/null 2>&1; then \
+			echo "  ✓ cleared this adhoc build's stale Input Monitoring grant (re-grant on next launch)"; \
+		fi; \
 	fi
 
 open: install

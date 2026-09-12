@@ -39,7 +39,7 @@
 //    1. A tiny HTTP server (Network.framework `NWListener`, port 9847) serving
 //       `GET /metrics` in Prometheus text exposition format.
 //    2. One NDJSON line per ~1s appended to
-//       ~/Library/Logs/Glimmer/telemetry-<ISO8601>.ndjson (dir created).
+//       ~/Library/Logs/Shimmer/telemetry-<ISO8601>.ndjson (dir created).
 //  Both render the SAME `TelemetrySnapshot`, captured once per second on a
 //  dedicated serial queue - the StatsCollector read reuses its existing lock
 //  (no second hot-path lock is added).
@@ -160,6 +160,13 @@ final class TelemetryExporter: @unchecked Sendable {
     /// capture path (see TelemetryExporter+Capture.swift); read on the same queue
     /// by the HTTP handler.
     var latestPrometheus: String = "# no sample yet\n"
+
+    /// The same tick rendered as one JSON object, served to `GET /snapshot`.
+    /// Prometheus text is what a scraper wants; a single JSON object is what a
+    /// person - or an assistant reading over the wire - wants, and it is the
+    /// identical line the NDJSON log appends, so the live view and the recording
+    /// can never disagree. Same queue confinement as `latestPrometheus`.
+    var latestNDJSON: String = "{}"
 
     /// Previous-tick monotonic totals + wall-clock, so the capture derives the
     /// per-second rates (pkts/s, input events/s, flush/s) from deltas. Confined to
@@ -336,7 +343,7 @@ final class TelemetryExporter: @unchecked Sendable {
 
     // MARK: - C2 Logs-directory sweep
 
-    /// Total-byte budget for `~/Library/Logs/Glimmer` after a sweep. Once the
+    /// Total-byte budget for `~/Library/Logs/Shimmer` after a sweep. Once the
     /// dir exceeds this, the OLDEST Glimmer log files are pruned (newest kept)
     /// until it fits. 300MB holds many sessions of NDJSON + the size-capped
     /// per-frame trace tails while bounding unbounded growth.
@@ -447,7 +454,8 @@ final class TelemetryExporter: @unchecked Sendable {
         }
     }
 
-    /// Minimal HTTP/1.1 handling: read the request, serve `/metrics` (or 404),
+    /// Minimal HTTP/1.1 handling: read the request, serve `/metrics` (Prometheus)
+    /// or `/snapshot` (one JSON object, the newest tick) - 404 otherwise - then
     /// close. We do not keep connections alive - a scraper reconnects per scrape,
     /// which is the Prometheus default and keeps this server trivially simple.
     /// Every accepted connection is TRACKED + deadline-swept (silent/half-open
@@ -474,8 +482,15 @@ final class TelemetryExporter: @unchecked Sendable {
                     + "Content-Length: \(body.utf8.count)\r\n"
                     + "Connection: close\r\n\r\n"
                     + body
+            } else if request.hasPrefix("GET /snapshot") {
+                let body = self.latestNDJSON + "\n"
+                response = "HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: application/json; charset=utf-8\r\n"
+                    + "Content-Length: \(body.utf8.count)\r\n"
+                    + "Connection: close\r\n\r\n"
+                    + body
             } else {
-                let body = "404 not found - try GET /metrics\n"
+                let body = "404 not found - try GET /metrics or GET /snapshot\n"
                 response = "HTTP/1.1 404 Not Found\r\n"
                     + "Content-Type: text/plain; charset=utf-8\r\n"
                     + "Content-Length: \(body.utf8.count)\r\n"

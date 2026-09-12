@@ -160,6 +160,14 @@ extension AppModel {
                 self.maybeOfferRawHID()
             }
         })
+        // The menu-bar charm shows the pad's battery percentage, which nothing
+        // in GameController publishes a change notification for. A 60s tick is
+        // the whole refresh mechanism: a controller battery moves by ~1% an
+        // hour, so anything faster is a read nobody can see the result of, and
+        // the timer costs one array walk a minute. The tick is only ever
+        // observed by the charm, so a closed menu and an absent pad both cost
+        // exactly this timer and nothing downstream.
+        startControllerBatteryPolling()
         notificationTokens.append(nc.addObserver(
             forName: .GCControllerDidDisconnect, object: nil, queue: .main
         ) { [weak self] _ in
@@ -252,6 +260,26 @@ extension AppModel {
     /// screen under the panel-native presets (StreamDisplayMode.effective).
     var effectiveDisplayMode: StreamDisplayMode {
         StreamDisplayMode.effective(chosen: streamDisplayMode, preset: qualityPreset)
+    }
+
+    /// Arm the menu-bar charm's battery refresh. Called once, from
+    /// `startLiveRefresh()` - which is itself a once-per-launch call (it
+    /// registers notification observers, so a second call would double them),
+    /// which is why there's no stored handle and no re-arm guard here: the main
+    /// run loop owns the timer for the life of the process, and the closure
+    /// holds `self` weakly.
+    ///
+    /// 60s because a controller battery moves about a percent an hour. The
+    /// tick's only reader is `menuBarControllerBattery`, so when no pad is
+    /// connected this costs an integer increment a minute and nothing else.
+    private func startControllerBatteryPolling() {
+        // Built unscheduled and added in `.common` (not `Timer.scheduledTimer`,
+        // which registers it in `.default` only) so the charm keeps refreshing
+        // while a menu is tracking or a window is being dragged.
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.controllerBatteryTick &+= 1 }
+        }
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     func shutdown() {

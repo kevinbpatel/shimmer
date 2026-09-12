@@ -11,17 +11,19 @@
 import Foundation
 import ServiceManagement
 
-/// Owns the SMAppService login-item lifecycle, shared by the General toggles
+/// Owns the SMAppService login-item lifecycle, shared by the General toggle
 /// and the launch-time reconcile. Registration is keyed by the user's saved
-/// intent (UserDefaults `launchAtLogin` / `launchMinimized`):
-///   * minimized → register the HELPER (relaunches the main app suppressed)
-///   * not minimized → register the main app (normal open at login)
+/// intent (UserDefaults `launchAtLogin`) and always goes through the HELPER,
+/// which relaunches the main app with the suppressed-window sentinel - the
+/// app starts in the menu bar at login exactly as it does on any launch.
 enum LoginItemManager {
     static let helperBundleID = "com.kevinbpatel.shimmer.LoginHelper"
 
-    /// The service that backs the user's current intent.
-    private static func activeService(minimized: Bool) -> SMAppService {
-        minimized ? SMAppService.loginItem(identifier: helperBundleID) : SMAppService.mainApp
+    /// The service that backs launch-at-login: always the helper, which
+    /// relaunches the app with the suppressed-window sentinel. (An older
+    /// build could register the main app directly; `apply` unregisters it.)
+    private static var activeService: SMAppService {
+        SMAppService.loginItem(identifier: helperBundleID)
     }
 
     /// Apply the desired state, returning the resulting status so the caller can
@@ -29,8 +31,8 @@ enum LoginItemManager {
     /// swallowed them into os_log, which is why a broken registration looked
     /// fine until the next reboot never happened).
     @discardableResult
-    static func apply(launchAtLogin: Bool, minimized: Bool) -> SMAppService.Status {
-        let helper = SMAppService.loginItem(identifier: helperBundleID)
+    static func apply(launchAtLogin: Bool) -> SMAppService.Status {
+        let helper = activeService
         let mainApp = SMAppService.mainApp
         do {
             guard launchAtLogin else {
@@ -39,17 +41,10 @@ enum LoginItemManager {
                 Diag.info("login item disabled", "LoginItem")
                 return .notRegistered
             }
-            if minimized {
-                if mainApp.status == .enabled { try mainApp.unregister() }
-                try helper.register()
-                Diag.notice("login item registered (helper) → \(statusLabel(helper.status))", "LoginItem")
-                return helper.status
-            } else {
-                if helper.status == .enabled { try helper.unregister() }
-                try mainApp.register()
-                Diag.notice("login item registered (main app) → \(statusLabel(mainApp.status))", "LoginItem")
-                return mainApp.status
-            }
+            if mainApp.status == .enabled { try mainApp.unregister() }
+            try helper.register()
+            Diag.notice("login item registered (helper) → \(statusLabel(helper.status))", "LoginItem")
+            return helper.status
         } catch {
             Diag.error("login item registration FAILED: \(error.localizedDescription)", "LoginItem")
             return .notFound
@@ -62,16 +57,15 @@ enum LoginItemManager {
     /// re-registers when the actual status has drifted from enabled.
     static func reconcile() {
         guard UserDefaults.standard.bool(forKey: "launchAtLogin") else { return }
-        let minimized = UserDefaults.standard.bool(forKey: "launchMinimized")
-        let status = activeService(minimized: minimized).status
+        let status = activeService.status
         switch status {
         case .enabled:
-            Diag.info("login item enabled (\(minimized ? "helper" : "main app"))", "LoginItem")
+            Diag.info("login item enabled (helper)", "LoginItem")
         case .requiresApproval:
             Diag.notice("login item needs approval in System Settings ▸ General ▸ Login Items", "LoginItem")
         default:
             Diag.notice("login item drifted (\(statusLabel(status))) - re-registering", "LoginItem")
-            apply(launchAtLogin: true, minimized: minimized)
+            apply(launchAtLogin: true)
         }
     }
 

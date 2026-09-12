@@ -62,8 +62,6 @@ private struct SettingsTabPage: View {
             SettingsRule()
             VideoPane()
             SettingsRule()
-            AudioPane()
-            SettingsRule()
             ShortcutsPane()
             SettingsRule()
             AppPane()

@@ -265,7 +265,11 @@ extension StreamWindow {
                 firstResponder=\(firstResponder, privacy: .public)
                 """
             )
-            if !win.isKeyWindow {
+            // Not while deliberately backgrounded: a launch straight into
+            // Picture in Picture has hidden the window on purpose by now, and
+            // the NSApp.activate() below would read as "the user came back"
+            // to the model's Cmd-Tab-resume logic - tearing the PiP down.
+            if !win.isKeyWindow, !self.isBackgrounded {
                 self.log.error("Window not key 1.5s after show(); retrying activate + makeKeyAndOrderFront + first-responder install")
                 NSApp.activate()
                 win.makeKeyAndOrderFront(nil)
