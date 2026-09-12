@@ -51,6 +51,7 @@ extension StreamSession {
         onBackgroundedChanged: (@MainActor (Bool) -> Void)? = nil,
         pipHotkeyProvider: @escaping @MainActor () -> HotkeyChord = { .defaultPiP },
         autoPictureInPictureProvider: @escaping @MainActor () -> Bool = { false },
+        keepAwakeProvider: @escaping @MainActor () -> KeepAwakePolicy = { .always },
         onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil,
         pipPointerProvider: @escaping @MainActor () -> Bool = { true }
     ) async throws -> AsyncStream<StreamEvent> {
@@ -66,11 +67,15 @@ extension StreamSession {
         self.reconnectConfig = config
         self.reconnectAppID = appID
 
-        // Keep the Mac (and its display) awake AND opt OUT of App Nap for the
-        // whole session. Begun here so a slow handshake can't let the machine
-        // sleep before the first frame; released in `stop()`. Idempotent against
-        // the `!isStreaming` guard above, so we never stack assertions.
+        // Opt OUT of App Nap for the whole session, and keep the Mac (and its
+        // display) awake per the user's policy. Begun here so a slow handshake
+        // can't let the machine sleep before the first frame; released in
+        // `stop()`. Idempotent against the `!isStreaming` guard above, so we
+        // never stack assertions.
         beginPowerAssertion()
+        self.keepAwakeProvider = keepAwakeProvider
+        windowBackgrounded = false
+        await reconcileKeepAwake()
         // Release the assertion on any UNSUCCESSFUL exit from start() - an early
         // throw (pairing failure, host unreachable) happens before stop() is
         // reachable, so without this the Mac would stay awake forever after a
@@ -82,6 +87,10 @@ extension StreamSession {
             if !startHandedOff, let assertion = self.powerAssertion {
                 ProcessInfo.processInfo.endActivity(assertion)
                 self.powerAssertion = nil
+                if let sleep = self.sleepAssertion {
+                    ProcessInfo.processInfo.endActivity(sleep)
+                    self.sleepAssertion = nil
+                }
             }
         }
 
@@ -157,6 +166,7 @@ extension StreamSession {
             onBackgroundedChanged: onBackgroundedChanged,
             pipHotkeyProvider: pipHotkeyProvider,
             autoPictureInPictureProvider: autoPictureInPictureProvider,
+            keepAwakeProvider: keepAwakeProvider,
             onPictureInPictureChanged: onPictureInPictureChanged,
             pipPointerProvider: pipPointerProvider))
 
@@ -237,12 +247,41 @@ extension StreamSession {
     /// two `*SleepDisabled` flags keep the screen lit for controller-only
     /// sessions (see the field doc on `powerAssertion` for the full rationale).
     private func beginPowerAssertion() {
+        // `.userInitiated` on its own INCLUDES idleSystemSleepDisabled (Apple
+        // defines it that way), which would keep the Mac up under "Never";
+        // the AllowingIdleSystemSleep variant is the same App Nap opt-out
+        // without the sleep flag. Sleep is `sleepAssertion`'s job alone.
         powerAssertion = ProcessInfo.processInfo.beginActivity(
-            options: [
-                .userInitiated, .latencyCritical,
-                .idleDisplaySleepDisabled, .idleSystemSleepDisabled
-            ],
+            options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
             reason: "Shimmer is streaming")
+    }
+
+    /// Hold or release the keep-awake half to match the user's policy and the
+    /// window's state. Idempotent, and called on every edge that can change
+    /// the answer: session start, the window hiding/showing (a Cmd-Tab-away,
+    /// Picture in Picture, the return), and a Settings change mid-stream.
+    /// `stop()` ends whatever is held.
+    /// The window's shown/hidden edge, from StreamWindow via the setup wiring.
+    func setWindowBackgrounded(_ backgrounded: Bool) async {
+        guard backgrounded != windowBackgrounded else { return }
+        windowBackgrounded = backgrounded
+        await reconcileKeepAwake()
+    }
+
+    func reconcileKeepAwake() async {
+        let provider = keepAwakeProvider
+        let policy = await MainActor.run { provider() }
+        let hold = policy.holdsSleepAssertion(windowShowing: !windowBackgrounded)
+        if hold, sleepAssertion == nil {
+            sleepAssertion = ProcessInfo.processInfo.beginActivity(
+                options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled],
+                reason: "Shimmer is streaming - keeping the Mac awake")
+            log.info("Keep-awake held (policy=\(policy.rawValue, privacy: .public), windowShowing=\(!self.windowBackgrounded, privacy: .public))")
+        } else if !hold, let held = sleepAssertion {
+            ProcessInfo.processInfo.endActivity(held)
+            sleepAssertion = nil
+            log.info("Keep-awake released (policy=\(policy.rawValue, privacy: .public), windowShowing=\(!self.windowBackgrounded, privacy: .public))")
+        }
     }
 
     /// Step 1 of start(): fetch /serverinfo, stamp its launch sub-leg, log the

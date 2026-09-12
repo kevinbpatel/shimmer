@@ -167,6 +167,22 @@ struct StreamPane: View {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
             }
 
+            // A pad doesn't reset the Mac's idle timer, so a stream being
+            // played would dim and sleep without this - but a stream parked
+            // in a corner while you read is no reason to hold the display
+            // open. "Only while showing" follows the stream window: up →
+            // awake; hidden or in Picture in Picture → the Mac's own rules.
+            SettingsField("Keep the Mac awake") {
+                Picker("", selection: $model.keepAwakePolicy) {
+                    ForEach(KeepAwakePolicy.allCases) { policy in
+                        Text(policy.displayName).tag(policy)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .settingsControl()
+            }
+
         }
     }
 }

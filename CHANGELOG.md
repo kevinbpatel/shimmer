@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Whether a stream keeps the Mac awake is a choice now - Settings › "Keep the
+Mac awake": Always (what every build so far did), Only while showing, or
+Never. "Only while showing" follows the stream window: up and being played,
+the display stays on; hidden or parked in Picture in Picture, the Mac's own
+sleep rules apply. A change lands on the running stream. The App Nap opt-out
+that keeps a backgrounded stream at full priority is separate and unchanged
+(and no longer quietly forbids system sleep on its own).
+
 Shimmer starts in the menu bar. Every launch - Dock, Spotlight, login - comes
 up with no window and no Dock icon; "Open Shimmer" in the menu bar brings the
 window up when you want it. The one exception is a first run with no PC

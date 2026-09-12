@@ -192,11 +192,16 @@ extension StreamSession {
         bridge?.eventContinuation = nil
         bridge = nil
 
-        // 6. Release the keep-awake assertion taken in start(). Balanced 1:1
-        //    with beginActivity; nil-guarded so a second stop() can't double-end.
+        // 6. Release the App Nap opt-out taken in start(), and the keep-awake
+        //    if it is held. Balanced 1:1 with beginActivity; nil-guarded so a
+        //    second stop() can't double-end.
         if let assertion = powerAssertion {
             ProcessInfo.processInfo.endActivity(assertion)
             powerAssertion = nil
+        }
+        if let sleep = sleepAssertion {
+            ProcessInfo.processInfo.endActivity(sleep)
+            sleepAssertion = nil
         }
 
         input = nil

@@ -208,6 +208,7 @@ extension AppModel {
                     },
                     pipHotkeyProvider: { [weak self] in self?.pipHotkey ?? .defaultPiP },
                     autoPictureInPictureProvider: { [weak self] in self?.autoPictureInPicture ?? false },
+                    keepAwakeProvider: { [weak self] in self?.keepAwakePolicy ?? .always },
                     onPictureInPictureChanged: { [weak self] active in
                         self?.nativeStreamPictureInPicture = active
                     },

@@ -307,6 +307,15 @@ final class AppModel {
     /// `effectiveDisplayMode`); snapshotted into the StreamConfig at session
     /// start, like `streamCoversNotch`. A windowed stream caps the refresh at
     /// the display, so a flip recomputes the "Your next stream" summary.
+    /// Whether a live stream keeps the Mac and its display awake - always,
+    /// only while the stream window is up, or never. Pushed to the running
+    /// session so a change lands mid-stream.
+    var keepAwakePolicy: KeepAwakePolicy = KeepAwakePolicy.defaultPolicy {
+        didSet {
+            UserDefaults.standard.set(keepAwakePolicy.rawValue, forKey: KeepAwakePolicy.defaultsKey)
+            Task { [weak self] in await self?.nativeSession?.reconcileKeepAwake() }
+        }
+    }
     var streamDisplayMode: StreamDisplayMode = StreamDisplayMode.defaultMode {
         didSet {
             UserDefaults.standard.set(streamDisplayMode.rawValue, forKey: StreamDisplayMode.defaultsKey)
@@ -590,6 +599,8 @@ final class AppModel {
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
+        keepAwakePolicy = KeepAwakePolicy.persisted(
+            rawValue: UserDefaults.standard.string(forKey: KeepAwakePolicy.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord

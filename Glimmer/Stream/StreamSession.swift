@@ -390,16 +390,30 @@ public actor StreamSession {
     //     unfocused, occluded, or on a second display. That throttling slows the
     //     main-run-loop pacing tick (FramePacer.handleTick) so frames back up
     //     faster than they present → backlog overflow → spurious IDR/RFI on a
-    //     stream that's perfectly healthy. We add `.userInitiated` to opt the
-    //     process out of App Nap and `.latencyCritical` to mark this as the
-    //     real-time video work it is, so background / second-monitor streaming
-    //     stays at full decode/pace/present priority.
+    //     stream that's perfectly healthy. We add `.userInitiatedAllowingIdle-
+    //     SystemSleep` to opt the process out of App Nap (the plain
+    //     `.userInitiated` would also forbid system sleep, which is the
+    //     policy's call, not this token's) and `.latencyCritical` to mark this
+    //     as the real-time video work it is, so background / second-monitor
+    //     streaming stays at full decode/pace/present priority.
     //
     // `ProcessInfo.beginActivity` is Apple's recommended high-level API (it wraps
     // IOPMAssertion); the returned token must be handed back to `endActivity`
     // exactly once, which `stop()` does. Held as `any` because the concrete type
     // is opaque.
+    //
+    // The two jobs are two tokens now: `powerAssertion` is the App Nap opt-out
+    // and is held for the whole session unconditionally; `sleepAssertion` is
+    // the keep-awake, held per the user's `KeepAwakePolicy` and the window's
+    // shown/hidden state (`reconcileKeepAwake`).
     var powerAssertion: (any NSObjectProtocol)?
+    var sleepAssertion: (any NSObjectProtocol)?
+    /// The user's keep-awake choice, read live so a Settings change lands on
+    /// the running session.
+    var keepAwakeProvider: @MainActor () -> KeepAwakePolicy = { .always }
+    /// Mirrors StreamWindow.isBackgrounded: false while the stream window is
+    /// up, true once it is hidden or parked in Picture in Picture.
+    var windowBackgrounded = false
 
     // State. `isStreaming` is written from StreamSession+Lifecycle (teardown) and
     // StreamSession+Callbacks, so it is module-internal rather than private(set);
