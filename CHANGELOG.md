@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Settings is two pages now, the way a game's are: Stream (resolution, frame
+rate, bitrate, codec, HDR, how the stream is shown, Picture in Picture, audio,
+keep-awake, what happens when it ends, the stats overlay) and General
+(shortcuts, the controller, login, the Wi-Fi helper, troubleshooting). Neither
+scrolls. The tabs read PCs · Stream · General · About.
+
 Settings › Audio › "Prefer low latency over smoothness" caps the adaptive
 audio cushion at 60 ms on every link. The cushion exists to ride out Wi-Fi
 hiccups, and after one it can sit at 100 ms or more for minutes; with this on

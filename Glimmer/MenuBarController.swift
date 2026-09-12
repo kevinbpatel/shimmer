@@ -230,7 +230,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func showSettingsPage() {
         AppDelegate.openMainWindow?()
-        model.settingsTab = .settings
+        model.settingsTab = .stream
         NSApp.activate()
     }
 

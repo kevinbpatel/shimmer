@@ -21,14 +21,15 @@ import SwiftUI
 /// The pages the settings view can show. Raw values are persisted as the
 /// remembered tab, so leave them alone when renaming a title.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case computers, settings, about
+    case computers, stream, general, about
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .computers: return "PCs"
-        case .settings: return "Settings"
+        case .stream: return "Stream"
+        case .general: return "General"
         case .about: return "About"
         }
     }
@@ -39,7 +40,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         // stand for a PC in the host rows and the menu bar, so the tab gets
         // a glyph of its own. "PCs" is the app's own word for them.
         case .computers: return "pc"
-        case .settings: return "slider.horizontal.3"
+        // The signal, for everything about the stream itself; the sliders
+        // stay with the app-level page.
+        case .stream: return "dot.radiowaves.left.and.right"
+        case .general: return "slider.horizontal.3"
         case .about: return "info.circle"
         }
     }
@@ -52,7 +56,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var windowHeight: CGFloat {
         switch self {
         case .computers: return 528 - 32
-        case .settings: return 588 - 32
+        // Stream carries eleven fields (two of them two rows tall); General
+        // seven. Sized so neither page scrolls.
+        case .stream: return 660 - 32
+        case .general: return 588 - 32
         case .about: return 540 - 32
         }
     }
