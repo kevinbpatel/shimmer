@@ -16,6 +16,10 @@
 //                                    window (the Dock / menu-bar path).
 //    GLIMMER_DEBUG_PIP_PROBE=1       log the whole PiP state machine once a
 //                                    second (`PIPPROBE` lines).
+//    GLIMMER_DEBUG_PIP_CLOSE_AFTER=<sec>  <sec> after the PiP entry, stop PiP
+//                                    with the window left hidden (the × path).
+//    GLIMMER_DEBUG_PIP_AGAIN_AFTER=<sec>  <sec> after the PiP entry, enter PiP
+//                                    again (the menu-bar path from hidden).
 //
 //  The same knobs are accepted as command-line arguments
 //  (`--debug-stream=<substr> --debug-pip-after=<sec> ...`) because a GUI app
@@ -119,6 +123,8 @@ extension AppModel {
         let pipAfter = Self.debugKnob("pip-after").flatMap(Double.init)
         let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init)
         let returnAfter = Self.debugKnob("return-after").flatMap(Double.init)
+        let closeAfter = Self.debugKnob("pip-close-after").flatMap(Double.init)
+        let againAfter = Self.debugKnob("pip-again-after").flatMap(Double.init)
         log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .public) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
 
         // Give discovery/host-load a beat, then select + stream.
@@ -136,13 +142,16 @@ extension AppModel {
             self.log.notice("DEBUG automation: selecting \(host.name, privacy: .public) (\(host.apps.count) apps) and streaming default")
             self.selectHost(host)
             self.streamDefaultApp()
-            self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, quitAfter: quitAfter)
+            self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, closeAfter: closeAfter,
+                                    againAfter: againAfter, quitAfter: quitAfter)
         }
     }
 
     /// Poll for the stream to go live, then schedule the PiP + return + quit
     /// actions relative to that moment (connect time is variable).
-    private func armDebugPiPAndQuit(pipAfter: Double?, returnAfter: Double?, quitAfter: Double?) {
+    private func armDebugPiPAndQuit(
+        pipAfter: Double?, returnAfter: Double?, closeAfter: Double?, againAfter: Double?, quitAfter: Double?
+    ) {
         var fired = false
         let start = Date()
         let poll = Timer(timeInterval: 0.25, repeats: true) { [weak self] t in
@@ -165,6 +174,21 @@ extension AppModel {
                     DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + returnAfter) { [weak self] in
                         self?.log.notice("DEBUG automation: returning from Picture in Picture")
                         self?.resumeStreamWindow()
+                    }
+                }
+                if let closeAfter {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + closeAfter) { [weak self] in
+                        self?.log.notice("DEBUG automation: closing Picture in Picture (window stays hidden)")
+                        Task { @MainActor [weak self] in
+                            guard let win = await self?.nativeSession?.window else { return }
+                            win.pictureInPicture.stop()
+                        }
+                    }
+                }
+                if let againAfter {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + pipAfter + againAfter) { [weak self] in
+                        self?.log.notice("DEBUG automation: entering Picture in Picture again")
+                        self?.enterPictureInPicture()
                     }
                 }
             }

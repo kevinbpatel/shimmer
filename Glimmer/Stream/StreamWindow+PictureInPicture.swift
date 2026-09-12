@@ -50,7 +50,20 @@ extension StreamWindow {
         // Any resign-debounce teardown in flight is superseded by this
         // explicit hide (same token discipline as the becomeKey observer).
         resignGeneration &+= 1
-        hideStreamWindow(forPictureInPicture: true)
+        if isBackgrounded {
+            // Already hidden - a × close of an earlier PiP, or a switch-away
+            // without auto-PiP - so the window is ordered OUT, and
+            // hideStreamWindow would be a no-op: PiP would then start on an
+            // off-screen fullscreen layer and mirror it 1:1 as the bottom-left
+            // crop. Enter mirror-source mode directly (alpha 0, click-through,
+            // pre-shrunk) and put the window back on screen without any of
+            // the foreground re-engage - it stays invisible and non-key.
+            enterPiPSourceMode()
+            window.orderFront(nil)
+            log.info("Picture in Picture from the hidden window - source put back on screen at alpha 0")
+        } else {
+            hideStreamWindow(forPictureInPicture: true)
+        }
         startPictureInPictureNow()
         publishPresentSuppression()
     }

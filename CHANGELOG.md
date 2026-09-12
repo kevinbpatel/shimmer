@@ -20,6 +20,15 @@ HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
 longer requested at all on a display with no headroom, since it cannot help
 there and this is exactly how it hurts.
 
+Fix: Picture in Picture chosen from the menu bar while the stream window was
+already hidden - after closing an earlier PiP with ×, or a switch-away
+without auto-PiP - opened a PiP window showing only the bottom-left corner of
+the picture. The entry path relied on the hide step to set up the mirror
+source, and the hide step does nothing for a window that is already hidden,
+so PiP started on the off-screen full-size layer. A hidden window is now put
+back on screen invisibly (alpha 0, click-through, pre-shrunk) before PiP
+starts, exactly as a visible one is.
+
 Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
 instant Picture in Picture was still opening left the PiP window up for good,
 showing the bottom-left corner of the picture. The stop we issued from inside
