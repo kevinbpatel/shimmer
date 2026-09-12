@@ -146,14 +146,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.sectionHeader(title: "Stream Audio"))
         menu.addItem(action(model.streamMuted ? "Unmute" : "Mute", #selector(toggleMute),
                             image: Self.symbol(model.streamMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")))
+        // The submenu is the ladder alone: 100% down to 10%, the current rung
+        // checked. (Louder / Quieter rows sat above it for a while; two verbs
+        // over a list of the same values read as clutter.)
         let volume = NSMenu()
-        let louder = action("Louder", #selector(stepLouder), image: Self.symbol("speaker.plus"))
-        louder.isEnabled = model.streamVolume < 1
-        volume.addItem(louder)
-        let quieter = action("Quieter", #selector(stepQuieter), image: Self.symbol("speaker.minus"))
-        quieter.isEnabled = model.streamVolume > AppModel.minStreamVolume
-        volume.addItem(quieter)
-        volume.addItem(.separator())
         for level in AppModel.streamVolumeLevels {
             let rung = action("\(Int((level * 100).rounded()))%", #selector(setVolume))
             rung.representedObject = level
@@ -161,7 +157,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             volume.addItem(rung)
         }
         let volumeRow = NSMenuItem(title: "Volume: \(model.streamVolumePercent)%", action: nil, keyEquivalent: "")
-        volumeRow.image = Self.symbol(model.streamMuted ? "speaker.slash" : "speaker.wave.2")
         volumeRow.submenu = volume
         menu.addItem(volumeRow)
 
@@ -190,18 +185,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // the window is the exception, not the point. Both open the same
         // tabbed window: Settings on its tab, Open Shimmer on the last one.
         menu.addItem(.separator())
-        // Plain text, like Tailscale's. macOS 26 decorates a "Settings…"
-        // item with a gear on its own when the item has no image (the 27 SDK
-        // adds `preferredImageVisibility` for this); an explicit empty image
-        // is the one lever the 26 SDK offers, and it draws nothing.
-        // Both carry it, so the pair sits on the same text column as the rows
-        // above and the Quit row below rather than one hugging the left edge.
-        let settings = action("Settings…", #selector(openSettings), key: ",")
-        settings.image = NSImage(size: .zero)
-        menu.addItem(settings)
-        let open = action("Open Shimmer", #selector(openWindow))
-        open.image = NSImage(size: .zero)
-        menu.addItem(open)
+        // Plain text at the left edge, like Tailscale's. macOS 26 decorates a
+        // menu item with a gear of its own when its ACTION is named
+        // `openSettings` (measured: the title, the ⌘, and the exact standard
+        // title are all irrelevant - only that selector name draws one; the
+        // 27 SDK adds `preferredImageVisibility`). So the selector is not
+        // called that, and neither row carries an image - an empty image
+        // would suppress the gear but reserve the image column and indent.
+        menu.addItem(action("Settings…", #selector(showSettingsPage), key: ","))
+        menu.addItem(action("Open Shimmer", #selector(openWindow)))
         menu.addItem(.separator())
         // No "Check for Updates…" here, by request. Sparkle still checks on
         // its own at launch, and the command stays in the app menu.
@@ -225,15 +217,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleMute() { model.toggleStreamMute() }
-    @objc private func stepLouder() { model.stepStreamVolume(by: AppModel.streamVolumeStep) }
-    @objc private func stepQuieter() { model.stepStreamVolume(by: -AppModel.streamVolumeStep) }
 
     @objc private func setVolume(_ sender: NSMenuItem) {
         guard let level = sender.representedObject as? Double else { return }
         model.setStreamVolume(level)
     }
 
-    @objc private func openSettings() {
+    @objc private func showSettingsPage() {
         AppDelegate.openMainWindow?()
         model.settingsTab = .settings
         NSApp.activate()
