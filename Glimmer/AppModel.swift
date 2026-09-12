@@ -228,8 +228,6 @@ final class AppModel {
         let app: LibraryApp
         let host: Host
         let occupantApp: String
-        /// The launch was the menu bar's "in Picture in Picture" alternate.
-        var inPictureInPicture: Bool = false
     }
 
     var showStreamStats: Bool = false {
@@ -283,21 +281,10 @@ final class AppModel {
     var autoPictureInPicture: Bool = true {
         didSet { UserDefaults.standard.set(autoPictureInPicture, forKey: "autoPictureInPicture") }
     }
-    /// The menu bar's launch row starts the stream popped out in Picture in
-    /// Picture instead of showing the stream window; ⌥ on the row gives the
-    /// other one either way. Off by default - a launch is expected to show
-    /// the picture; this is for the "game in the corner" habit.
-    var menuBarStreamsPopOut: Bool = false {
-        didSet { UserDefaults.standard.set(menuBarStreamsPopOut, forKey: "menuBarStreamsPopOut") }
-    }
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
     var nativeStreamPictureInPicture: Bool = false
-    /// The app that was frontmost when a "Stream … in Picture in Picture"
-    /// launch was requested; activation is handed back to it the moment PiP
-    /// is up (`stream(app:on:inPictureInPicture:)`). Nil for every other launch.
-    var pictureInPictureLaunchReturnApp: NSRunningApplication?
 
     /// Pop the running stream out into Picture in Picture (menu bar entry
     /// point). No-op when nothing is streaming.
@@ -605,7 +592,6 @@ final class AppModel {
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
-        menuBarStreamsPopOut = Self.persistedBool("menuBarStreamsPopOut") ?? menuBarStreamsPopOut
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord
     }
 

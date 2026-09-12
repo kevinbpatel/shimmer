@@ -39,9 +39,9 @@ extension AppModel {
         return host.apps.first?.name ?? "Desktop"
     }
 
-    func streamDefaultApp(inPictureInPicture: Bool = false) {
+    func streamDefaultApp() {
         guard let host = selectedHost, let app = heroTargetApp else { return }
-        requestStream(app: app, on: host, inPictureInPicture: inPictureInPicture)
+        requestStream(app: app, on: host)
     }
 
     /// The menu bar's row for a LIVE session: what is streaming, and - when
@@ -51,12 +51,6 @@ extension AppModel {
     var liveStreamRowTitle: String {
         let name = heroTargetApp?.name ?? defaultAppName
         return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
-    }
-
-    /// The hero row's Picture in Picture form: same app, straight into the
-    /// corner window. "Pop out" is the verb the PiP settings already use.
-    var heroPictureInPictureLabel: String {
-        "Pop out \(heroTargetApp?.name ?? defaultAppName)"
     }
 
     // MARK: - Hero verb (state-aware primary action)

@@ -36,17 +36,16 @@ extension AppModel {
     /// same app: resuming takes it from them. nvhttp gives us no way to tell
     /// that apart from our own orphaned session - both are just `currentgame`
     /// - and every Moonlight client resumes on a name match too.
-    func requestStream(app: LibraryApp, on host: Host, inPictureInPicture: Bool = false) {
+    func requestStream(app: LibraryApp, on host: Host) {
         if !isStreaming,
            let live = hostLiveStatus, live.hostID == host.id,
            Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
            case .streamingApp(let occupant) = live.state,
            Self.isTakeover(occupant: occupant, launching: app.name) {
-            pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant,
-                                              inPictureInPicture: inPictureInPicture)
+            pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant)
             return
         }
-        stream(app: app, on: host, inPictureInPicture: inPictureInPicture)
+        stream(app: app, on: host)
     }
 
     /// Does starting `appName` cost the host's current session? Only when some
@@ -61,10 +60,10 @@ extension AppModel {
     func confirmPendingTakeover() {
         guard let pending = pendingTakeover else { return }
         pendingTakeover = nil
-        stream(app: pending.app, on: pending.host, inPictureInPicture: pending.inPictureInPicture)
+        stream(app: pending.app, on: pending.host)
     }
 
-    func stream(app: LibraryApp, on host: Host, inPictureInPicture: Bool = false) {
+    func stream(app: LibraryApp, on host: Host) {
         // RE-ENTRANCY GUARD. The native backend runs ONE session at a time
         // (StreamBridgeContext.current is a single process-global slot), and
         // a second entry here would corrupt it wholesale: a second
@@ -126,16 +125,6 @@ extension AppModel {
 
         var cfg = nativeStreamConfig(for: host)
         cfg.windowTitle = Self.streamWindowTitle(hostName: host.displayName, appName: app.name)
-        cfg.startsInPictureInPicture = inPictureInPicture
-        // Whoever was frontmost gets activation back once PiP is up (see the
-        // onPictureInPictureChanged handler below); show() will activate us
-        // in the meantime, as every launch does. Only ever another app.
-        if inPictureInPicture, let front = NSWorkspace.shared.frontmostApplication,
-           front.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            pictureInPictureLaunchReturnApp = front
-        } else {
-            pictureInPictureLaunchReturnApp = nil
-        }
         // One line naming how the stream will be shown and what was asked for,
         // so a "why is it 1080p in a window" report answers itself from the log.
         Diag.info("Show the stream: \(cfg.displayMode.displayName.lowercased()) - requesting "
@@ -221,15 +210,6 @@ extension AppModel {
                     autoPictureInPictureProvider: { [weak self] in self?.autoPictureInPicture ?? false },
                     onPictureInPictureChanged: { [weak self] active in
                         self?.nativeStreamPictureInPicture = active
-                        // A launch straight into PiP: hand activation back to
-                        // the app the user was in, so the picture lands in the
-                        // corner of THEIR screen and not on top of an activated
-                        // Shimmer with no window to show.
-                        if active, let back = self?.pictureInPictureLaunchReturnApp {
-                            self?.pictureInPictureLaunchReturnApp = nil
-                            NSApp.yieldActivation(to: back)
-                            back.activate()
-                        }
                     },
                     pipPointerProvider: { true }
                 )

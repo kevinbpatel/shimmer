@@ -31,23 +31,6 @@ extension StreamWindow {
     /// re-animate an already-visible window.
     public func fadeInOnFirstFrame() {
         guard awaitingFirstFrameFadeIn else { return }
-        // Launched "in Picture in Picture": the window is on screen at alpha 0
-        // right now - exactly the mirror-source state PiP entry wants - so
-        // pop out from here and never fade in. The hide path inside
-        // enterPictureInPicture() signals backgrounded, restores the cursor
-        // and leaves the presentation options alone (they were deferred to
-        // this fade, so nothing was ever applied). If PiP can't start
-        // (another app owns it) fall through to the normal fade-in.
-        if startsInPictureInPicture {
-            startsInPictureInPicture = false
-            if pictureInPicture.isPossible {
-                awaitingFirstFrameFadeIn = false
-                log.info("First frame - starting in Picture in Picture instead of showing the window")
-                enterPictureInPicture()
-                return
-            }
-            log.notice("Asked to start in Picture in Picture but it isn't possible right now - showing the window")
-        }
         awaitingFirstFrameFadeIn = false
         // The window is at level `mainMenuWindow + 1` (notch path) or in a
         // fullscreen Space (safe-area path), so as alphaValue ramps 0 → 1

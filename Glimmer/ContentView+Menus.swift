@@ -95,16 +95,20 @@ struct MenuBarContent: View {
                         // action resolved the last-played target, so the item
                         // could say "Stream Desktop" and launch Steam.
                         //
-                        // Two forms of the launch: show the stream, or pop it
-                        // straight out into Picture in Picture (the window never
-                        // shows, the picture lands in the corner, the app you
-                        // were in stays in front). Settings picks which one the
-                        // row is; holding ⌥ gives the other.
-                        let popOutFirst = model.menuBarStreamsPopOut
-                        launchRow(popOut: popOutFirst)
-                            .modifierKeyAlternate(.option) {
-                                launchRow(popOut: !popOutFirst)
+                        Button {
+                            model.streamDefaultApp()
+                            activate()
+                        } label: {
+                            Label {
+                                Text(model.heroActionLabel)
+                            } icon: {
+                                if let app = model.heroTargetApp {
+                                    AppGlyphIcon(app: app, size: 12)
+                                } else {
+                                    Image(systemName: "play.fill")
+                                }
                             }
+                        }
                     }
 
                     if model.hosts.count > 1 {
@@ -224,30 +228,6 @@ struct MenuBarContent: View {
                 Label("Quit Shimmer", systemImage: "power")
             }
             .keyboardShortcut("q")
-        }
-    }
-
-    /// The menu bar's launch row in one of its two forms. `activate()` only
-    /// for the shown-window form: a pop-out launch hands activation back to
-    /// the app the user was in once PiP is up, so bringing Shimmer forward
-    /// here would only be undone.
-    @ViewBuilder
-    private func launchRow(popOut: Bool) -> some View {
-        Button {
-            model.streamDefaultApp(inPictureInPicture: popOut)
-            if !popOut { activate() }
-        } label: {
-            Label {
-                Text(popOut ? model.heroPictureInPictureLabel : model.heroActionLabel)
-            } icon: {
-                if popOut {
-                    Image(systemName: "pip.enter")
-                } else if let app = model.heroTargetApp {
-                    AppGlyphIcon(app: app, size: 12)
-                } else {
-                    Image(systemName: "play.fill")
-                }
-            }
         }
     }
 

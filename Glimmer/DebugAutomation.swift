@@ -14,8 +14,6 @@
 //    GLIMMER_DEBUG_QUIT_AFTER=<sec>  quit the app <sec> after streaming starts.
 //    GLIMMER_DEBUG_RETURN_AFTER=<sec> <sec> after the PiP entry, resume the
 //                                    window (the Dock / menu-bar path).
-//    GLIMMER_DEBUG_STREAM_IN_PIP=1   launch via the menu bar's ⌥-alternate:
-//                                    straight into Picture in Picture.
 //    GLIMMER_DEBUG_PIP_PROBE=1       log the whole PiP state machine once a
 //                                    second (`PIPPROBE` lines).
 //    GLIMMER_DEBUG_PIP_CLOSE_AFTER=<sec>  <sec> after the PiP entry, stop PiP
@@ -155,7 +153,7 @@ extension AppModel {
             }
             self.log.notice("DEBUG automation: selecting \(host.name, privacy: .public) (\(host.apps.count) apps) and streaming default")
             self.selectHost(host)
-            self.streamDefaultApp(inPictureInPicture: Self.debugKnob("stream-in-pip") != nil)
+            self.streamDefaultApp()
             self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, closeAfter: closeAfter,
                                     againAfter: againAfter, quitAfter: quitAfter)
         }
