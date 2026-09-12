@@ -61,10 +61,13 @@ struct MenuBarContent: View {
                 model.settingsTab = .computers
                 activate()
             } label: {
-                // Tailscale's sizes, measured against it at 1x: the title is the
-                // menu's own 13pt in semibold, the status the 11pt small size.
+                // Tailscale's type, as measured off it at 2x for the desk app's
+                // header (ergodriven-tempo-mac, MenuHeaderRow): the title is the
+                // menu's own 13pt in REGULAR weight - the size and the colour do
+                // the work, not a heavier face - and the status the 11pt small
+                // size in secondary, with no extra spacing between the two.
                 Text(model.selectedHost?.displayName ?? "Shimmer")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13))
                 + Text("\n" + (model.selectedHost == nil ? "No PC paired" : model.selectedHostStatusLine))
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
