@@ -61,10 +61,12 @@ struct MenuBarContent: View {
                 model.settingsTab = .computers
                 activate()
             } label: {
+                // Tailscale's sizes, measured against it at 1x: the title is the
+                // menu's own 13pt in semibold, the status the 11pt small size.
                 Text(model.selectedHost?.displayName ?? "Shimmer")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 + Text("\n" + (model.selectedHost == nil ? "No PC paired" : model.selectedHostStatusLine))
-                    .font(.system(size: 13))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
 
