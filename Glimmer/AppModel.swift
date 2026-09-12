@@ -228,6 +228,8 @@ final class AppModel {
         let app: LibraryApp
         let host: Host
         let occupantApp: String
+        /// The launch was the menu bar's "in Picture in Picture" alternate.
+        var inPictureInPicture: Bool = false
     }
 
     var showStreamStats: Bool = false {
@@ -285,6 +287,10 @@ final class AppModel {
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
     var nativeStreamPictureInPicture: Bool = false
+    /// The app that was frontmost when a "Stream … in Picture in Picture"
+    /// launch was requested; activation is handed back to it the moment PiP
+    /// is up (`stream(app:on:inPictureInPicture:)`). Nil for every other launch.
+    var pictureInPictureLaunchReturnApp: NSRunningApplication?
 
     /// Pop the running stream out into Picture in Picture (menu bar entry
     /// point). No-op when nothing is streaming.

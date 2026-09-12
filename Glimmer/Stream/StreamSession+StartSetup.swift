@@ -93,6 +93,7 @@ extension StreamSession {
         win.coversNotch = config.coversNotch
         win.windowTitle = config.windowTitle
         win.streamPixelSize = CGSize(width: config.width, height: config.height)
+        win.startsInPictureInPicture = config.startsInPictureInPicture
         let dec = VideoDecoder()
         dec.attach(to: win.displayLayer)
         // The window's backgrounded/foregrounded signal drives the launcher's

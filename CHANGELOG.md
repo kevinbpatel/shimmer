@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+Hold ⌥ on the menu bar's "Stream <app>" and it reads "Stream <app> in Picture
+in Picture": the stream opens straight into the corner window on its first
+frame, the fullscreen window never shows, and the app you were in stays in
+front.
+
+The menu bar's live-session rows are one row now, named and iconed off the
+app: "Streaming <app>" while the window is up, "Back to <app>" whenever it is
+hidden or in Picture in Picture. It used to be a greyed-out "Stream <app>"
+plus a separate "Back to stream".
+
 Settings is labels and controls only - every explanatory paragraph under a
 control is gone, and so is the Appearance picker: the app follows the system
 the way a Mac app should.

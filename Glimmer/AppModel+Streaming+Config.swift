@@ -39,9 +39,23 @@ extension AppModel {
         return host.apps.first?.name ?? "Desktop"
     }
 
-    func streamDefaultApp() {
+    func streamDefaultApp(inPictureInPicture: Bool = false) {
         guard let host = selectedHost, let app = heroTargetApp else { return }
-        requestStream(app: app, on: host)
+        requestStream(app: app, on: host, inPictureInPicture: inPictureInPicture)
+    }
+
+    /// The menu bar's row for a LIVE session: what is streaming, and - when
+    /// the window is hidden or in Picture in Picture - the way back to it.
+    /// One row instead of a greyed-out "Stream X" plus a separate "Back to
+    /// stream", so the verb and the app name sit together.
+    var liveStreamRowTitle: String {
+        let name = heroTargetApp?.name ?? defaultAppName
+        return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
+    }
+
+    /// The ⌥-alternate of the hero row: same app, straight into PiP.
+    var heroPictureInPictureLabel: String {
+        "\(heroActionLabel) in Picture in Picture"
     }
 
     // MARK: - Hero verb (state-aware primary action)

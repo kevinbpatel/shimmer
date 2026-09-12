@@ -60,44 +60,67 @@ struct MenuBarContent: View {
                 // "Connected to" only when actually streaming this host - the
                 // selected host is not necessarily the connected one.
                 Section(model.isStreaming ? "Connected to \(host.displayName)" : host.displayName) {
-                    // Named AND iconed off the app this actually launches - the
-                    // one you streamed here last, not a fixed "Desktop". The
-                    // label used to read `defaultAppName` while the action
-                    // resolved the last-played target, so the item could say
-                    // "Stream Desktop" and launch Steam.
-                    Button {
-                        model.streamDefaultApp()
-                        activate()
-                    } label: {
-                        Label {
-                            Text(model.heroActionLabel)
-                        } icon: {
-                            if let app = model.heroTargetApp {
-                                AppGlyphIcon(app: app, size: 12)
-                            } else {
-                                Image(systemName: "play.fill")
-                            }
-                        }
-                    }
-                    .disabled(model.isStreaming)
-
                     if model.isStreaming {
-                        // Stream-window control while a session is live. "Back to
-                        // stream" whenever the fullscreen window is hidden (plain
-                        // Cmd-Tab-away OR showing in PiP); "Picture in Picture"
-                        // whenever it isn't already popped out.
-                        if model.nativeStreamBackgrounded {
-                            Button {
-                                model.resumeStreamWindow()
-                            } label: {
-                                Label("Back to stream", systemImage: "arrow.up.left.and.arrow.down.right")
+                        // ONE row for the live session, named and iconed off the
+                        // app: "Streaming X" (status, disabled) while the window
+                        // is up, "Back to X" (the way back) whenever it is hidden
+                        // - a plain Cmd-Tab-away OR showing in PiP. It used to be
+                        // a greyed-out "Stream X" plus a separate "Back to stream".
+                        Button {
+                            model.resumeStreamWindow()
+                        } label: {
+                            Label {
+                                Text(model.liveStreamRowTitle)
+                            } icon: {
+                                if let app = model.heroTargetApp {
+                                    AppGlyphIcon(app: app, size: 12)
+                                } else {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                }
                             }
                         }
+                        .disabled(!model.nativeStreamBackgrounded)
+                        // "Picture in Picture" whenever it isn't already popped out.
                         if !model.nativeStreamPictureInPicture {
                             Button {
                                 model.enterPictureInPicture()
                             } label: {
                                 Label("Picture in Picture", systemImage: "pip.enter")
+                            }
+                        }
+                    } else {
+                        // Named AND iconed off the app this actually launches -
+                        // the one you streamed here last, not a fixed "Desktop".
+                        // The label used to read `defaultAppName` while the
+                        // action resolved the last-played target, so the item
+                        // could say "Stream Desktop" and launch Steam.
+                        //
+                        // Hold ⌥ and the row launches straight into Picture in
+                        // Picture: the window never shows, the picture lands in
+                        // the corner and the app you were in stays in front.
+                        Button {
+                            model.streamDefaultApp()
+                            activate()
+                        } label: {
+                            Label {
+                                Text(model.heroActionLabel)
+                            } icon: {
+                                if let app = model.heroTargetApp {
+                                    AppGlyphIcon(app: app, size: 12)
+                                } else {
+                                    Image(systemName: "play.fill")
+                                }
+                            }
+                        }
+                        .modifierKeyAlternate(.option) {
+                            Button {
+                                model.streamDefaultApp(inPictureInPicture: true)
+                            } label: {
+                                Label {
+                                    Text(model.heroPictureInPictureLabel)
+                                } icon: {
+                                    Image(systemName: "pip.enter")
+                                }
                             }
                         }
                     }

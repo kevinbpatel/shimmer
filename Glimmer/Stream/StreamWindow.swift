@@ -290,6 +290,10 @@ public final class StreamWindow {
     /// decoder and produces a new "first" frame - the window is already
     /// visible, no fade needed).
     var awaitingFirstFrameFadeIn = false
+    /// The first decoded frame pops Picture in Picture instead of fading the
+    /// window in (`StreamConfig.startsInPictureInPicture`). One-shot: cleared
+    /// on the first frame whether or not PiP could start.
+    public var startsInPictureInPicture = false
 
     /// The window level `show()` parked the streaming window at (in the
     /// `coversNotch == true` borderless-covering path, `mainMenuWindow + 1`).

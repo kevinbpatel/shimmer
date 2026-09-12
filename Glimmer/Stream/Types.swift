@@ -97,6 +97,11 @@ public struct StreamConfig: Sendable {
     /// Title for the Window-mode window ("Tower - Desktop"). Unused in full
     /// screen (a borderless cover has no title bar).
     public var windowTitle: String = ""
+    /// Pop the stream straight into the system Picture in Picture window on
+    /// the first decoded frame instead of showing the stream window - the
+    /// menu bar's ⌥-alternate launch. Snapshotted at session start like
+    /// `displayMode`; ignored if PiP isn't possible at that moment.
+    public var startsInPictureInPicture: Bool = false
 
     public init(width: Int, height: Int, fps: Int, bitrateKbps: Int) {
         self.width = width
