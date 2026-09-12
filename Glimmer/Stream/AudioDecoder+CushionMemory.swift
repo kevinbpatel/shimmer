@@ -419,7 +419,7 @@ extension AudioDecoder {
             // late/never resolve can't freeze at the tunnel-300 default (only
             // ever equals-or-lowers the cap; pure field write under the lock).
             let resolvedLink = EnvSignalController.shared.streamLink
-            effectiveCushionMaxMs = Self.cushionMaxMs(forLink: resolvedLink)
+            effectiveCushionMaxMs = cushionCapMsLocked(forLink: resolvedLink)
             effectiveOverrunCeilingMs = effectiveCushionMaxMs + Self.bufferOverrunCeilingSlackMs
             cushionLinkClass = resolvedLink
             cushionLinkResolved = true
@@ -451,7 +451,7 @@ extension AudioDecoder {
         cushionLinkClass = link
         // Refresh the LINK-AWARE caps now the route is real (the init seed defaulted
         // to the deeper tunnel cap; a resolved-wired link tightens it back to 150ms).
-        effectiveCushionMaxMs = Self.cushionMaxMs(forLink: link)
+        effectiveCushionMaxMs = cushionCapMsLocked(forLink: link)
         effectiveOverrunCeilingMs = effectiveCushionMaxMs + Self.bufferOverrunCeilingSlackMs
         var coldSeedApplied = false
         if let stored {

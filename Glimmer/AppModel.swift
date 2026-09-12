@@ -314,6 +314,16 @@ final class AppModel {
     var quitAppWhenStreamEnds: Bool = false {
         didSet { UserDefaults.standard.set(quitAppWhenStreamEnds, forKey: "quitAppWhenStreamEnds") }
     }
+    /// Settings › "Prefer low audio latency": cap the adaptive audio cushion at
+    /// 60 ms on every link. Off by default - the deeper caps are what keep
+    /// Wi-Fi and tunnels from crackling. Pushed to the running stream.
+    var preferLowAudioLatency: Bool = false {
+        didSet {
+            UserDefaults.standard.set(preferLowAudioLatency, forKey: "preferLowAudioLatency")
+            nativeSession?.audioDecoder.setCushionCeiling(
+                preferLowAudioLatency ? AudioDecoder.lowLatencyCushionCeilingMs : nil)
+        }
+    }
     /// Whether a live stream keeps the Mac and its display awake - always,
     /// only while the stream window is up, or never. Pushed to the running
     /// session so a change lands mid-stream.
@@ -607,6 +617,7 @@ final class AppModel {
         streamDisplayMode = StreamDisplayMode.persisted(
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
         quitAppWhenStreamEnds = Self.persistedBool("quitAppWhenStreamEnds") ?? quitAppWhenStreamEnds
+        preferLowAudioLatency = Self.persistedBool("preferLowAudioLatency") ?? preferLowAudioLatency
         keepAwakePolicy = KeepAwakePolicy.persisted(
             rawValue: UserDefaults.standard.string(forKey: KeepAwakePolicy.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats

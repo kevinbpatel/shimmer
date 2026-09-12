@@ -306,6 +306,41 @@ public final class AudioDecoder: @unchecked Sendable {
     /// ceiling key off this so a worse link can deepen past the wired cap instead of
     /// cascading under-runs. Defaults deep (like the seed). Guarded by `audioMeterLock`.
     var effectiveCushionMaxMs: Double = AudioDecoder.playoutCushionMaxMsTunnel
+    /// Settings › "Prefer low audio latency": a ceiling (ms) the link-aware cap
+    /// may never exceed. nil = off. The cushion then tops out here on every
+    /// link, so a Wi-Fi hiccup costs an audible blip instead of minutes of
+    /// audio trailing the picture. Guarded by `audioMeterLock`.
+    var userCushionCeilingMs: Double?
+    /// The ceiling the setting applies: twice the base pre-roll, so the ratchet
+    /// still has two steps of room, and well under the 150-300ms link caps.
+    static let lowLatencyCushionCeilingMs: Double = 60
+
+    /// The runtime cap: the link's own, lowered - never raised - by the user's
+    /// ceiling. Pure, so the truth table is unit-tested.
+    static func cushionCapMs(forLink link: String, userCeilingMs: Double?) -> Double {
+        let linkCap = cushionMaxMs(forLink: link)
+        guard let ceiling = userCeilingMs else { return linkCap }
+        return min(linkCap, ceiling)
+    }
+
+    /// `cushionCapMs(forLink:userCeilingMs:)` for this decoder's ceiling.
+    /// Callers hold `audioMeterLock`.
+    func cushionCapMsLocked(forLink link: String) -> Double {
+        Self.cushionCapMs(forLink: link, userCeilingMs: userCushionCeilingMs)
+    }
+
+    /// Apply or clear the user's ceiling, live: re-derives the cap for the
+    /// current link and pulls the target and learned floor under it so the
+    /// change lands on the running stream.
+    public func setCushionCeiling(_ ceilingMs: Double?) {
+        audioMeterLock.lock()
+        defer { audioMeterLock.unlock() }
+        userCushionCeilingMs = ceilingMs
+        effectiveCushionMaxMs = cushionCapMsLocked(forLink: cushionLinkClass)
+        effectiveOverrunCeilingMs = effectiveCushionMaxMs + Self.bufferOverrunCeilingSlackMs
+        playoutTargetMs = min(playoutTargetMs, effectiveCushionMaxMs)
+        learnedFloorMs = min(learnedFloorMs, effectiveCushionMaxMs)
+    }
     /// LINK-AWARE runtime over-run ceiling (ms) = cap + `bufferOverrunCeilingSlackMs`,
     /// so the backstop tracks the active cap. Guarded by `audioMeterLock`.
     var effectiveOverrunCeilingMs: Double =

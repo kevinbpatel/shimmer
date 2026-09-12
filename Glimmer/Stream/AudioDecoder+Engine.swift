@@ -171,7 +171,7 @@ extension AudioDecoder {
         cushionLinkResolveDeadlineNanos = seedNowNanos &+ Self.cushionLinkResolveWindowNanos
         // LINK-AWARE caps: seed from the resolved link; `resolveCushionLink`
         // refreshes them if the route lands after bring-up.
-        effectiveCushionMaxMs = Self.cushionMaxMs(forLink: seed.link)
+        effectiveCushionMaxMs = cushionCapMsLocked(forLink: seed.link)
         effectiveOverrunCeilingMs = effectiveCushionMaxMs + Self.bufferOverrunCeilingSlackMs
         quietWindowMinFillMs = .infinity
         rePrimeCount = 0

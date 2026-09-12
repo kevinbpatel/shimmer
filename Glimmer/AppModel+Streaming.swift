@@ -156,6 +156,9 @@ extension AppModel {
             let session = StreamSession(backend: NativeBackend())
             await MainActor.run {
                 self.nativeSession = session
+                // The audio cushion ceiling, before the engine seeds the cushion.
+                session.audioDecoder.setCushionCeiling(
+                    self.preferLowAudioLatency ? AudioDecoder.lowLatencyCushionCeilingMs : nil)
                 // Seed the persisted stream volume / mute BEFORE the first
                 // packet decodes, so a stream the user left muted comes up
                 // muted instead of blasting for the half-second it takes them

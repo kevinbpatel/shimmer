@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Settings › Audio › "Prefer low latency over smoothness" caps the adaptive
+audio cushion at 60 ms on every link. The cushion exists to ride out Wi-Fi
+hiccups, and after one it can sit at 100 ms or more for minutes; with this on
+it takes the occasional blip instead. Off by default, and it lands on the
+running stream.
+
 Fix: choosing "HEVC" for a PC could still get an AV1 stream, and a stream with
 HDR off could still come as 10-bit. Both narrowings removed only the Main
 profiles and left the 4:4:4 ones advertised; they now remove whole families by

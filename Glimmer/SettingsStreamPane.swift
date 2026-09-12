@@ -174,6 +174,13 @@ struct StreamPane: View {
                 Toggle("Quit the game on the PC", isOn: $model.quitAppWhenStreamEnds)
             }
 
+            // The cushion that rides out Wi-Fi hiccups can sit at 100+ ms for
+            // minutes after one; this caps it at 60 ms on every link and takes
+            // the occasional blip instead.
+            SettingsField("Audio") {
+                Toggle("Prefer low latency over smoothness", isOn: $model.preferLowAudioLatency)
+            }
+
             // A pad doesn't reset the Mac's idle timer, so a stream being
             // played would dim and sleep without this - but a stream parked
             // in a corner while you read is no reason to hold the display
