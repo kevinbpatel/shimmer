@@ -149,8 +149,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // user can't undo before starting the next one.
         menu.addItem(.separator())
         menu.addItem(.sectionHeader(title: "Stream Audio"))
-        menu.addItem(action(model.streamMuted ? "Unmute" : "Mute", #selector(toggleMute),
-                            image: Self.symbol(model.streamMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")))
+        // No glyphs in this group: macOS 26 lays the image column out per
+        // section, so one icon here would indent both rows.
+        menu.addItem(action(model.streamMuted ? "Unmute" : "Mute", #selector(toggleMute)))
         // The submenu is the ladder alone: 100% down to 10%, the current rung
         // checked. (Louder / Quieter rows sat above it for a while; two verbs
         // over a list of the same values read as clutter.)
