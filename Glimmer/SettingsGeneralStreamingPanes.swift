@@ -54,11 +54,13 @@ struct AppPane: View {
                     .onChange(of: launchAtLogin) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: on, minimized: launchMinimized)
                     }
-                Toggle("Stay hidden at login (menu bar only)", isOn: $launchMinimized)
+                // Every launch, not just login: the window stays closed and
+                // the app lives in the menu bar ("Open Shimmer" brings it up).
+                // The same key picks the suppressed-relaunch helper for login.
+                Toggle("Start in the menu bar only", isOn: $launchMinimized)
                     .onChange(of: launchMinimized) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: launchAtLogin, minimized: on)
                     }
-                    .disabled(!launchAtLogin)
                 if loginItemNeedsApproval {
                     HStack(spacing: 8) {
                         Label("macOS needs you to approve Shimmer in Login Items.",

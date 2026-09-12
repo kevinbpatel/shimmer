@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+"Stay hidden at login (menu bar only)" is now "Start in the menu bar only",
+and it means every launch, not just login: the window stays closed and the
+Dock icon stays away until you pick "Open Shimmer" from the menu bar. It no
+longer needs "Be ready at login" to be on.
+
 Hold ⌥ on the menu bar's "Stream <app>" and it reads "Stream <app> in Picture
 in Picture": the stream opens straight into the corner window on its first
 frame, the fullscreen window never shows, and the app you were in stays in

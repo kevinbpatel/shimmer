@@ -27,6 +27,13 @@ struct OpenWindowCapture: View {
 /// we control both sides of the launch.
 private let launchedAtLogin = ProcessInfo.processInfo.arguments.contains("--launched-at-login")
 
+/// Start as a menu bar item with no window: every login launch (the helper
+/// relaunches us suppressed), and every launch at all when the user asked for
+/// it in Settings ("Start in the menu bar only" - the `launchMinimized` key
+/// the login helper registration also reads). A lazy global, so the read
+/// lands after ContainerMigration has moved the defaults into place.
+private let startsInMenuBar = launchedAtLogin || UserDefaults.standard.bool(forKey: "launchMinimized")
+
 @main
 struct GlimmerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -141,9 +148,9 @@ struct GlimmerApp: App {
         // first Dock click do nothing pre-restoration-fix).
         .restorationBehavior(.disabled)
         // Suppress the auto-shown window when we were launched by the
-        // login helper. User-initiated launches don't carry the sentinel
-        // arg, so the Window scene spawns normally.
-        .defaultLaunchBehavior(launchedAtLogin ? .suppressed : .automatic)
+        // login helper, or whenever the user wants the app to live in the
+        // menu bar ("Open Shimmer" brings the window up on demand).
+        .defaultLaunchBehavior(startsInMenuBar ? .suppressed : .automatic)
         .commands {
             CommandGroup(replacing: .newItem) {}
             #if canImport(Sparkle)
@@ -268,13 +275,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await mgr.bootstrap() }
         }
 
-        // Login-launched? Start as `.accessory` so the Dock icon never
-        // appears alongside an invisible window. didBecomeKey on a
-        // subsequent user-triggered window open flips us back to
-        // `.regular` via the recheck observer.
-        if launchedAtLogin {
+        // Starting in the menu bar (login launch, or the Settings choice)?
+        // Begin as `.accessory` so the Dock icon never appears alongside an
+        // invisible window. didBecomeKey on a subsequent user-triggered
+        // window open flips us back to `.regular` via the recheck observer.
+        if startsInMenuBar {
             NSApp.setActivationPolicy(.accessory)
-            Diag.info("login launch → activation policy .accessory (menu-bar only)", "Launch")
+            Diag.info("menu-bar start (launchedAtLogin=\(launchedAtLogin)) → activation policy .accessory", "Launch")
         }
 
         let nc = NotificationCenter.default
