@@ -415,8 +415,8 @@ public actor StreamSession {
     /// DISCONNECT: the host keeps the app running and the next Stream click
     /// resumes it. On, every stop sends /cancel as every build before did.
     var quitAppOnStopProvider: @MainActor () -> Bool = { false }
-    /// Latched by an explicit "Quit <app>" so the stop that follows sends
-    /// /cancel regardless of the setting.
+    /// Reserved for an explicit "quit the app" stop; nothing sets it today
+    /// (the menu row was removed - it sat under the return row).
     var quitAppRequested = false
     /// Mirrors StreamWindow.isBackgrounded: false while the stream window is
     /// up, true once it is hidden or parked in Picture in Picture.

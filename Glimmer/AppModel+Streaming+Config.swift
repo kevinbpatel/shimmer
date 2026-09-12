@@ -66,29 +66,6 @@ extension AppModel {
         }
     }
 
-    /// "Quit <app>" while streaming: end the stream and the app on the host.
-    func quitStreamAndApp() {
-        guard let session = nativeSession else { return }
-        Diag.notice("User asked to quit the app on the host - stopping with /cancel", "Stream")
-        Task { await session.stopAndQuitApp() }
-    }
-
-    /// "Quit <app>" while NOT streaming: the host still reports the app we
-    /// disconnected from as running. One /cancel, then a fresh status poll so
-    /// the menu and library stop offering to resume it.
-    func quitRunningApp(on host: Host) {
-        Diag.notice("User asked to quit \(host.displayName)'s running app - sending /cancel", "Stream")
-        Task { [weak self] in
-            guard let self else { return }
-            let client = NetworkClient(server: self.nativeServerInfo(for: host))
-            do { try await client.cancel() } catch {
-                Diag.error("/cancel failed: \(error.localizedDescription)", "Stream")
-            }
-            await client.shutdown()
-            await MainActor.run { self.restartHostStatusPolling() }
-        }
-    }
-
     /// The menu bar's row for a LIVE session: what is streaming, and - when
     /// the window is hidden or in Picture in Picture - the way back to it.
     /// One row instead of a greyed-out "Stream X" plus a separate "Back to

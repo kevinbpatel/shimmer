@@ -24,14 +24,6 @@ extension StreamSession {
         await stop(cause: .userStopped)
     }
 
-    /// End the stream AND the app on the host: the explicit "Quit <app>"
-    /// action. Latches /cancel for the stop that follows, whatever the
-    /// "Quit the game when the stream ends" setting says.
-    public func stopAndQuitApp() async {
-        quitAppRequested = true
-        await stop(cause: .userStopped)
-    }
-
     /// Tear down the session.
     ///
     /// - Parameter cause: why the teardown was initiated. The P2 disconnect-

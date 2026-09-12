@@ -115,21 +115,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     menu.addItem(action("Picture in Picture", #selector(enterPictureInPicture),
                                         image: Self.symbol("pip.enter")))
                 }
-                // Ending the stream is a disconnect; this is the way to end
-                // the game itself.
-                menu.addItem(action("Quit \(model.heroTargetApp?.name ?? "the app")",
-                                    #selector(quitStreamAndApp), image: Self.symbol("xmark.circle")))
+                // No "Quit <app>" here: ending a stream is a disconnect and the
+                // game stays up on the PC by design, and a quit row under the
+                // return row is an accident waiting to happen. Settings ›
+                // "Quit the game on the PC" is where the other preference lives.
             } else {
                 // Named AND iconed off the app this actually launches - the one
-                // you streamed here last, not a fixed "Desktop".
+                // you streamed here last, not a fixed "Desktop". If the PC still
+                // has it up from an earlier disconnect, this resumes it.
                 menu.addItem(action(model.heroActionLabel, #selector(streamHero),
                                     image: glyph(model.heroTargetApp) ?? Self.symbol("play.fill")))
-                // The host still has the app up from an earlier disconnect (the
-                // hero row above resumes it): offer to end it instead.
-                if let running = model.runningAppName {
-                    menu.addItem(action("Quit \(running)", #selector(quitRunningApp),
-                                        image: Self.symbol("xmark.circle")))
-                }
             }
             if model.hosts.count > 1 {
                 let switcher = NSMenu()
@@ -218,11 +213,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func resumeStream() { model.resumeStreamWindow() }
-    @objc private func quitStreamAndApp() { model.quitStreamAndApp() }
-    @objc private func quitRunningApp() {
-        guard let host = model.selectedHost else { return }
-        model.quitRunningApp(on: host)
-    }
     @objc private func enterPictureInPicture() { model.enterPictureInPicture() }
 
     @objc private func switchHost(_ sender: NSMenuItem) {
