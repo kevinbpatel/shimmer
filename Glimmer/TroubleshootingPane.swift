@@ -119,7 +119,11 @@ struct RawHIDControl: View {
         NSWorkspace.shared.openApplication(
             at: Bundle.main.bundleURL, configuration: config
         ) { _, _ in
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+            // From the run loop, not a GCD block: with a stream live the
+            // termination gate stops the session in a main-actor task that a
+            // nested loop inside a main-queue callout can never run (see
+            // AppModel.terminateFromRunLoop).
+            RunLoop.main.perform { NSApp.terminate(nil) }
         }
     }
 

@@ -33,6 +33,12 @@ had left it with resize increments of zero, which AppKit's order-in frame
 standardization divided by. The lock is now cleared the documented way, and
 the window is ordered in before its chrome is touched.)
 
+Fix: Troubleshooting's relaunch could hang the app with the stream still up.
+Quitting with a live session stops it first, on the main actor - and a quit
+requested from inside a Grand Central Dispatch block can never get there
+(AppKit waits in a nested loop that the still-running block starves). Every
+programmatic quit now goes through the run loop, as Cmd-Q always did.
+
 Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
 instant Picture in Picture was still opening left the PiP window up for good,
 showing the bottom-left corner of the picture. The stop we issued from inside

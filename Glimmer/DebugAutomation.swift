@@ -49,6 +49,18 @@ extension AppModel {
             .flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// `NSApp.terminate` from the RUN LOOP, never from inside a GCD main-queue
+    /// block. With a live session, applicationShouldTerminate answers
+    /// `.terminateLater` and stops the session in a `@MainActor` task; AppKit
+    /// then spins a nested event loop waiting for the reply. Inside a
+    /// main-queue callout that task can never run (the queue is serial and we
+    /// are still in it), so the app sits in `-[NSApplication terminate:]`
+    /// forever with the stream still up. A run-loop-invoked terminate spins a
+    /// loop that drains the main queue normally - the Cmd-Q path.
+    static func terminateFromRunLoop() {
+        RunLoop.main.perform { NSApp.terminate(nil) }
+    }
+
     /// First loaded host whose name or address contains `match`.
     func debugHost(matching match: String) -> Host? {
         let host = hosts.first {
@@ -77,7 +89,7 @@ extension AppModel {
                 }
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { NSApp.terminate(nil) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { Self.terminateFromRunLoop() }
             }
             return
         }
@@ -102,7 +114,7 @@ extension AppModel {
                         }
                     }
                     await client.shutdown()
-                    NSApp.terminate(nil)
+                    Self.terminateFromRunLoop()
                 }
             }
             return
@@ -193,9 +205,7 @@ extension AppModel {
                 }
             }
             if let quitAfter {
-                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) {
-                    NSApp.terminate(nil)
-                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + quitAfter) { Self.terminateFromRunLoop() }
             }
         }
         RunLoop.main.add(poll, forMode: .common)
