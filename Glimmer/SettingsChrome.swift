@@ -27,7 +27,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .computers: return "Computers"
+        case .computers: return "PCs"
         case .settings: return "Settings"
         case .about: return "About"
         }
@@ -35,7 +35,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .computers: return "display"
+        // The tower, not the monitor: "display" / "desktopcomputer" already
+        // stand for a PC in the host rows and the menu bar, so the tab gets
+        // a glyph of its own. "PCs" is the app's own word for them.
+        case .computers: return "pc"
         case .settings: return "slider.horizontal.3"
         case .about: return "info.circle"
         }
