@@ -46,16 +46,10 @@ struct MenuBarContent: View {
             // constraints (system NSMenu: Labels show their SF Symbol,
             // Sections render titled groups, custom materials are NOT
             // honoured - lean on iconography + structure, not glass). Item
-            // order: navigational ("Open Shimmer") FIRST, then stream actions,
-            // then app-wide (Settings / Quit) - Apple's first-party agent
-            // pattern (Time Machine, Bluetooth).
-            Button {
-                openWindow(id: "main")
-                activate()
-            } label: {
-                Label("Open Shimmer", systemImage: "macwindow")
-            }
-
+            // order: the stream actions first, then the window rows
+            // (Settings… / Open Shimmer) and Quit at the bottom - the shape of
+            // Tailscale's menu, where the window is the exception, not the
+            // point.
             if let host = model.selectedHost {
                 // "Connected to" only when actually streaming this host - the
                 // selected host is not necessarily the connected one.
@@ -216,6 +210,18 @@ struct MenuBarContent: View {
                 Label("Settings…", systemImage: "gearshape")
             }
             .keyboardShortcut(",")
+
+            // The window on whatever tab it was last on (Computers, usually):
+            // the library, pairing, "Show the stream". Shimmer starts in the
+            // menu bar, so this is the way in.
+            Button {
+                openWindow(id: "main")
+                activate()
+            } label: {
+                Label("Open Shimmer", systemImage: "macwindow")
+            }
+
+            Divider()
 
             // No "Check for Updates…" here, by request. Sparkle still checks on
             // its own (`checkForUpdatesInBackground` at launch), and the manual

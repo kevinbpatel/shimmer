@@ -9,6 +9,10 @@ paired, where the window opens so there is something to pair from. The "Stay
 hidden at login" toggle is gone with it: login launches behave like every
 other launch, and "Be ready at login" no longer needs a second decision.
 
+The menu bar's window rows moved to the bottom, the way Tailscale's menu is
+laid out: the stream first, then "Settings…" and "Open Shimmer" together, and
+"Quit Shimmer" on its own.
+
 The menu bar's live-session rows are one row now, named and iconed off the
 app: "Streaming <app>" while the window is up, "Back to <app>" whenever it is
 hidden or in Picture in Picture. It used to be a greyed-out "Stream <app>"
