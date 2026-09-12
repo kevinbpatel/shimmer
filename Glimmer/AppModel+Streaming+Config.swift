@@ -44,6 +44,26 @@ extension AppModel {
         requestStream(app: app, on: host)
     }
 
+    /// One line on the selected PC, for the menu bar header and the library's
+    /// readiness chip: what the last fresh /serverinfo said, or "Connected"
+    /// while THIS Mac is streaming it (the poller is paused then, so the
+    /// snapshot would only age out to "Checking…").
+    var selectedHostStatusLine: String {
+        if isStreaming { return "Connected" }
+        guard let live = hostLiveStatus,
+              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
+            return "Checking…"
+        }
+        switch live.state {
+        case .idle: return "Online"
+        case .streamingApp(let name): return "Streaming \(name)"
+        case .streamingUnknownApp: return "Streaming"
+        case .asleep: return "Asleep or offline"
+        case .certMismatch: return "Trust needed - pair again"
+        case .unknown: return "Checking…"
+        }
+    }
+
     /// The menu bar's row for a LIVE session: what is streaming, and - when
     /// the window is hidden or in Picture in Picture - the way back to it.
     /// One row instead of a greyed-out "Stream X" plus a separate "Back to

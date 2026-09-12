@@ -211,20 +211,7 @@ struct ComputersTab: View {
         }
     }
 
-    private var statusText: String {
-        guard let live = model.hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return "Checking…"
-        }
-        switch live.state {
-        case .idle: return "Online"
-        case .streamingApp(let name): return "Streaming \(name)"
-        case .streamingUnknownApp: return "Streaming"
-        case .asleep: return "Asleep or offline"
-        case .certMismatch: return "Trust needed - pair again"
-        case .unknown: return "Checking…"
-        }
-    }
+    private var statusText: String { model.selectedHostStatusLine }
 
     private var searchField: some View {
         HStack(spacing: 6) {

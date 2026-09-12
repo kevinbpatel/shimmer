@@ -50,10 +50,28 @@ struct MenuBarContent: View {
             // (Settings… / Open Shimmer) and Quit at the bottom - the shape of
             // Tailscale's menu, where the window is the exception, not the
             // point.
-            if let host = model.selectedHost {
-                // "Connected to" only when actually streaming this host - the
-                // selected host is not necessarily the connected one.
-                Section(model.isStreaming ? "Connected to \(host.displayName)" : host.displayName) {
+            // Two-line header, the shape of Tailscale's: the PC's name in the
+            // title weight, its live status in secondary beneath. An NSMenu
+            // can't host a custom view from SwiftUI, but concatenated Text runs
+            // with their own fonts DO render as one multi-line item - as long
+            // as the item is enabled (a disabled Text dims both lines). So it
+            // is a Button, and its click is the natural one: open the window.
+            Button {
+                openWindow(id: "main")
+                model.settingsTab = .computers
+                activate()
+            } label: {
+                Text(model.selectedHost?.displayName ?? "Shimmer")
+                    .font(.system(size: 15, weight: .semibold))
+                + Text("\n" + (model.selectedHost == nil ? "No PC paired" : model.selectedHostStatusLine))
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            if model.selectedHost != nil {
+                Group {
                     if model.isStreaming {
                         // ONE row for the live session, named and iconed off the
                         // app: "Streaming X" (status, disabled) while the window
@@ -122,10 +140,6 @@ struct MenuBarContent: View {
                             Label("Switch PC", systemImage: "desktopcomputer")
                         }
                     }
-                }
-            } else {
-                Section {
-                    Label("No PC paired", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
                 }
             }
 
