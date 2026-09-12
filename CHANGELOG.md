@@ -11,9 +11,12 @@ other launch, and "Be ready at login" no longer needs a second decision.
 
 The menu bar opens with a header like Tailscale's: the PC's name, and under
 it what the PC is doing - Online, Asleep or offline, Streaming <app> from
-another device, Connected while this Mac is streaming it. Clicking it opens
-the window on Computers. The small "bazzite" / "Connected to bazzite" section
-title it replaces is gone.
+another device, Connected while this Mac is streaming it. It is a plain
+header, not a row: it doesn't highlight or do anything. The small "bazzite" /
+"Connected to bazzite" section title it replaces is gone. (Under the hood
+the dropdown is a native AppKit menu now rather than SwiftUI's, which is what
+makes an inert header possible - and gives Switch PC and the volume ladder
+real checkmarks.)
 
 The menu bar's window rows moved to the bottom, the way Tailscale's menu is
 laid out: the stream first, then "Settings…" and "Open Shimmer" together, and

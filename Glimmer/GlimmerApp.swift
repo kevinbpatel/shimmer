@@ -2,22 +2,15 @@ import AppKit
 import ServiceManagement
 import SwiftUI
 
-/// Captures SwiftUI's `openWindow` action and parks it on AppDelegate so the
-/// AppKit reopen handler can spawn the main window when SwiftUI's `Window`
-/// scene has destroyed its instance after an X-close. Hosted on the
-/// `MenuBarExtra` content (NOT the main window) so the captured closure's
-/// SwiftUI environment outlives the launcher window - closing the launcher
-/// leaves the menu bar item alive, so this view stays alive, so the closure
-/// stays callable.
-struct OpenWindowCapture: View {
-    @Environment(\.openWindow) private var openWindow
-    var body: some View {
-        Color.clear
-            .frame(width: 0, height: 0)
-            .onAppear {
-                AppDelegate.openMainWindow = { openWindow(id: "main") }
-            }
+/// Hands SwiftUI's window opener to AppKit at launch. Commands are built with
+/// the main menu before any window exists, so this runs on a menu-bar-only
+/// launch too - the view-based capture it replaces could only run once a
+/// window had appeared, which on such a launch is never.
+struct OpenWindowPublisher: Commands {
+    init(open: @escaping @MainActor () -> Void) {
+        AppDelegate.openMainWindow = open
     }
+    var body: some Commands { EmptyCommands() }
 }
 
 /// Sentinel arg passed by Glimmer Login Helper when it relaunches the main
@@ -38,6 +31,7 @@ private let startsInMenuBar = launchedAtLogin || UserDefaults.standard.integer(f
 @main
 struct GlimmerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var model: AppModel
 
     init() {
@@ -153,13 +147,14 @@ struct GlimmerApp: App {
         // with nothing paired, where the window is the way to pair.
         .defaultLaunchBehavior(startsInMenuBar ? .suppressed : .automatic)
         .commands {
+            OpenWindowPublisher(open: { openWindow(id: "main") })
             CommandGroup(replacing: .newItem) {}
             #if canImport(Sparkle)
             // Standard macOS "Check for Updates..." under the app menu (after the
             // About item). Sparkle drives the rest: a check on every open
             // (applicationDidFinishLaunching) plus a daily background check and
             // the update panels. Mirrored in the menu-bar dropdown for the
-            // accessory (no-window) case - see MenuBarContent.
+            // accessory (no-window) case is covered by the launch check alone.
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: UpdaterController.shared.updater)
             }
@@ -177,56 +172,6 @@ struct GlimmerApp: App {
             #endif
         }
 
-        MenuBarExtra {
-            MenuBarContent()
-                .environment(model)
-                .background(OpenWindowCapture())
-        } label: {
-            // Precedence, worst news first:
-            //   error        -> the warning triangle alone (nothing else matters)
-            //   pad connected-> the controller's own glyph + its battery percentage
-            //   streaming    -> play.fill
-            //   idle         -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
-            //
-            // The pad outranks `play.fill` deliberately: a live stream is
-            // already obvious from the screen in front of you, whereas the
-            // percentage is the one number you want mid-session and the one
-            // you'd have to open a menu to see. See `menuBarControllerGlyph`
-            // for why a PlayStation pad gets a bundled DualSense mark and
-            // everything else gets Apple's generic controller symbol.
-            if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
-                Image(systemName: symbol)
-            } else if let battery = model.menuBarControllerBattery {
-                // The pad AND its charge, as one baked image - the status item
-                // button has a single image slot, so this cannot be composed
-                // here. See MenuBarBatteryGlyph for everything that was probed.
-                //
-                // The battery is drawn in STEAM's style, not Apple's, and
-                // upright: an Apple-shaped battery sitting a few points from the
-                // Mac's own menu-bar battery reads as a second system battery.
-                // Short, square-cornered and vertical is unmistakably a
-                // different object. The exact percentage stays in the dropdown.
-                //
-                // Only a PlayStation pad has this art. Anything else keeps the
-                // generic controller symbol and the number - and that fallback
-                // is an HStack of a bare Image and a bare Text on purpose: those
-                // are the button's two slots, and a `Label` would drop its title.
-                if model.menuBarControllerGlyph == .playStation {
-                    Image(MenuBarBatteryGlyph.assetName(
-                        forPercent: battery.percent, charging: battery.charging))
-                } else {
-                    HStack(spacing: 3) {
-                        model.menuBarControllerGlyph.image()
-                        Text("\(battery.percent)%")
-                    }
-                }
-            } else if let symbol = model.menuBarSystemImageName {
-                Image(systemName: symbol)
-            } else {
-                Image("MenuBarIcon")
-            }
-        }
-        .menuBarExtraStyle(.menu)
     }
 }
 
@@ -235,8 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// manager before any SwiftUI view body runs.
     nonisolated(unsafe) static var boundManager: AppModel?
 
-    /// Captured SwiftUI `openWindow(id: "main")` invocation. Set by
-    /// `OpenWindowCapture` the first time MainWindow appears; used by
+    /// SwiftUI's `openWindow(id: "main")`, published at launch by
+    /// `OpenWindowPublisher`; used by the menu bar, Settings, and
     /// applicationShouldHandleReopen when the X-closed Window scene needs
     /// to be respawned (NSApp.windows no longer contains it, but SwiftUI
     /// will rebuild from the WindowGroup on openWindow).
@@ -320,10 +265,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// silent unless an update is actually available. Skipped on login launches
     /// (the user didn't open it; the daily scheduled check covers that session).
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMenuBar()
         guard !launchedAtLogin else { return }
         UpdaterController.shared.updater.checkForUpdatesInBackground()
     }
+    #else
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        installMenuBar()
+    }
     #endif
+
+    /// The menu bar item and its dropdown (AppKit - see MenuBarController).
+    /// Held on the main actor, where it is created and lives; the delegate
+    /// itself isn't declared MainActor, but AppKit calls it on the main thread.
+    @MainActor private static var menuBar: MenuBarController?
+
+    private func installMenuBar() {
+        MainActor.assumeIsolated {
+            guard let model = Self.boundManager else { return }
+            Self.menuBar = MenuBarController(model: model)
+        }
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Keep the menu bar item alive when all windows close.
