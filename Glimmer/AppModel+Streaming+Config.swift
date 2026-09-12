@@ -196,6 +196,13 @@ extension AppModel {
         }
     }
 
+    /// Every 10-bit profile, by the wire mask - the earlier hand-listed
+    /// Main10 pair left the 10-bit 4:4:4 profiles advertised, so an SDR
+    /// session could still negotiate 10-bit and inherit the BT.2020 mis-tag.
+    nonisolated static func stripTenBit(from formats: VideoFormats) -> VideoFormats {
+        formats.subtracting(.tenBit)
+    }
+
     /// Bridge our published quality settings into the engine's StreamConfig.
     /// The codec set is the probed client capability capped by the host's
     /// override (right-click → Codec; Automatic by default, which negotiates
@@ -232,7 +239,7 @@ extension AppModel {
         // the source instead of compensating for it, and 10-bit buys nothing
         // on an SDR pipeline. moonlight-qt masks the same way.
         if !cfg.hdr {
-            formats = formats.subtracting([.hevcMain10, .av1Main10])
+            formats = Self.stripTenBit(from: formats)
         }
         cfg.videoFormats = formats
         // Codec-aware wire budget (see wireBitrateKbps): the H.264-anchored dial

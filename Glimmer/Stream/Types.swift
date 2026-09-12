@@ -229,6 +229,15 @@ public struct VideoFormats: OptionSet, Sendable {
     public static let av1High8_444   = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_AV1_HIGH8_444)
     public static let av1High10_444  = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_AV1_HIGH10_444)
 
+    /// Whole families, from the wire masks: every profile of a codec, or
+    /// every 10-bit profile across codecs. The per-host codec cap and the
+    /// HDR-off strip subtract these rather than hand-listed members, so the
+    /// 4:4:4 profiles (same codec and bit-depth bits) can't slip through.
+    public static let h264Family = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_H264)
+    public static let hevcFamily = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_H265)
+    public static let av1Family  = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_AV1)
+    public static let tenBit     = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_10BIT)
+
     /// Build the client-supported codec mask from probed VideoToolbox
     /// capabilities, NOT from a hardcoded "we support everything" set.
     /// Negotiating against a fictional capability set is the standing

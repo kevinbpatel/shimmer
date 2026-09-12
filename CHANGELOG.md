@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Fix: choosing "HEVC" for a PC could still get an AV1 stream, and a stream with
+HDR off could still come as 10-bit. Both narrowings removed only the Main
+profiles and left the 4:4:4 ones advertised; they now remove whole families by
+the protocol's own masks.
+
 Shimmer declares Game Mode support. When a stream is full screen and in
 front, macOS 14+ can give it CPU/GPU priority and double the Bluetooth
 sampling rate for controllers and AirPods; it engages and disengages on its

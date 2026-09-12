@@ -278,6 +278,7 @@
 		D2000037 /* KeyboardScanMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000036 /* KeyboardScanMapTests.swift */; };
 		D20000A1 /* ControllerQuitChordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000A0 /* ControllerQuitChordTests.swift */; };
 		A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000320000000000000 /* PictureInPictureTests.swift */; };
+		A1C0DECDCMSK100000000000 /* CodecMaskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */; };
 		A1C0DELNCHPL100000000000 /* LaunchPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DELNCHPL200000000000 /* LaunchPlanTests.swift */; };
 		A1C0DEKAWTST100000000000 /* KeepAwakePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEKAWTST200000000000 /* KeepAwakePolicyTests.swift */; };
 		D2000039 /* StreamProtocolConstantsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2000038 /* StreamProtocolConstantsTests.swift */; };
@@ -596,6 +597,7 @@
 		D2000036 /* KeyboardScanMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardScanMapTests.swift; sourceTree = "<group>"; };
 		D20000A0 /* ControllerQuitChordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerQuitChordTests.swift; sourceTree = "<group>"; };
 		A1C0DE000320000000000000 /* PictureInPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PictureInPictureTests.swift"; sourceTree = "<group>"; };
+		A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodecMaskTests.swift"; sourceTree = "<group>"; };
 		A1C0DELNCHPL200000000000 /* LaunchPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LaunchPlanTests.swift"; sourceTree = "<group>"; };
 		A1C0DEKAWTST200000000000 /* KeepAwakePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeepAwakePolicyTests.swift"; sourceTree = "<group>"; };
 		D2000038 /* StreamProtocolConstantsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamProtocolConstantsTests.swift; sourceTree = "<group>"; };
@@ -970,6 +972,7 @@
 				D2000036 /* KeyboardScanMapTests.swift */,
 				D20000A0 /* ControllerQuitChordTests.swift */,
 				A1C0DE000320000000000000 /* PictureInPictureTests.swift */,
+				A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */,
 				A1C0DELNCHPL200000000000 /* LaunchPlanTests.swift */,
 				A1C0DEKAWTST200000000000 /* KeepAwakePolicyTests.swift */,
 				D2000038 /* StreamProtocolConstantsTests.swift */,
@@ -1383,6 +1386,7 @@
 				D2000037 /* KeyboardScanMapTests.swift in Sources */,
 				D20000A1 /* ControllerQuitChordTests.swift in Sources */,
 				A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */,
+				A1C0DECDCMSK100000000000 /* CodecMaskTests.swift in Sources */,
 				A1C0DELNCHPL100000000000 /* LaunchPlanTests.swift in Sources */,
 				A1C0DEKAWTST100000000000 /* KeepAwakePolicyTests.swift in Sources */,
 				D2000039 /* StreamProtocolConstantsTests.swift in Sources */,

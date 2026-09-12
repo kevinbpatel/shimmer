@@ -35,14 +35,19 @@ enum HostCodecPreference: String, CaseIterable, Identifiable {
     /// Cap the probed client capability set for this preference. Lower
     /// formats always stay advertised - the cap removes ceilings, never
     /// fallbacks, so a misconfigured override can't fail a connection.
+    ///
+    /// Whole families by wire mask: the earlier hand-listed Main profiles left
+    /// the AV1 4:4:4 bits advertised under "HEVC", and negotiation - which
+    /// picks a codec family from the mask before a profile - still landed on
+    /// AV1 on an Apple Silicon Mac.
     func apply(to probed: VideoFormats) -> VideoFormats {
         switch self {
         case .auto:
             return probed
         case .hevc:
-            return probed.subtracting([.av1, .av1Main10])
+            return probed.subtracting(.av1Family)
         case .h264:
-            return probed.subtracting([.av1, .av1Main10, .hevc, .hevcMain10])
+            return probed.subtracting(.av1Family).subtracting(.hevcFamily)
         }
     }
 
