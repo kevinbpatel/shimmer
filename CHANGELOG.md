@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Shimmer declares Game Mode support. When a stream is full screen and in
+front, macOS 14+ can give it CPU/GPU priority and double the Bluetooth
+sampling rate for controllers and AirPods; it engages and disengages on its
+own, shows a controller icon in the menu bar while on, and that icon's menu is
+where it is turned off. Picture in Picture and window mode are untouched.
+
 Ending a stream no longer quits the game. A stop is a disconnect: the PC keeps
 the app running, the menu bar and library say "<app> running", and the next
 Stream click resumes it where it was (the host takes the new resolution and
