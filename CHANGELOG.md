@@ -27,7 +27,11 @@ the picture. The entry path relied on the hide step to set up the mirror
 source, and the hide step does nothing for a window that is already hidden,
 so PiP started on the off-screen full-size layer. A hidden window is now put
 back on screen invisibly (alpha 0, click-through, pre-shrunk) before PiP
-starts, exactly as a visible one is.
+starts, exactly as a visible one is. (In window mode on macOS 26.6 the first
+cut of this crashed on the way back in: suspending the window's aspect lock
+had left it with resize increments of zero, which AppKit's order-in frame
+standardization divided by. The lock is now cleared the documented way, and
+the window is ordered in before its chrome is touched.)
 
 Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
 instant Picture in Picture was still opening left the PiP window up for good,

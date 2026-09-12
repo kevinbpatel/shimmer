@@ -58,8 +58,15 @@ extension StreamWindow {
             // crop. Enter mirror-source mode directly (alpha 0, click-through,
             // pre-shrunk) and put the window back on screen without any of
             // the foreground re-engage - it stays invisible and non-key.
-            enterPiPSourceMode()
+            // Order in FIRST, on the window's normal chrome and frame - the
+            // same call the return path makes - and only then mutate it. An
+            // order-in standardizes the frame against the window's aspect /
+            // resize increments; doing that after source mode had touched them
+            // trapped inside AppKit on macOS 26.6 (window mode). Alpha 0 goes
+            // on before the order-in so nothing flashes.
+            window.alphaValue = 0
             window.orderFront(nil)
+            enterPiPSourceMode()
             log.info("Picture in Picture from the hidden window - source put back on screen at alpha 0")
         } else {
             hideStreamWindow(forPictureInPicture: true)
@@ -255,7 +262,12 @@ extension StreamWindow {
         // fullscreen cover has none of these set, so this is a no-op there.
         savedChromeBeforePiP = (window.contentAspectRatio, window.contentMinSize,
                                 window.frameAutosaveName)
-        window.contentAspectRatio = .zero
+        // Aspect ratio and resize increments share one slot in NSWindow: an
+        // aspect lock stores increments of (0,0), and `contentAspectRatio =
+        // .zero` LEAVES them at zero - an aspect-less window that AppKit's
+        // order-in frame standardization then divides by (a trap on macOS
+        // 26.6). Increments of (1,1) is the documented way to clear the lock.
+        window.contentResizeIncrements = NSSize(width: 1, height: 1)
         window.contentMinSize = .zero
         if !window.frameAutosaveName.isEmpty { window.setFrameAutosaveName("") }
         window.alphaValue = 0
