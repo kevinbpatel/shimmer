@@ -3,7 +3,7 @@
 ## Unreleased
 
 The menu-bar header's second line says what is streaming while a stream is live
-- "Streaming · 1080p60", with " HDR" when HDR is on - instead of a bare
+- "Streaming at 1080p60", with " HDR" when HDR is on - instead of a bare
 "Connected". It falls back to "Streaming" for the moment before the decoder has
 reported its format, and to the host's online/asleep status when idle as before.
 

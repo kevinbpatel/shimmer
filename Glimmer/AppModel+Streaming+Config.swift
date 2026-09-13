@@ -51,12 +51,12 @@ extension AppModel {
     var selectedHostStatusLine: String {
         if isStreaming {
             // While live, the header's second line says what is actually
-            // streaming, at a glance: "Streaming · 1080p60", plus " HDR" when
+            // streaming, at a glance: "Streaming at 1080p60", plus " HDR" when
             // HDR is on. Just "Streaming" for the ~1s before the decoder has
             // reported its format. The exact size + codec live in the Stream
             // section below; this is the compact shorthand.
             guard let short = activeStreamShorthand else { return "Streaming" }
-            return "Streaming · \(short)"
+            return "Streaming at \(short)"
         }
         guard let live = hostLiveStatus,
               Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
