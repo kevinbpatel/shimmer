@@ -55,9 +55,11 @@ enum ResolutionChoice: Hashable {
     case standard(CommonResolution)
     case custom
 
-    /// Every row the picker lists, in order.
+    /// Every row the picker lists, in order. HiDPI was removed - it upscaled
+    /// the panel to a virtual "Looks like" size and confused more than it
+    /// helped; Match display plus the explicit standard sizes cover it.
     static let all: [ResolutionChoice] =
-        [.matchDisplay, .hidpi] + CommonResolution.allCases.map { .standard($0) } + [.custom]
+        [.matchDisplay] + CommonResolution.allCases.map { .standard($0) } + [.custom]
 
     /// The choice a (preset, width, height) triple reads as.
     static func from(preset: QualityPreset, customWidth: Int, customHeight: Int) -> ResolutionChoice {

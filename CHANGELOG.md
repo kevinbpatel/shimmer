@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+The Resolution picker drops the HiDPI option. It streamed an upscaled virtual
+"Looks like" size of the panel, which muddled the choice more than it helped;
+Match display and the explicit 720p/1080p/1440p/2160p sizes cover the ground.
+Anyone who had HiDPI selected is moved to Match display once, automatically.
+
 The stream window opens at the resolution's own size now, 1:1. A 1080p stream
 lands on exactly 1920x1080 physical pixels (960x540 points on a 2x display),
 1440p on 2560x1440, 4K on 3840x2160 - each stream pixel on one screen pixel, no

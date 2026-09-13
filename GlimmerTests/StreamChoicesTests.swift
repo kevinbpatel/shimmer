@@ -25,7 +25,10 @@ struct StreamChoicesTests {
     @Test func pickerListsEveryStandardSizeBetweenMatchAndCustom() {
         #expect(ResolutionChoice.all.first == .matchDisplay)
         #expect(ResolutionChoice.all.last == .custom)
-        #expect(ResolutionChoice.all.count == 2 + CommonResolution.allCases.count + 1)
+        // Match display, then every standard size, then Custom. HiDPI was
+        // removed, so there is exactly one leading row before the standards.
+        #expect(ResolutionChoice.all.count == 1 + CommonResolution.allCases.count + 1)
+        #expect(!ResolutionChoice.all.contains(.hidpi))
     }
 
     // MARK: Frame rate picker

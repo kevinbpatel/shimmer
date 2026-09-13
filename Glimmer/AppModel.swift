@@ -87,9 +87,10 @@ final class AppModel {
 
     // Quality
     // Default `.matchDisplay` (panel-native resolution + refresh) - the option
-    // shown at the top of the preset list. Users on constrained links can drop
-    // to HiDPI; an explicit choice is persisted by the didSet below and read
-    // back (with the legacy-preset remap) in init().
+    // shown at the top of the preset list. An explicit choice is persisted by
+    // the didSet below and read back (with the legacy-preset remap) in init().
+    // (HiDPI was removed from the Resolution picker; init() migrates anyone
+    // still on it to Match display.)
     var qualityPreset: QualityPreset = QualityPreset.defaultPreset {
         willSet {
             // Restoring the saved preset is not a user switching presets - see
@@ -590,6 +591,19 @@ final class AppModel {
         // pin included), rather than letting it reach into AppModel.
         artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
+        // HiDPI is gone from the Resolution picker (see ResolutionChoice.all),
+        // so an install on it has no row to show. Convert it to Match display
+        // (the panel-native size it most resembles) ONCE - a one-shot marker
+        // like the frame-rate drop below, so a later user pick isn't re-stamped.
+        // Under isRestoringDefaults the didSet persistence is suppressed, so the
+        // new value is written to UserDefaults by hand here.
+        if !UserDefaults.standard.bool(forKey: "didDropHiDPIResolution") {
+            UserDefaults.standard.set(true, forKey: "didDropHiDPIResolution")
+            if qualityPreset == .hidpi {
+                qualityPreset = .matchDisplay
+                UserDefaults.standard.set(QualityPreset.matchDisplay.rawValue, forKey: "qualityPreset")
+            }
+        }
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
         // focus-loss commit (0 self-heals via persistedPositiveInt; 1000 Hz
