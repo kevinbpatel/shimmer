@@ -210,15 +210,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func streamHero() {
         model.streamDefaultApp()
-        // The model just made us a regular app (isStreaming → .regular).
-        // AppKit drops an activate() issued in the same runloop turn as a
-        // policy change, and the cooperative-activation grant this click
-        // carries is good for a moment, not the seconds the connect takes -
-        // so claim it now AND next turn. Active with no window yet is fine:
+        // Claim activation NOW, while the app is still .accessory: this click
+        // is the user-interaction grant cooperative activation needs, and it
+        // is good for a moment, not the seconds a connect takes. The model
+        // flips us to .regular a beat later (AppModel.isStreaming) - after
+        // this has landed, because AppKit drops an activate() issued in the
+        // same turn as a policy change. Active with no window yet is fine:
         // the stream window then arrives in the active app's stage, in front,
         // instead of behind whatever Stage Manager had up.
         NSApp.activate()
-        DispatchQueue.main.async { NSApp.activate() }
     }
 
     @objc private func resumeStream() { model.resumeStreamWindow() }

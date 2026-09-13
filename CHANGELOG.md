@@ -8,6 +8,9 @@ no Dock icon, and, it turns out, no stage of its own - so the new window fell
 in behind the stage on screen, and a Cmd-Tab away from it had no way back.
 The app is a regular one now for as long as a stream is live (window, hidden,
 or Picture in Picture), and returns to the menu bar when the stream ends.
+The controller also reaches the host for the whole stream whether or not
+Shimmer is the app in front - as moonlight-qt does - instead of only while
+its window is focused or in Picture in Picture.
 
 The menu-bar controller mark says "charging" with a bolt you can see. It was
 Steam's bolt at Steam's size, lying on its side the way Big Picture's does -

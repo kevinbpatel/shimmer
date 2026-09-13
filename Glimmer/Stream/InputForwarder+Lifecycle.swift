@@ -17,6 +17,7 @@
 //
 
 import AppKit
+import GameController
 
 extension InputForwarder {
 
@@ -58,7 +59,20 @@ extension InputForwarder {
         self.inputView = view
         window.acceptsMouseMovedEvents = true
 
-        log.info("InputForwarder attached to window; first-responder install deferred until window is key")
+        // The pad reaches the host for the WHOLE session, whichever app is in
+        // front. GameController delivers only to the active app unless this
+        // is set, and a stream cannot be hostage to activation: a menu-bar
+        // start whose activate() the system declined (Stage Manager, a policy
+        // flip in the same turn - 2026-09-12) left every button dead except
+        // the raw-HID PS button. moonlight-qt makes the same call
+        // (SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1). Keyboard and mouse still
+        // follow focus by construction - they arrive through the window.
+        if savedBackgroundControllerEvents == nil {
+            savedBackgroundControllerEvents = GCController.shouldMonitorBackgroundEvents
+        }
+        GCController.shouldMonitorBackgroundEvents = true
+
+        log.info("InputForwarder attached to window; controller background events on; first-responder install deferred until window is key")
     }
 
     /// Apply first-responder to our StreamInputView. Called by StreamWindow
@@ -108,6 +122,10 @@ extension InputForwarder {
         // Raise every held key/button/modifier so a mid-press teardown can't
         // leave the host with phantom-held input.
         raiseAllHeldInputs(reason: "stream teardown")
+        if let saved = savedBackgroundControllerEvents {
+            GCController.shouldMonitorBackgroundEvents = saved
+            savedBackgroundControllerEvents = nil
+        }
         // The PiP pointer mirror's timer and monitor must not outlive the
         // session (the window's exit path already stops it; this is the
         // backstop for a teardown that never went through it).

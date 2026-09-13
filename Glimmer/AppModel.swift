@@ -64,8 +64,23 @@ final class AppModel {
     // Stream lifecycle
     var isStreaming = false {
         // The app is `.regular` for as long as a stream is live - see
-        // AppDelegate.refreshActivationPolicy for why (Stage Manager).
-        didSet { if isStreaming != oldValue { AppDelegate.refreshActivationPolicy() } }
+        // AppDelegate.refreshActivationPolicy for why (Stage Manager). Applied
+        // a beat LATER, not here: the menu-bar click that starts a stream
+        // calls NSApp.activate() right after this flips, and AppKit drops an
+        // activation issued in the same turn as a policy change - the click's
+        // grant was wasted, the window never became key, and GameController
+        // (which delivers only to the active app) went quiet: the "controller
+        // does nothing but the PS button" report of 2026-09-12. Activating
+        // FIRST, while still .accessory, is granted; the app stays active
+        // through the flip that follows. StreamWindow.show() refreshes too,
+        // so a resume faster than this delay is still regular by the time
+        // its window orders in.
+        didSet {
+            guard isStreaming != oldValue else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                MainActor.assumeIsolated { AppDelegate.refreshActivationPolicy() }
+            }
+        }
     }
     /// Active native session, retained while streaming.
     @ObservationIgnored var nativeSession: StreamSession?
