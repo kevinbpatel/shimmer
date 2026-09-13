@@ -216,8 +216,6 @@ final class AppModel {
     var activeStreamWidth: Int = 0
     var activeStreamHeight: Int = 0
     var activeStreamFps: Int = 0
-    /// Codec label as the decoder reports it: "hevc" / "h264" / "av1".
-    var activeStreamCodec: String?
 
     /// Brief "Stream ended" toast on the launcher. Flipped on whenever a
     /// stream session ends cleanly (regardless of whether the user quit

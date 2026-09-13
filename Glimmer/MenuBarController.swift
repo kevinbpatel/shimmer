@@ -147,23 +147,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // that reads native. Shown whether or not a stream is live, because
         // mute persists: a control that disappears with the session is one the
         // user can't undo before starting the next one.
-        // Live stream facts (inert, sampled on open): what the active stream
-        // actually negotiated - size and refresh, then codec plus HDR when on.
-        // Hidden until the decoder has reported its format, and when not
-        // streaming. No glyphs, so the rows sit at the left edge like the rest.
-        if let resolution = model.activeStreamResolutionLine {
-            menu.addItem(.separator())
-            menu.addItem(.sectionHeader(title: "Stream"))
-            let res = NSMenuItem(title: resolution, action: nil, keyEquivalent: "")
-            res.isEnabled = false
-            menu.addItem(res)
-            if let format = model.activeStreamFormatLine {
-                let fmt = NSMenuItem(title: format, action: nil, keyEquivalent: "")
-                fmt.isEnabled = false
-                menu.addItem(fmt)
-            }
-        }
-
         menu.addItem(.separator())
         menu.addItem(.sectionHeader(title: "Stream Audio"))
         // No glyphs in this group: macOS 26 lays the image column out per
@@ -183,26 +166,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         volumeRow.submenu = volume
         menu.addItem(volumeRow)
 
-        // Controller battery charm - whenever a pad reporting battery is
-        // connected (sampled on open). The glyph matches the label's so the
-        // two read as one thing.
-        if let battery = model.menuBarControllerBattery {
-            menu.addItem(.separator())
-            menu.addItem(.sectionHeader(title: "Controller"))
-            let charm = NSMenuItem(
-                title: "\(battery.percent)% battery\(battery.charging ? " · charging" : "")",
-                action: nil, keyEquivalent: "")
-            if battery.charging {
-                charm.image = Self.symbol("battery.100.bolt")
-            } else {
-                switch model.menuBarControllerGlyph {
-                case .playStation: charm.image = Self.asset("DualSenseGlyph", height: 11)
-                case .generic: charm.image = Self.symbol("gamecontroller.fill")
-                }
-            }
-            charm.isEnabled = false
-            menu.addItem(charm)
-        }
+        // Controller battery is shown by the menu-bar icon itself (the battery
+        // glyph on the status item), not repeated as a "N% battery" row here.
 
         // The window rows and Quit at the bottom - Tailscale's layout, where
         // the window is the exception, not the point. Both open the same

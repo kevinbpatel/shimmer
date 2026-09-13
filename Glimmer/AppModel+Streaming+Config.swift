@@ -83,25 +83,6 @@ extension AppModel {
         return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
     }
 
-    /// The active stream's size and refresh for the menu-bar Stream section,
-    /// e.g. "1920 × 1080 · 60 Hz", or nil until the decoder reports its format
-    /// (or when not streaming). Uses a × (multiplication sign), not an x.
-    var activeStreamResolutionLine: String? {
-        guard isStreaming, activeStreamWidth > 0, activeStreamHeight > 0 else { return nil }
-        var line = "\(activeStreamWidth) × \(activeStreamHeight)"
-        if activeStreamFps > 0 { line += " · \(activeStreamFps) Hz" }
-        return line
-    }
-
-    /// The active stream's codec, plus " · HDR" when HDR is effectively on, for
-    /// the menu-bar Stream section - e.g. "HEVC" or "HEVC · HDR". Nil until the
-    /// codec is known (or when not streaming).
-    var activeStreamFormatLine: String? {
-        guard isStreaming, let codec = activeStreamCodec else { return nil }
-        let label = Self.displayCodec(codec)
-        return nativeHDRActive ? "\(label) · HDR" : label
-    }
-
     /// Compact "1080p60"-style shorthand for the header's streaming line, with
     /// " HDR" appended when HDR is effectively on - or nil until the decoder has
     /// reported its format (or when not streaming). Height drives the p-label
@@ -112,16 +93,6 @@ extension AppModel {
         if activeStreamFps > 0 { short += "\(activeStreamFps)" }
         if nativeHDRActive { short += " HDR" }
         return short
-    }
-
-    /// Human codec label from the decoder's raw token. Pure, so it is unit-tested.
-    nonisolated static func displayCodec(_ raw: String) -> String {
-        switch raw.lowercased() {
-        case "hevc": return "HEVC"
-        case "h264": return "H.264"
-        case "av1": return "AV1"
-        default: return raw.uppercased()
-        }
     }
 
     // MARK: - Hero verb (state-aware primary action)

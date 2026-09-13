@@ -2,16 +2,14 @@
 
 ## Unreleased
 
+The menu-bar dropdown drops the Stream detail section and the "N% battery"
+controller row - the header already says what is streaming, and the controller's
+charge shows on the menu-bar icon itself, so both were redundant.
+
 The menu-bar header's second line says what is streaming while a stream is live
 - "Streaming at 1080p60", with " HDR" when HDR is on - instead of a bare
 "Connected". It falls back to "Streaming" for the moment before the decoder has
 reported its format, and to the host's online/asleep status when idle as before.
-
-The menu-bar dropdown shows what the live stream actually is. While streaming, a
-Stream section lists the negotiated resolution and refresh (e.g. 1920 × 1080 ·
-60 Hz) and the codec, with HDR noted when it's effectively on (e.g. HEVC · HDR)
-- read straight from the decoder's setup, so it reflects what's really decoding,
-including after a reconnect or resolution change, not just what was requested.
 
 The Resolution picker drops the HiDPI option. It streamed an upscaled virtual
 "Looks like" size of the panel, which muddled the choice more than it helped;
