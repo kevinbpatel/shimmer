@@ -1,7 +1,8 @@
 //
 //  SettingsGeneralStreamingPanes.swift
 //
-//  The App settings pane: login items, the Wi-Fi helper, and diagnostics.
+//  The App settings pane: login items, the stats overlay, and diagnostics.
+//  (Wi-Fi smoothing moved to the Stream tab's Video pane - it tunes the stream.)
 //  SettingsRoot composes panes across files, so the types are internal. (Filename keeps
 //  its pre-redesign name - renaming means touching the pbxproj for zero
 //  behavioural gain; the Stream / Video / Audio panes that replaced the old
@@ -26,9 +27,6 @@ struct AppPane: View {
     /// left with a toggle that silently does nothing at the next reboot.
     @State private var loginItemNeedsApproval = false
 
-    /// The privileged AWDL network helper (parks awdl0 during streams).
-    @ObservedObject private var awdl = AWDLHelperManager.shared
-
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
     /// dismissed the window.
@@ -36,12 +34,6 @@ struct AppPane: View {
         DispatchQueue.main.async {
             let status = LoginItemManager.apply(launchAtLogin: launchAtLogin)
             loginItemNeedsApproval = (status == .requiresApproval)
-        }
-    }
-
-    private func scheduleHelperToggle(_ enable: Bool) {
-        Task { @MainActor in
-            if enable { AWDLHelperManager.shared.enable() } else { AWDLHelperManager.shared.disable() }
         }
     }
 
@@ -67,27 +59,8 @@ struct AppPane: View {
 
             SettingsRule()
 
-            SettingsField("Wi-Fi") {
-                Toggle("Smooth out Wi-Fi stutter while streaming",
-                       isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
-                if case .requiresApproval = awdl.state {
-                    HStack(spacing: 8) {
-                        Label("macOS needs you to approve the Shimmer network helper.",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12)).foregroundStyle(.orange)
-                        Button("Open Login Items") { awdl.openSystemSettings() }
-                    }
-                }
-                if case .unavailable(let why) = awdl.state {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Network helper unavailable: \(why)", systemImage: "xmark.octagon")
-                            .font(.system(size: 12)).foregroundStyle(.red)
-                        if let url = awdl.recoveryDocURL {
-                            Link("How to manage login items (Apple Support)", destination: url)
-                                .font(.system(size: 12))
-                        }
-                    }
-                }
+            SettingsField("Stats overlay") {
+                Toggle("Show stream health over the picture", isOn: $model.showStreamStats)
             }
 
             SettingsRule()
@@ -126,7 +99,6 @@ struct AppPane: View {
             }
         }
         .onAppear {
-            awdl.refresh()
             guard launchAtLogin else { loginItemNeedsApproval = false; return }
             let service = SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
             loginItemNeedsApproval = (service.status == .requiresApproval)

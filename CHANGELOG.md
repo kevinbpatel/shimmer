@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Two Settings controls moved to where they belong: "Smooth out Wi-Fi stutter" is
+on the Stream tab now (it tunes the stream), and the stats overlay is on General
+next to Troubleshooting (it is a diagnostic, not a picture setting).
+
 Settings tabs: the machines tab is now "Servers" with a server-rack icon
 (clearer than "PCs", and its own glyph distinct from the host rows), and the
 Stream tab's Wi-Fi-looking radio-waves icon becomes a screen-with-play glyph
