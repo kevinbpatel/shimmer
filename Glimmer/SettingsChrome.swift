@@ -27,7 +27,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .computers: return "PCs"
+        // The enum case stays `computers` (the --debug-open-settings rawValue
+        // and existing references); only the shown name changed to "Servers".
+        case .computers: return "Servers"
         case .stream: return "Stream"
         case .general: return "General"
         case .about: return "About"
@@ -36,13 +38,13 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        // The tower, not the monitor: "display" / "desktopcomputer" already
-        // stand for a PC in the host rows and the menu bar, so the tab gets
-        // a glyph of its own. "PCs" is the app's own word for them.
-        case .computers: return "pc"
-        // The signal, for everything about the stream itself; the sliders
-        // stay with the app-level page.
-        case .stream: return "dot.radiowaves.left.and.right"
+        // A rack, matching the "Servers" name (Sunshine hosts) - and distinct
+        // from the "display"/"desktopcomputer" glyph the host rows and menu bar
+        // already use for a machine.
+        case .computers: return "server.rack"
+        // A screen with a play badge: the video you watch, not the Wi-Fi-looking
+        // radio waves. The sliders stay with the app-level General page.
+        case .stream: return "play.tv"
         case .general: return "slider.horizontal.3"
         case .about: return "info.circle"
         }

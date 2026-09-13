@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Settings tabs: the machines tab is now "Servers" with a server-rack icon
+(clearer than "PCs", and its own glyph distinct from the host rows), and the
+Stream tab's Wi-Fi-looking radio-waves icon becomes a screen-with-play glyph
+that reads as the video you watch.
+
 The menu-bar dropdown drops the Stream detail section and the "N% battery"
 controller row - the header already says what is streaming, and the controller's
 charge shows on the menu-bar icon itself, so both were redundant.
