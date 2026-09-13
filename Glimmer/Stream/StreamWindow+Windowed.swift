@@ -66,6 +66,7 @@ extension StreamWindow {
             guard let self, !self.didClose, !self.window.isKeyWindow else { return }
             self.log.error("Window not key 1.5s after show(); retrying activate + makeKeyAndOrderFront + first-responder install")
             NSApp.activate()
+            self.window.orderFrontRegardless()   // on top even when activation is refused
             self.window.makeKeyAndOrderFront(nil)
             self.onDidBecomeReadyForInput?()
         }

@@ -275,6 +275,10 @@ extension StreamWindow {
             if !win.isKeyWindow, !self.isBackgrounded {
                 self.log.error("Window not key 1.5s after show(); retrying activate + makeKeyAndOrderFront + first-responder install")
                 NSApp.activate()
+                // Regardless: in front of every window even if activation
+                // was refused (no user-interaction grant left), so the stream
+                // is at least on top rather than behind the focused stage.
+                win.orderFrontRegardless()
                 win.makeKeyAndOrderFront(nil)
                 self.onDidBecomeReadyForInput?()
             }
