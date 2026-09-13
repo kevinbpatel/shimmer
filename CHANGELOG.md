@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+A controller that wakes a moment after the stream comes up now reaches the game
+on its own. A sleepy or low-battery DualSense can have its raw-HID link up (the
+PlayStation button works) while GameController has not yet handed the pad to
+Shimmer; the stream used to check for the pad once at connect and then only wait
+for a connect event, so a pad that appeared a beat late stayed dead until a full
+restart. The stream now re-scans for the pad for the first several seconds after
+it connects, so it - and its battery reading - self-heal within seconds.
+
 Under Stage Manager, a stream started from the menu bar opened behind
 whatever was focused. Shimmer was still a menu-bar-only app at that moment -
 no Dock icon, and, it turns out, no stage of its own - so the new window fell

@@ -190,6 +190,22 @@ extension InputForwarder {
                 // and so never hit the didBecomeKey resync).
                 resyncControllers()
                 installDiagnosticMonitors()
+                // A pad can register with GameController a beat AFTER the stream
+                // connects (a sleepy DualSense waking - HID up, GameController
+                // not yet). The session-start enumeration and the didConnect
+                // observer can both miss that window, leaving the stream with no
+                // controller until a restart. Re-scan now and briefly after so a
+                // late pad reaches the host within seconds. Idempotent
+                // (attachConnectedPads skips pads we already have); guarded on
+                // isReady so it never attaches into a torn-down stream.
+                GCController.startWirelessControllerDiscovery {}
+                attachConnectedPads()
+                for delay in [1.5, 4.0, 8.0] {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                        guard let self, self.isReady else { return }
+                        self.attachConnectedPads()
+                    }
+                }
             } else {
                 removeDiagnosticMonitors()
             }
