@@ -190,6 +190,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     weak var model: AppModel?
 
+    /// `.regular` - Dock icon, a Cmd-Tab entry, and under Stage Manager a
+    /// stage of its own - whenever there is something to come back to: the
+    /// main window open, or a stream live in any form (window, hidden by a
+    /// Cmd-Tab, Picture in Picture). `.accessory` when only the menu bar is
+    /// alive. The stream counts because of Stage Manager: an accessory app's
+    /// window is given no stage, so a stream started from the menu bar came
+    /// up BEHIND whatever was focused, and a Cmd-Tab away had no way back.
+    /// Called on every window becomeKey/willClose and on `isStreaming`
+    /// flipping; idempotent, so the callers need not coordinate. Flipping at
+    /// stream START (seconds before the window shows) also sidesteps AppKit's
+    /// habit of ignoring an `activate()` issued in the same runloop turn as a
+    /// policy change.
+    @MainActor static func refreshActivationPolicy() {
+        guard let app = NSApp else { return }   // hostless unit tests
+        let mainOpen = app.windows.contains { $0.identifier?.rawValue == "main" && $0.isVisible }
+        let streaming = boundManager?.isStreaming == true
+        let wanted: NSApplication.ActivationPolicy = (mainOpen || streaming) ? .regular : .accessory
+        guard app.activationPolicy() != wanted else { return }
+        app.setActivationPolicy(wanted)
+        Diag.info("activation policy → \(wanted == .regular ? "regular" : "accessory") "
+            + "(mainOpen=\(mainOpen) streaming=\(streaming))", "Launch")
+    }
+
     /// NSWindow open/close observers wired in applicationWillFinishLaunching
     /// to toggle `NSApp.activationPolicy` between `.regular` (Dock icon
     /// visible) when the main window is open and `.accessory` (no Dock
@@ -241,12 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 // willClose fires while the window is still in NSApp.windows,
                 // so defer one runloop tick to see the post-close state.
-                DispatchQueue.main.async {
-                    let mainOpen = NSApp.windows.contains {
-                        $0.identifier?.rawValue == "main" && $0.isVisible
-                    }
-                    NSApp.setActivationPolicy(mainOpen ? .regular : .accessory)
-                }
+                DispatchQueue.main.async { MainActor.assumeIsolated { Self.refreshActivationPolicy() } }
             }
         }
         windowVisibilityObservers.append(nc.addObserver(

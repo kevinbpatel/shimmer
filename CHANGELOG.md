@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Under Stage Manager, a stream started from the menu bar opened behind
+whatever was focused. Shimmer was still a menu-bar-only app at that moment -
+no Dock icon, and, it turns out, no stage of its own - so the new window fell
+in behind the stage on screen, and a Cmd-Tab away from it had no way back.
+The app is a regular one now for as long as a stream is live (window, hidden,
+or Picture in Picture), and returns to the menu bar when the stream ends.
+
 The menu-bar controller mark's charging bolt is legible now. It was Steam's
 bolt at Steam's size, lying on its side the way Big Picture's does - which
 reads there because it is white on a green fill, and did not read here because

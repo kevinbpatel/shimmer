@@ -42,6 +42,7 @@ extension StreamWindow {
         // framing; "Fill the notch" is a full-screen-only choice.
         streamDelegate.coversNotch = false
         streamDelegate.displayMode = .window
+        AppDelegate.refreshActivationPolicy()   // a stage of our own, not behind the focused one
         NSApp.activate()
         configureWindowedChrome()
         // Same first-frame fade-in as full screen: an empty display layer

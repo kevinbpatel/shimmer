@@ -62,7 +62,11 @@ final class AppModel {
     let artwork = AppArtworkStore()
 
     // Stream lifecycle
-    var isStreaming = false
+    var isStreaming = false {
+        // The app is `.regular` for as long as a stream is live - see
+        // AppDelegate.refreshActivationPolicy for why (Stage Manager).
+        didSet { if isStreaming != oldValue { AppDelegate.refreshActivationPolicy() } }
+    }
     /// Active native session, retained while streaming.
     @ObservationIgnored var nativeSession: StreamSession?
 
