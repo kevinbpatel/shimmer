@@ -274,11 +274,12 @@ struct BatteryPixels {
     /// a green fill. One colour has no such help: the same bolt punched out of
     /// a black fill is a 4pt speck at menu-bar size (measured 2026-09-12 against
     /// Steam's own render - identical geometry, illegible mark). So here it
-    /// stands upright, the way Apple's battery.100percent.bolt does, and at
-    /// 1.4x - as large as it gets before its points reach the walls through the
-    /// halo - centred on the hole. Left un-snapped: it is all diagonals, so
-    /// there is no grid for it to land on.
-    static let boltScale: CGFloat = 1.4
+    /// stands upright and REPLACES the fill: while charging the track holds a
+    /// solid 16x22 bolt and nothing else, centred on the hole, with room to
+    /// the walls on every side. Chosen from six rounds of mock-ups
+    /// (2026-09-12) over a bolt on top of the fill in any size or place. Left
+    /// un-snapped: it is all diagonals, so there is no grid for it to land on.
+    static let boltScale: CGFloat = 1.6
     var bolt: CGPath {
         let p = CGMutablePath()
         let k = Self.boltScale * unitPx
@@ -338,26 +339,16 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     ctx.setFillColor(NSColor.black.cgColor)
     ctx.addPath(battery.shell)
     ctx.fillPath(using: .evenOdd)
-    if let charge = battery.fill(level: level) { ctx.fill(charge) }
-
     if charging {
-        // Steam sets the bolt straight over the fill in `currentColor`. In a
-        // one-colour template that would vanish into it, so the bolt gets a
-        // punched-out gap first and is then set solid inside it - the same mark,
-        // legible whether it lands on fill or on bare shell.
-        let bolt = battery.bolt
-        ctx.saveGState()
-        // The halo may eat fill, never wall: clipped to the hole so the
-        // battery's outline stays whole however close the points come.
-        ctx.clip(to: battery.hole)
-        ctx.setBlendMode(.clear)
-        ctx.addPath(bolt.copy(strokingWithWidth: 2.6 * battery.unitPx, lineCap: .round,
-                              lineJoin: .round, miterLimit: 10))
+        // The bolt IS the charging mark: one solid shape in an otherwise empty
+        // track, no fill under it and no halo around it. The level is not
+        // shown while charging - at 17pt a bolt half-filled to 40% and one
+        // filled to 70% are the same smudge, and the exact number is one click
+        // away in the dropdown - so there is one charging asset, not eleven.
+        ctx.addPath(battery.bolt)
         ctx.fillPath()
-        ctx.restoreGState()
-        ctx.setFillColor(NSColor.black.cgColor)
-        ctx.addPath(bolt)
-        ctx.fillPath()
+    } else if let charge = battery.fill(level: level) {
+        ctx.fill(charge)
     }
     return ctx.makeImage()
 }
@@ -365,9 +356,12 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
 // MARK: - Emit
 
 var written = 0
-for level in levels {
-    for charging in [false, true] {
-        let name = "ControllerBattery\(level)\(charging ? "Charging" : "")"
+// Eleven level marks plus the single charging mark (level is irrelevant there).
+let jobs: [(name: String, level: Int, charging: Bool)] =
+    levels.map { ("ControllerBattery\($0)", $0, false) } + [("ControllerBatteryCharging", 100, true)]
+for job in jobs {
+    do {
+        let (name, level, charging) = job
         let dir = assetRoot.appendingPathComponent("\(name).imageset")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var entries: [String] = []
@@ -403,5 +397,5 @@ for level in levels {
                             atomically: true, encoding: .utf8)
     }
 }
-print("wrote \(levels.count * 2) imagesets (\(written) PNGs) at "
+print("wrote \(jobs.count) imagesets (\(written) PNGs) at "
       + String(format: "%.1fx%.1fpt", markWidth, markHeight))

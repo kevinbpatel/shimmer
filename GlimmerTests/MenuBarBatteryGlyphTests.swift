@@ -40,11 +40,14 @@ struct MenuBarBatteryGlyphTests {
     }
 
     /// Charging is a different asset, not the same one - the bolt has to be
-    /// baked in, since nothing can be overlaid onto it later.
-    @Test func chargingSelectsDifferentArt() {
+    /// baked in, since nothing can be overlaid onto it later. And it is ONE
+    /// asset: the bolt stands in for the level while the pad is plugged in.
+    @Test func chargingSelectsOneDifferentAsset() {
         for percent in [0, 30, 70, 100] {
             #expect(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: true)
                     != MenuBarBatteryGlyph.assetName(forPercent: percent, charging: false))
+            #expect(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: true)
+                    == "ControllerBatteryCharging")
         }
     }
 
@@ -63,7 +66,7 @@ struct MenuBarBatteryGlyphTests {
         #expect(MenuBarBatteryGlyph.assetName(forPercent: 74, charging: false) == "ControllerBattery70")
         #expect(MenuBarBatteryGlyph.assetName(forPercent: 75, charging: false) == "ControllerBattery80")
         #expect(MenuBarBatteryGlyph.assetName(forPercent: 96, charging: true)
-                == "ControllerBattery100Charging")
+                == "ControllerBatteryCharging")
     }
 
     @Test func outOfRangeReadingsClampRatherThanWrap() {
