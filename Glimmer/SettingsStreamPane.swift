@@ -70,7 +70,9 @@ struct StreamPane: View {
             let d = model.hidpiDefaultsForCurrentDisplay()
             return "HiDPI (\(d.width) × \(d.height))"
         case .standard(let size):
-            return "\(size.width) × \(size.height) · \(size.shortLabel)"
+            // Parentheses, not a middle dot - matches the "Match display (5120 ×
+            // 2880)" row above it.
+            return "\(size.width) × \(size.height) (\(size.shortLabel))"
         case .custom:
             return "Custom…"
         }
