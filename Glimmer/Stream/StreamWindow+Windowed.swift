@@ -72,13 +72,17 @@ extension StreamWindow {
         }
     }
 
-    /// Title, aspect lock, minimum size, opening size, and the autosaved frame.
-    /// Order matters: the pixel-mapped size is applied FIRST so a fresh install
-    /// opens 1:1 with the stream, then the autosave name is set - AppKit
-    /// restores a saved frame at that moment, so on later launches the user's
-    /// last position and size win. The restored size is then conformed to
-    /// THIS stream's aspect (a saved 16:10 frame would letterbox a 16:9
-    /// stream) and the whole frame constrained onto the screen.
+    /// Title, aspect lock, minimum size, and the opening frame.
+    ///
+    /// The window ALWAYS opens at the stream's resolution 1:1 - content points
+    /// = pixels / backingScale, so a 1080p stream lands on exactly 1920x1080
+    /// physical pixels (960x540 pt on a 2x panel), 1440p on 2560x1440, 4K on
+    /// 3840x2160: each stream pixel on one screen pixel, no scaling blur,
+    /// whatever resolution the stream is set to. The frame-autosave is kept for
+    /// POSITION only - the window reopens where the user last put it, but at the
+    /// resolution's size, not whatever size they last dragged to (which is what
+    /// broke the pixel density before). A 4K request on a smaller panel is
+    /// scaled DOWN to fit, preserving aspect.
     private func configureWindowedChrome() {
         window.title = windowTitle
         let aspect = streamPixelSize.width > 0 && streamPixelSize.height > 0
@@ -87,10 +91,12 @@ extension StreamWindow {
         window.contentMinSize = StreamWindowGeometry.minimumContentSize(aspect: aspect)
         let screen = window.screen ?? NSScreen.main ?? NSScreen.screens.first
         let available = availableContentArea(on: screen)
-        let mapped = StreamWindowGeometry.pixelMappedContentSize(
-            pixelWidth: Int(streamPixelSize.width), pixelHeight: Int(streamPixelSize.height),
-            backingScaleFactor: screen?.backingScaleFactor ?? 1)
-        window.setContentSize(StreamWindowGeometry.fitted(mapped, within: available))
+        let mapped = StreamWindowGeometry.fitted(
+            StreamWindowGeometry.pixelMappedContentSize(
+                pixelWidth: Int(streamPixelSize.width), pixelHeight: Int(streamPixelSize.height),
+                backingScaleFactor: screen?.backingScaleFactor ?? 1),
+            within: available)
+        window.setContentSize(mapped)
         if let screen {
             let visible = screen.visibleFrame
             window.setFrameOrigin(NSPoint(x: visible.midX - window.frame.width / 2,
@@ -103,9 +109,19 @@ extension StreamWindow {
         if !window.setFrameAutosaveName(Self.frameAutosaveName) {
             log.error("Stream window frame autosave name already in use - this session's frame won't persist")
         }
-        let restored = window.contentRect(forFrameRect: window.frame).size
-        let conformed = StreamWindowGeometry.conformed(restored, toAspect: aspect, within: available)
-        if conformed != restored { window.setContentSize(conformed) }
+        // Position from the restore, size from the resolution: force the
+        // content back to the pixel-mapped size, anchored at the restored
+        // top-left so the window stays where the user put it. This is what
+        // makes every open 1:1 with the stream regardless of the last size the
+        // user dragged to. Guarded on a real mapped size (streamPixelSize is
+        // set before show(), but a zero would collapse the window).
+        if mapped.width > 0, mapped.height > 0 {
+            let restored = window.frame
+            let frameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: mapped)).size
+            window.setFrame(NSRect(x: restored.minX, y: restored.maxY - frameSize.height,
+                                   width: frameSize.width, height: frameSize.height),
+                            display: false)
+        }
         window.setFrame(window.constrainFrameRect(window.frame, to: screen), display: false)
         // Seed the FREE-pointer state. The per-view transparent-cursor
         // backstop defaults ON because full screen hides the cursor for the

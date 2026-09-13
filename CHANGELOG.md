@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+The stream window opens at the resolution's own size now, 1:1. A 1080p stream
+lands on exactly 1920x1080 physical pixels (960x540 points on a 2x display),
+1440p on 2560x1440, 4K on 3840x2160 - each stream pixel on one screen pixel, no
+upscaling blur, whatever you set the resolution to. It used to reopen at
+whatever size you last dragged the window to, which threw the pixel density off;
+now it always matches the stream, and only your window position is remembered.
+A resolution larger than the screen scales down to fit, keeping aspect.
+
 A controller that wakes a moment after the stream comes up now reaches the game
 on its own. A sleepy or low-battery DualSense can have its raw-HID link up (the
 PlayStation button works) while GameController has not yet handed the pad to
