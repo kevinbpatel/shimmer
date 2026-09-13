@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+The menu-bar controller mark's charging bolt is legible now. It was Steam's
+bolt at Steam's size, lying on its side the way Big Picture's does - which
+reads there because it is white on a green fill, and did not read here because
+a menu-bar template gets one colour, leaving a 4pt speck punched out of a
+black fill. The bolt now stands upright, the way Apple's own battery bolt
+does, at 1.4x. The charge inside the battery also sits the same distance from
+the wall as the wall is thick, as Steam's does; on Retina it had a 3-pixel gap
+beside a 2-pixel wall.
+
 Settings is two pages now, the way a game's are: Stream (resolution, frame
 rate, bitrate, codec, HDR, how the stream is shown, Picture in Picture, audio,
 keep-awake, what happens when it ends, the stats overlay) and General

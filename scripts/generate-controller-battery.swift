@@ -207,9 +207,7 @@ if abs(padActualHeightUnits - padHeightUnits) > 0.5 {
 /// uniformly too thin or too heavy.
 struct BatteryPixels {
     let outer: CGRect, hole: CGRect, nub: CGRect, fillTrack: CGRect
-    /// Long-axis origin of the body, kept so the bolt can be placed in the same
-    /// frame without re-deriving it.
-    let bodyLeft: CGFloat, bodyBottom: CGFloat, right: CGFloat, unitPx: CGFloat
+    let unitPx: CGFloat
 
     /// - Parameter scale: 1 or 2; everything here is in that scale's device pixels.
     init(scale: Int) {
@@ -233,9 +231,13 @@ struct BatteryPixels {
         hole = outer.insetBy(dx: wall, dy: wall)             // M36 9H3V27H36V9Z
         nub = rect((bodyShort - nubShort) / 2, (bodyShort + nubShort) / 2,   // x 39..42, y 14..22
                    bodyLong, bodyLong + nubLong)
-        fillTrack = rect(fillOffsetShort, fillOffsetShort + fillShort,       // x=6 w=27, y=12 h=12
-                         fillOffsetLong, fillOffsetLong + fillLong)
-        bodyLeft = x0; bodyBottom = y0; right = sx(bodyShort); unitPx = u
+        // The fill track sits inside the hole by exactly the border's thickness
+        // - Steam's x=6 w=27, y=12 h=12 is the 3-unit border again, all four
+        // sides. So it is INSET by the same rounded wall, not snapped edge by
+        // edge: snapping put 3 pixels of gap beside a 2-pixel wall at 2x, and
+        // the charge read as floating in a frame that was too big for it.
+        fillTrack = hole.insetBy(dx: wall, dy: wall)
+        unitPx = u
     }
 
     /// Shell and hole as ONE even-odd path. It has to be one path: filling the
@@ -260,21 +262,30 @@ struct BatteryPixels {
     /// reads fuller than the pad actually is, is the one error that matters.
     func fill(level: Double) -> CGRect? {
         guard level > 0 else { return nil }   // level 0 draws a bare shell, as Steam's does
-        let length = (fillLong * CGFloat(level) * unitPx).rounded(.down)
+        let length = (fillTrack.height * CGFloat(level)).rounded(.down)
         guard length >= 1 else { return nil }
         return CGRect(x: fillTrack.minX, y: fillTrack.minY, width: fillTrack.width, height: length)
     }
 
-    /// Steam's bolt, `M16 20L21 11V16H26L21 25V20H16Z` in the 48x36 viewBox,
-    /// turned with the rest of the battery. Left un-snapped: it is all diagonals,
-    /// so there is no grid for it to land on.
+    /// Steam's bolt, `M16 20L21 11V16H26L21 25V20H16Z` in the 48x36 viewBox - a
+    /// 10x14 mark - but not at Steam's size or in Steam's orientation. Steam
+    /// draws it in the un-turned battery, so after the quarter-turn it lies on
+    /// its side, 10 units along the body, and it reads because it is white on
+    /// a green fill. One colour has no such help: the same bolt punched out of
+    /// a black fill is a 4pt speck at menu-bar size (measured 2026-09-12 against
+    /// Steam's own render - identical geometry, illegible mark). So here it
+    /// stands upright, the way Apple's battery.100percent.bolt does, and at
+    /// 1.4x - as large as it gets before its points reach the walls through the
+    /// halo - centred on the hole. Left un-snapped: it is all diagonals, so
+    /// there is no grid for it to land on.
+    static let boltScale: CGFloat = 1.4
     var bolt: CGPath {
         let p = CGMutablePath()
-        // viewBox -> body-local (long from the body's left, across from its
-        // bottom edge at y=30) -> the turned frame, where long runs up and
-        // across runs in from the right.
+        let k = Self.boltScale * unitPx
+        // Steam's points about the bolt's own centre (21, 18). The viewBox's y
+        // runs down and CG's runs up, so y flips to keep the same shape.
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: right - (30 - y) * unitPx, y: bodyBottom + x * unitPx)
+            CGPoint(x: hole.midX + (x - 21) * k, y: hole.midY - (y - 18) * k)
         }
         p.move(to: point(16, 20)); p.addLine(to: point(21, 11))
         p.addLine(to: point(21, 16)); p.addLine(to: point(26, 16))
@@ -336,6 +347,9 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
         // legible whether it lands on fill or on bare shell.
         let bolt = battery.bolt
         ctx.saveGState()
+        // The halo may eat fill, never wall: clipped to the hole so the
+        // battery's outline stays whole however close the points come.
+        ctx.clip(to: battery.hole)
         ctx.setBlendMode(.clear)
         ctx.addPath(bolt.copy(strokingWithWidth: 2.6 * battery.unitPx, lineCap: .round,
                               lineJoin: .round, miterLimit: 10))

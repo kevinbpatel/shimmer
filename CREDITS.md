@@ -38,7 +38,9 @@ taken from the Steam client itself - the stylesheet's
 (body 39×24, 3-thick border, 3×8 nub, a 27×12 fill track). The battery is
 redrawn from those numbers, and the arrangement was recovered by rebuilding
 Steam's markup as a page and letting a browser do the layout, rather than by
-measuring a screenshot.
+measuring a screenshot. One departure: the charging bolt is Steam's shape but
+stands upright at 1.4x, where Steam's lies on its side at 1x - Steam's reads
+as white on a green fill, and a one-colour menu-bar template needs the size.
 
 **The DualSense glyph itself is Valve's artwork, used verbatim** - the
 `ControllerType` PS5 glyph, kept at `scripts/assets/steam-controller_dualsense.svg`
