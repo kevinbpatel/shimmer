@@ -49,7 +49,15 @@ extension AppModel {
     /// while THIS Mac is streaming it (the poller is paused then, so the
     /// snapshot would only age out to "Checking…").
     var selectedHostStatusLine: String {
-        if isStreaming { return "Connected" }
+        if isStreaming {
+            // While live, the header's second line says what is actually
+            // streaming, at a glance: "Streaming · 1080p60", plus " HDR" when
+            // HDR is on. Just "Streaming" for the ~1s before the decoder has
+            // reported its format. The exact size + codec live in the Stream
+            // section below; this is the compact shorthand.
+            guard let short = activeStreamShorthand else { return "Streaming" }
+            return "Streaming · \(short)"
+        }
         guard let live = hostLiveStatus,
               Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
             return "Checking…"
@@ -92,6 +100,18 @@ extension AppModel {
         guard isStreaming, let codec = activeStreamCodec else { return nil }
         let label = Self.displayCodec(codec)
         return nativeHDRActive ? "\(label) · HDR" : label
+    }
+
+    /// Compact "1080p60"-style shorthand for the header's streaming line, with
+    /// " HDR" appended when HDR is effectively on - or nil until the decoder has
+    /// reported its format (or when not streaming). Height drives the p-label
+    /// (1080p / 1440p / 2160p), matching the Resolution picker's own names.
+    var activeStreamShorthand: String? {
+        guard isStreaming, activeStreamHeight > 0 else { return nil }
+        var short = "\(activeStreamHeight)p"
+        if activeStreamFps > 0 { short += "\(activeStreamFps)" }
+        if nativeHDRActive { short += " HDR" }
+        return short
     }
 
     /// Human codec label from the decoder's raw token. Pure, so it is unit-tested.
