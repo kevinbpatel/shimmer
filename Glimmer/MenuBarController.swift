@@ -147,6 +147,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // that reads native. Shown whether or not a stream is live, because
         // mute persists: a control that disappears with the session is one the
         // user can't undo before starting the next one.
+        // Live stream facts (inert, sampled on open): what the active stream
+        // actually negotiated - size and refresh, then codec plus HDR when on.
+        // Hidden until the decoder has reported its format, and when not
+        // streaming. No glyphs, so the rows sit at the left edge like the rest.
+        if let resolution = model.activeStreamResolutionLine {
+            menu.addItem(.separator())
+            menu.addItem(.sectionHeader(title: "Stream"))
+            let res = NSMenuItem(title: resolution, action: nil, keyEquivalent: "")
+            res.isEnabled = false
+            menu.addItem(res)
+            if let format = model.activeStreamFormatLine {
+                let fmt = NSMenuItem(title: format, action: nil, keyEquivalent: "")
+                fmt.isEnabled = false
+                menu.addItem(fmt)
+            }
+        }
+
         menu.addItem(.separator())
         menu.addItem(.sectionHeader(title: "Stream Audio"))
         // No glyphs in this group: macOS 26 lays the image column out per

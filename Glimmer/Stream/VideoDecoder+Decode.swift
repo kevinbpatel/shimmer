@@ -61,6 +61,7 @@ extension VideoDecoder {
         log.info(
             "Decoder setup: format=\(String(videoFormat, radix: 16)) \(width)x\(height) @ \(redrawRate)fps"
         )
+        onStreamFormat?(Int(width), Int(height), Int(redrawRate), Self.codecLabel(for: videoFormat))
         return 0
     }
 

@@ -210,6 +210,15 @@ final class AppModel {
     /// chip in the stream UI.
     var nativeHDRActive: Bool = false
 
+    /// The active stream's negotiated format, mirrored from the decoder for the
+    /// menu-bar Stream section. Zero width means "not known yet" (before the
+    /// first decoder setup) or "not streaming"; the menu hides the section then.
+    var activeStreamWidth: Int = 0
+    var activeStreamHeight: Int = 0
+    var activeStreamFps: Int = 0
+    /// Codec label as the decoder reports it: "hevc" / "h264" / "av1".
+    var activeStreamCodec: String?
+
     /// Brief "Stream ended" toast on the launcher. Flipped on whenever a
     /// stream session ends cleanly (regardless of whether the user quit
     /// via hotkey, the host disconnected, or an error occurred); the

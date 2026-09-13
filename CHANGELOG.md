@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+The menu-bar dropdown shows what the live stream actually is. While streaming, a
+Stream section lists the negotiated resolution and refresh (e.g. 1920 × 1080 ·
+60 Hz) and the codec, with HDR noted when it's effectively on (e.g. HEVC · HDR)
+- read straight from the decoder's setup, so it reflects what's really decoding,
+including after a reconnect or resolution change, not just what was requested.
+
 The Resolution picker drops the HiDPI option. It streamed an upscaled virtual
 "Looks like" size of the panel, which muddled the choice more than it helped;
 Match display and the explicit 720p/1080p/1440p/2160p sizes cover the ground.

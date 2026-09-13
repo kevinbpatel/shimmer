@@ -261,3 +261,13 @@ struct QualityRestoreTests {
         }
     }
 }
+
+struct ActiveStreamFormatTests {
+    @Test func codecTokensBecomeHumanLabels() {
+        #expect(AppModel.displayCodec("hevc") == "HEVC")
+        #expect(AppModel.displayCodec("h264") == "H.264")
+        #expect(AppModel.displayCodec("av1") == "AV1")
+        // Unknown tokens are surfaced uppercased rather than hidden.
+        #expect(AppModel.displayCodec("vp9") == "VP9")
+    }
+}

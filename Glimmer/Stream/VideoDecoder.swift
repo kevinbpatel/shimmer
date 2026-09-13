@@ -409,6 +409,15 @@ public final class VideoDecoder {
     /// The body is hopped onto MainActor before fire, so the closure
     /// itself doesn't need to be Sendable.
     nonisolated(unsafe) public var onFirstDecodedFrame: (() -> Void)?
+
+    /// The negotiated stream format, fired from `handleSetup` on connect and on
+    /// every reconnect / resolution change - the GROUND TRUTH of what is being
+    /// decoded (width x height, refresh, codec label), as opposed to what was
+    /// requested. Mirrored onto AppModel for the menu-bar Stream section.
+    /// nonisolated(unsafe) like onFirstDecodedFrame: called from the nonisolated
+    /// decode-thread setup, and its closure only yields to an AsyncStream
+    /// continuation (Sendable, ordered), which is safe from any thread.
+    nonisolated(unsafe) public var onStreamFormat: ((_ width: Int, _ height: Int, _ fps: Int, _ codec: String) -> Void)?
     nonisolated(unsafe) var didFireFirstDecodedFrame = false
 
     // Tracks the last CGColorSpace we attached to a pixel buffer so we only

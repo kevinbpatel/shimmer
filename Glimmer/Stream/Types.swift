@@ -485,6 +485,10 @@ public enum StreamEvent: Sendable {
     /// layer is configured for PQ/HLG with EDR. This is the "show the HDR
     /// chip" signal.
     case hdrActive(Bool)
+    /// The negotiated stream format from the decoder's setup (connect and every
+    /// reconnect): pixel size, refresh, and codec label ("hevc"/"h264"/"av1").
+    /// Mirrored onto AppModel for the menu-bar Stream section.
+    case streamFormat(width: Int, height: Int, fps: Int, codec: String)
     /// Audio receive-start failed (H7): the session came up VIDEO-ONLY (the ping
     /// keeps the A/V session alive, but no audio flows). Non-fatal - the visual
     /// stream is unaffected - so it rides the event channel rather than aborting

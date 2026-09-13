@@ -81,6 +81,8 @@ extension AppModel {
         streamPhase = .connecting(stage: "Connecting to \(host.displayName)…")
         nativeStreamError = nil
         nativeHDRActive = false
+        activeStreamWidth = 0; activeStreamHeight = 0; activeStreamFps = 0
+        activeStreamCodec = nil
         // Re-arm the disconnect toast for back-to-back cycles: if the
         // previous session's toast is still inside its 2-4 s hold, dropping
         // the flag here unmounts it (cancelling its hold task) so the NEXT
@@ -431,6 +433,8 @@ extension AppModel {
         case .connectionTerminated(let code):
             streamPhase = .idle
             nativeHDRActive = false
+            activeStreamWidth = 0; activeStreamHeight = 0; activeStreamFps = 0
+            activeStreamCodec = nil
             if code != 0 {
                 nativeStreamError = "Stream to \(host.displayName) ended unexpectedly."
             }
@@ -455,6 +459,9 @@ extension AppModel {
             streamPhase = .streaming
         case .hdrModeChanged: break  // intent signal only - see .hdrActive
         case .hdrActive(let active): nativeHDRActive = active
+        case let .streamFormat(width, height, fps, codec):
+            activeStreamWidth = width; activeStreamHeight = height
+            activeStreamFps = fps; activeStreamCodec = codec
         case .audioFailed:
             // H7: audio receive failed to start - the session is video-only.
             // Non-fatal to the visual stream, so stay in the streaming phase;
