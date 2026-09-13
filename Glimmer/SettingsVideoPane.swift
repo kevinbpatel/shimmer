@@ -68,10 +68,8 @@ struct VideoPane: View {
                 Toggle("Smooth out Wi-Fi stutter while streaming",
                        isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
                 if case .requiresApproval = awdl.state {
-                    HStack(spacing: 8) {
-                        Label("macOS needs you to approve the Shimmer network helper.",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12)).foregroundStyle(.orange)
+                    SettingsNotice(icon: "exclamationmark.triangle.fill",
+                                   message: "macOS needs you to approve the Shimmer network helper.") {
                         Button("Open Login Items") { awdl.openSystemSettings() }
                     }
                 }

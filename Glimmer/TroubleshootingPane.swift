@@ -58,14 +58,10 @@ struct RawHIDControl: View {
                 Text(AppModel.rawHIDExplanation)
             }
         if model.rawHIDControllerEnabled, !working {
-            HStack(spacing: 8) {
-                // Short enough to stay on ONE line beside the button - a
-                // wrapped message leaves the button floating against two lines
-                // of text, which is what made this row look assembled rather
-                // than designed. The button title carries the detail.
-                Label(sentToSettings ? "Relaunch to finish" : "Input Monitoring is off",
-                      systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12)).foregroundStyle(.orange)
+            SettingsNotice(
+                icon: "exclamationmark.triangle.fill",
+                message: sentToSettings ? "Relaunch to finish" : "Input Monitoring is off"
+            ) {
                 if sentToSettings {
                     Button("Quit & Reopen") { Self.relaunch() }
                         // Relaunching mid-session would drop the stream.

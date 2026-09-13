@@ -217,6 +217,39 @@ struct SettingsField<Content: View>: View {
     }
 }
 
+/// A tinted inline callout for a "macOS needs your approval" warning: an icon
+/// and a short message on the left, the action button pinned to the trailing
+/// edge, inside a rounded tinted box. Reads as one intentional element instead
+/// of a floating icon + orange label + button. Every permission prompt on the
+/// Settings pages uses it, so they match. The message is drawn in the primary
+/// colour (readable on the tint) while the ICON carries the warning colour.
+struct SettingsNotice<Action: View>: View {
+    let icon: String
+    let message: String
+    var tint: Color = .orange
+    @ViewBuilder var action: () -> Action
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 12)
+            action()
+                .controlSize(.small)
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: 460, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(tint.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(tint.opacity(0.22)))
+    }
+}
+
 /// A settings page: the scroll container with the padding every pane shares.
 struct SettingsPageBody<Content: View>: View {
     private let content: Content

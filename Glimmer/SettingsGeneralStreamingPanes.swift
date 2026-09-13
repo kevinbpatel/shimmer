@@ -48,10 +48,8 @@ struct AppPane: View {
                         scheduleLoginItemRegistration(launchAtLogin: on)
                     }
                 if loginItemNeedsApproval {
-                    HStack(spacing: 8) {
-                        Label("macOS needs you to approve Shimmer in Login Items.",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12)).foregroundStyle(.orange)
+                    SettingsNotice(icon: "exclamationmark.triangle.fill",
+                                   message: "macOS needs you to approve Shimmer in Login Items.") {
                         Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }

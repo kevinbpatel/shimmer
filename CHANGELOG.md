@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+The "macOS needs your approval" warnings in Settings - Input Monitoring for the
+enhanced DualSense buttons, Login Items, the Wi-Fi helper - are a proper tinted
+callout now: the icon and message on the left, the button pinned to the right
+inside a rounded box, instead of an icon, orange text and a button floating in a
+loose row. All three share one component, so they match.
+
 Two Settings controls moved to where they belong: "Smooth out Wi-Fi stutter" is
 on the Stream tab now (it tunes the stream), and the stats overlay is on General
 next to Troubleshooting (it is a diagnostic, not a picture setting).
