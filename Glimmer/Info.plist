@@ -24,15 +24,18 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Entertainment, not games. The games category + LSSupportsGameMode tag
+	     the app as a game, which parks macOS's Game Overlay controller icon in
+	     the menu bar the whole time Shimmer runs. Game Mode only ever engaged
+	     full-screen-and-frontmost - paused in window mode and PiP, which is how
+	     this is actually used - so the icon was permanent for a benefit that
+	     almost never applied. Dropping both removes the icon and Game Mode
+	     together: there is no macOS API to keep one without the other, and none
+	     to toggle Game Mode from inside the app (the declaration is read once at
+	     launch, so an in-app switch is impossible). Re-add the games category +
+	     <key>LSSupportsGameMode</key><true/> to bring it back. -->
 	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.games</string>
-	<!-- Game Mode (macOS 14+): CPU/GPU priority for the full-screen frontmost
-	     app and double the Bluetooth sampling rate for controllers and
-	     AirPods. Engages only while the stream window is full screen and
-	     frontmost; PiP and window mode are untouched. Needs the games
-	     category as well as the key (Apple DTS, forums thread 782343). -->
-	<key>LSSupportsGameMode</key>
-	<true/>
+	<string>public.app-category.entertainment</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSHumanReadableCopyright</key>
