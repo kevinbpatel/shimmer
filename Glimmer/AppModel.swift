@@ -62,15 +62,35 @@ final class AppModel {
     let artwork = AppArtworkStore()
 
     // Stream lifecycle
-    var isStreaming = false
+    var isStreaming = false {
+        // The app is `.regular` for as long as a stream is live - see
+        // AppDelegate.refreshActivationPolicy for why (Stage Manager). Applied
+        // a beat LATER, not here: the menu-bar click that starts a stream
+        // calls NSApp.activate() right after this flips, and AppKit drops an
+        // activation issued in the same turn as a policy change - the click's
+        // grant was wasted, the window never became key, and GameController
+        // (which delivers only to the active app) went quiet: the "controller
+        // does nothing but the PS button" report of 2026-09-12. Activating
+        // FIRST, while still .accessory, is granted; the app stays active
+        // through the flip that follows. StreamWindow.show() refreshes too,
+        // so a resume faster than this delay is still regular by the time
+        // its window orders in.
+        didSet {
+            guard isStreaming != oldValue else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                MainActor.assumeIsolated { AppDelegate.refreshActivationPolicy() }
+            }
+        }
+    }
     /// Active native session, retained while streaming.
     @ObservationIgnored var nativeSession: StreamSession?
 
     // Quality
     // Default `.matchDisplay` (panel-native resolution + refresh) - the option
-    // shown at the top of the preset list. Users on constrained links can drop
-    // to HiDPI; an explicit choice is persisted by the didSet below and read
-    // back (with the legacy-preset remap) in init().
+    // shown at the top of the preset list. An explicit choice is persisted by
+    // the didSet below and read back (with the legacy-preset remap) in init().
+    // (HiDPI was removed from the Resolution picker; init() migrates anyone
+    // still on it to Match display.)
     var qualityPreset: QualityPreset = QualityPreset.defaultPreset {
         willSet {
             // Restoring the saved preset is not a user switching presets - see
@@ -190,6 +210,13 @@ final class AppModel {
     /// chip in the stream UI.
     var nativeHDRActive: Bool = false
 
+    /// The active stream's negotiated format, mirrored from the decoder for the
+    /// menu-bar Stream section. Zero width means "not known yet" (before the
+    /// first decoder setup) or "not streaming"; the menu hides the section then.
+    var activeStreamWidth: Int = 0
+    var activeStreamHeight: Int = 0
+    var activeStreamFps: Int = 0
+
     /// Brief "Stream ended" toast on the launcher. Flipped on whenever a
     /// stream session ends cleanly (regardless of whether the user quit
     /// via hotkey, the host disconnected, or an error occurred); the
@@ -307,6 +334,32 @@ final class AppModel {
     /// `effectiveDisplayMode`); snapshotted into the StreamConfig at session
     /// start, like `streamCoversNotch`. A windowed stream caps the refresh at
     /// the display, so a flip recomputes the "Your next stream" summary.
+    /// Settings › "Quit the game when the stream ends". Off (the default,
+    /// and Moonlight's): ending a stream disconnects and the host keeps the
+    /// app running, so the next Stream click resumes it. On: every stop
+    /// sends /cancel, which terminates the app Sunshine launched.
+    var quitAppWhenStreamEnds: Bool = false {
+        didSet { UserDefaults.standard.set(quitAppWhenStreamEnds, forKey: "quitAppWhenStreamEnds") }
+    }
+    /// Settings › "Prefer low audio latency": cap the adaptive audio cushion at
+    /// 60 ms on every link. Off by default - the deeper caps are what keep
+    /// Wi-Fi and tunnels from crackling. Pushed to the running stream.
+    var preferLowAudioLatency: Bool = false {
+        didSet {
+            UserDefaults.standard.set(preferLowAudioLatency, forKey: "preferLowAudioLatency")
+            nativeSession?.audioDecoder.setCushionCeiling(
+                preferLowAudioLatency ? AudioDecoder.lowLatencyCushionCeilingMs : nil)
+        }
+    }
+    /// Whether a live stream keeps the Mac and its display awake - always,
+    /// only while the stream window is up, or never. Pushed to the running
+    /// session so a change lands mid-stream.
+    var keepAwakePolicy: KeepAwakePolicy = KeepAwakePolicy.defaultPolicy {
+        didSet {
+            UserDefaults.standard.set(keepAwakePolicy.rawValue, forKey: KeepAwakePolicy.defaultsKey)
+            Task { [weak self] in await self?.nativeSession?.reconcileKeepAwake() }
+        }
+    }
     var streamDisplayMode: StreamDisplayMode = StreamDisplayMode.defaultMode {
         didSet {
             UserDefaults.standard.set(streamDisplayMode.rawValue, forKey: StreamDisplayMode.defaultsKey)
@@ -545,6 +598,19 @@ final class AppModel {
         // pin included), rather than letting it reach into AppModel.
         artwork.serverInfoProvider = { [unowned self] host in self.nativeServerInfo(for: host) }
         qualityPreset = Self.persistedQualityPreset() ?? qualityPreset
+        // HiDPI is gone from the Resolution picker (see ResolutionChoice.all),
+        // so an install on it has no row to show. Convert it to Match display
+        // (the panel-native size it most resembles) ONCE - a one-shot marker
+        // like the frame-rate drop below, so a later user pick isn't re-stamped.
+        // Under isRestoringDefaults the didSet persistence is suppressed, so the
+        // new value is written to UserDefaults by hand here.
+        if !UserDefaults.standard.bool(forKey: "didDropHiDPIResolution") {
+            UserDefaults.standard.set(true, forKey: "didDropHiDPIResolution")
+            if qualityPreset == .hidpi {
+                qualityPreset = .matchDisplay
+                UserDefaults.standard.set(QualityPreset.matchDisplay.rawValue, forKey: "qualityPreset")
+            }
+        }
         // Width/height/fps are clamped on read: builds whose Quality pane
         // clamped on Return only could persist out-of-range values via a
         // focus-loss commit (0 self-heals via persistedPositiveInt; 1000 Hz
@@ -590,6 +656,10 @@ final class AppModel {
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
             rawValue: UserDefaults.standard.string(forKey: StreamDisplayMode.defaultsKey))
+        quitAppWhenStreamEnds = Self.persistedBool("quitAppWhenStreamEnds") ?? quitAppWhenStreamEnds
+        preferLowAudioLatency = Self.persistedBool("preferLowAudioLatency") ?? preferLowAudioLatency
+        keepAwakePolicy = KeepAwakePolicy.persisted(
+            rawValue: UserDefaults.standard.string(forKey: KeepAwakePolicy.defaultsKey))
         showStreamStats = Self.persistedBool("showStreamStats") ?? showStreamStats
         autoPictureInPicture = Self.persistedBool("autoPictureInPicture") ?? autoPictureInPicture
         controllerQuitChord = Self.persistedRawValue("controllerQuitChord", ControllerQuitChord.self) ?? controllerQuitChord

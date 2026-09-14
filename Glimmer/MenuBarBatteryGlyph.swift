@@ -39,9 +39,14 @@ enum MenuBarBatteryGlyph {
     /// or from GameController, which disagree at the edges, and a name with no
     /// asset behind it draws NOTHING in the menu bar - silently, which is the
     /// worst way for this to fail.
+    ///
+    /// Charging is ONE asset regardless of level: the track holds a solid bolt
+    /// and nothing else. A level shown inside a 17pt bolt is a smudge, and the
+    /// exact number is a click away in the dropdown.
     static func assetName(forPercent percent: Int, charging: Bool) -> String {
+        if charging { return "ControllerBatteryCharging" }
         let clamped = min(max(percent, 0), 100)
         let level = Int((Double(clamped) / Double(step)).rounded()) * step
-        return "ControllerBattery\(level)\(charging ? "Charging" : "")"
+        return "ControllerBattery\(level)"
     }
 }

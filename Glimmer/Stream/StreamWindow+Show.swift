@@ -92,6 +92,9 @@ extension StreamWindow {
         //    without an explicit activate the new window is "on screen but
         //    not key" - mouseMoved fires (it's hover, not focus), but
         //    keyDown does not.
+        //    And before THAT, be a regular app: an accessory app's window has
+        //    no Stage Manager stage and lands behind the focused one.
+        AppDelegate.refreshActivationPolicy()
         NSApp.activate()
 
         // 4. Cover the screen. We size to the current NSScreen.main frame so
@@ -272,6 +275,10 @@ extension StreamWindow {
             if !win.isKeyWindow, !self.isBackgrounded {
                 self.log.error("Window not key 1.5s after show(); retrying activate + makeKeyAndOrderFront + first-responder install")
                 NSApp.activate()
+                // Regardless: in front of every window even if activation
+                // was refused (no user-interaction grant left), so the stream
+                // is at least on top rather than behind the focused stage.
+                win.orderFrontRegardless()
                 win.makeKeyAndOrderFront(nil)
                 self.onDidBecomeReadyForInput?()
             }

@@ -126,6 +126,9 @@ public final class InputForwarder {
 
     weak var window: NSWindow?
     weak var inputView: StreamInputView?
+    /// `GCController.shouldMonitorBackgroundEvents` as it was before attach()
+    /// switched it on for the session; detach() puts it back. nil = untouched.
+    var savedBackgroundControllerEvents: Bool?
 
     /// Called when the user presses the configured quit hotkey. The session
     /// owner wires this to stop streaming.

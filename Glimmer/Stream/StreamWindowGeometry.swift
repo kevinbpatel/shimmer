@@ -41,19 +41,6 @@ enum StreamWindowGeometry {
         return CGSize(width: size.width * scale, height: size.height * scale)
     }
 
-    /// Conform a restored autosaved content size to this stream's aspect: keep
-    /// the width the user last chose, derive the height, then fit to the
-    /// screen. A frame saved from a 16:10 session opened for a 16:9 stream
-    /// would otherwise letterbox on the first frame - the exact bars the
-    /// aspect lock exists to prevent - because `setFrame` restores the saved
-    /// rectangle verbatim (the aspect ratio only constrains interactive
-    /// resizing).
-    static func conformed(_ size: CGSize, toAspect aspect: CGSize, within available: CGSize) -> CGSize {
-        guard aspect.width > 0, aspect.height > 0, size.width > 0 else { return size }
-        let conformed = CGSize(width: size.width, height: size.width * aspect.height / aspect.width)
-        return fitted(conformed, within: available)
-    }
-
     /// The minimum content size at this aspect: `minimumContentWidth` wide,
     /// the matching height, so the floor sits ON the aspect line and the
     /// resize constraint never fights the minimum.

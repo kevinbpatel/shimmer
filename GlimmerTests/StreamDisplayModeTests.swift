@@ -102,17 +102,6 @@ struct StreamDisplayModeTests {
         #expect(StreamWindowGeometry.fitted(small, within: CGSize(width: 1920, height: 1080)) == small)
     }
 
-    @Test func restoredFrameIsConformedToTheStreamAspect() {
-        // A 16:10 saved frame opened for a 16:9 stream keeps its width and
-        // takes the 16:9 height - no letterbox on the first frame.
-        let saved = CGSize(width: 1000, height: 625)
-        let aspect = CGSize(width: 1920, height: 1080)
-        #expect(StreamWindowGeometry.conformed(saved, toAspect: aspect, within: CGSize(width: 3000, height: 2000))
-            == CGSize(width: 1000, height: 562.5))
-        // ...and still fits the screen afterwards.
-        #expect(StreamWindowGeometry.conformed(saved, toAspect: aspect, within: CGSize(width: 800, height: 600))
-            == CGSize(width: 800, height: 450))
-    }
 
     @Test func minimumSizeSitsOnTheAspectLine() {
         #expect(StreamWindowGeometry.minimumContentSize(aspect: CGSize(width: 16, height: 9))

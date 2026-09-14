@@ -195,6 +195,16 @@ extension StreamWindow {
     /// front, then the shared foreground re-engage (which stops PiP).
     func returnFromPictureInPicture() {
         guard !didClose else { return }
+        // Window mode: restore the real frame + chrome + alpha BEFORE the window
+        // is activated and ordered front, so Stage Manager brings it onto the
+        // stage already at its saved place. The other order - order front, then
+        // let reengageForeground restore the frame - showed the window at the
+        // PiP panel's spot and then moved it to its saved frame, which Stage
+        // Manager animated as a "drift to centre, snap back to the left" glitch.
+        // exitPiPSourceMode is idempotent, so the call inside reengageForeground
+        // is then a no-op. The fullscreen-cover path keeps the original ordering:
+        // its restored frame is the whole screen, so there is nothing to drift.
+        if displayMode == .window { exitPiPSourceMode() }
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         reengageForeground()
@@ -321,7 +331,17 @@ extension StreamWindow {
                     guard let self, self.pipSourceMode, !self.didClose else { return }
                     let size = content.bounds.size
                     guard size.width > 1, size.height > 1 else { return }
-                    self.setSourceContent(origin: panel.frame.origin, size: size, display: true)
+                    // Pin the (invisible) source window to its ORIGINAL origin,
+                    // not the PiP panel's. The 1:1 mirror depends only on the
+                    // source layer's SIZE covering the panel's content; where the
+                    // source window sits on screen is irrelevant to what AVKit
+                    // captures. Parking it at the panel's origin used to physically
+                    // move the window across the screen, so on return it travelled
+                    // back to its saved frame - the "drifts to the panel's spot,
+                    // then snaps to the left" glitch under Stage Manager. Keeping
+                    // the origin fixed means only the size ever changes.
+                    self.setSourceContent(origin: self.savedFrameBeforePiP?.origin ?? self.window.frame.origin,
+                                          size: size, display: true)
                     // Part B of the workaround: AVKit draws an empty black
                     // overlay (AVPictureInPictureCALayerHostView) on top of the
                     // correctly-scaled content layer - the big black box. Hide

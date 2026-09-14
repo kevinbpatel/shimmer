@@ -229,6 +229,15 @@ public struct VideoFormats: OptionSet, Sendable {
     public static let av1High8_444   = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_AV1_HIGH8_444)
     public static let av1High10_444  = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_AV1_HIGH10_444)
 
+    /// Whole families, from the wire masks: every profile of a codec, or
+    /// every 10-bit profile across codecs. The per-host codec cap and the
+    /// HDR-off strip subtract these rather than hand-listed members, so the
+    /// 4:4:4 profiles (same codec and bit-depth bits) can't slip through.
+    public static let h264Family = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_H264)
+    public static let hevcFamily = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_H265)
+    public static let av1Family  = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_AV1)
+    public static let tenBit     = VideoFormats(rawValue: StreamProtocol.VIDEO_FORMAT_MASK_10BIT)
+
     /// Build the client-supported codec mask from probed VideoToolbox
     /// capabilities, NOT from a hardcoded "we support everything" set.
     /// Negotiating against a fictional capability set is the standing
@@ -476,6 +485,10 @@ public enum StreamEvent: Sendable {
     /// layer is configured for PQ/HLG with EDR. This is the "show the HDR
     /// chip" signal.
     case hdrActive(Bool)
+    /// The negotiated stream format from the decoder's setup (connect and every
+    /// reconnect): pixel size, refresh, and codec label ("hevc"/"h264"/"av1").
+    /// Mirrored onto AppModel for the menu-bar Stream section.
+    case streamFormat(width: Int, height: Int, fps: Int, codec: String)
     /// Audio receive-start failed (H7): the session came up VIDEO-ONLY (the ping
     /// keeps the A/V session alive, but no audio flows). Non-fatal - the visual
     /// stream is unaffected - so it rides the event channel rather than aborting

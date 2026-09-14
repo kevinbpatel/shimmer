@@ -70,7 +70,9 @@ struct StreamPane: View {
             let d = model.hidpiDefaultsForCurrentDisplay()
             return "HiDPI (\(d.width) × \(d.height))"
         case .standard(let size):
-            return "\(size.width) × \(size.height) · \(size.shortLabel)"
+            // Parentheses, not a middle dot - matches the "Match display (5120 ×
+            // 2880)" row above it.
+            return "\(size.width) × \(size.height) (\(size.shortLabel))"
         case .custom:
             return "Custom…"
         }
@@ -165,6 +167,36 @@ struct StreamPane: View {
 
             SettingsField("Picture in Picture") {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
+            }
+
+            // Off, ending a stream just disconnects: the game stays up on the
+            // PC and the next Stream click resumes it. "Quit <app>" in the
+            // menu bar ends it deliberately. On, every stop ends it.
+            SettingsField("When the stream ends") {
+                Toggle("Quit the game on the PC", isOn: $model.quitAppWhenStreamEnds)
+            }
+
+            // The cushion that rides out Wi-Fi hiccups can sit at 100+ ms for
+            // minutes after one; this caps it at 60 ms on every link and takes
+            // the occasional blip instead.
+            SettingsField("Audio") {
+                Toggle("Prefer low latency over smoothness", isOn: $model.preferLowAudioLatency)
+            }
+
+            // A pad doesn't reset the Mac's idle timer, so a stream being
+            // played would dim and sleep without this - but a stream parked
+            // in a corner while you read is no reason to hold the display
+            // open. "Only while showing" follows the stream window: up →
+            // awake; hidden or in Picture in Picture → the Mac's own rules.
+            SettingsField("Keep the Mac awake") {
+                Picker("", selection: $model.keepAwakePolicy) {
+                    ForEach(KeepAwakePolicy.allCases) { policy in
+                        Text(policy.displayName).tag(policy)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .settingsControl()
             }
 
         }

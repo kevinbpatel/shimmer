@@ -81,6 +81,7 @@ extension AppModel {
         streamPhase = .connecting(stage: "Connecting to \(host.displayName)…")
         nativeStreamError = nil
         nativeHDRActive = false
+        activeStreamWidth = 0; activeStreamHeight = 0; activeStreamFps = 0
         // Re-arm the disconnect toast for back-to-back cycles: if the
         // previous session's toast is still inside its 2-4 s hold, dropping
         // the flag here unmounts it (cancelling its hold task) so the NEXT
@@ -156,6 +157,9 @@ extension AppModel {
             let session = StreamSession(backend: NativeBackend())
             await MainActor.run {
                 self.nativeSession = session
+                // The audio cushion ceiling, before the engine seeds the cushion.
+                session.audioDecoder.setCushionCeiling(
+                    self.preferLowAudioLatency ? AudioDecoder.lowLatencyCushionCeilingMs : nil)
                 // Seed the persisted stream volume / mute BEFORE the first
                 // packet decodes, so a stream the user left muted comes up
                 // muted instead of blasting for the half-second it takes them
@@ -208,6 +212,8 @@ extension AppModel {
                     },
                     pipHotkeyProvider: { [weak self] in self?.pipHotkey ?? .defaultPiP },
                     autoPictureInPictureProvider: { [weak self] in self?.autoPictureInPicture ?? false },
+                    keepAwakeProvider: { [weak self] in self?.keepAwakePolicy ?? .always },
+                    quitAppOnStopProvider: { [weak self] in self?.quitAppWhenStreamEnds ?? false },
                     onPictureInPictureChanged: { [weak self] active in
                         self?.nativeStreamPictureInPicture = active
                     },
@@ -426,6 +432,7 @@ extension AppModel {
         case .connectionTerminated(let code):
             streamPhase = .idle
             nativeHDRActive = false
+            activeStreamWidth = 0; activeStreamHeight = 0; activeStreamFps = 0
             if code != 0 {
                 nativeStreamError = "Stream to \(host.displayName) ended unexpectedly."
             }
@@ -450,6 +457,10 @@ extension AppModel {
             streamPhase = .streaming
         case .hdrModeChanged: break  // intent signal only - see .hdrActive
         case .hdrActive(let active): nativeHDRActive = active
+        case let .streamFormat(width, height, fps, _):
+            // Codec rides the event but is not currently surfaced; the header
+            // shorthand uses size + refresh + HDR.
+            activeStreamWidth = width; activeStreamHeight = height; activeStreamFps = fps
         case .audioFailed:
             // H7: audio receive failed to start - the session is video-only.
             // Non-fatal to the visual stream, so stay in the streaming phase;

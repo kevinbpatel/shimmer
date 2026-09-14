@@ -49,15 +49,25 @@ extension AppModel {
     /// while THIS Mac is streaming it (the poller is paused then, so the
     /// snapshot would only age out to "Checking…").
     var selectedHostStatusLine: String {
-        if isStreaming { return "Connected" }
+        if isStreaming {
+            // While live, the header's second line says what is actually
+            // streaming, at a glance: "Streaming at 1080p60", plus " HDR" when
+            // HDR is on. Just "Streaming" for the ~1s before the decoder has
+            // reported its format. The exact size + codec live in the Stream
+            // section below; this is the compact shorthand.
+            guard let short = activeStreamShorthand else { return "Streaming" }
+            return "Streaming at \(short)"
+        }
         guard let live = hostLiveStatus,
               Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
             return "Checking…"
         }
+        // Sunshine reports BUSY whenever an app is running, streamed or not -
+        // after our own disconnect the game is simply still up on the host.
         switch live.state {
         case .idle: return "Online"
-        case .streamingApp(let name): return "Streaming \(name)"
-        case .streamingUnknownApp: return "Streaming"
+        case .streamingApp(let name): return "\(name) running"
+        case .streamingUnknownApp: return "An app is running"
         case .asleep: return "Asleep or offline"
         case .certMismatch: return "Trust needed - pair again"
         case .unknown: return "Checking…"
@@ -71,6 +81,18 @@ extension AppModel {
     var liveStreamRowTitle: String {
         let name = heroTargetApp?.name ?? defaultAppName
         return nativeStreamBackgrounded ? "Back to \(name)" : "Streaming \(name)"
+    }
+
+    /// Compact "1080p60"-style shorthand for the header's streaming line, with
+    /// " HDR" appended when HDR is effectively on - or nil until the decoder has
+    /// reported its format (or when not streaming). Height drives the p-label
+    /// (1080p / 1440p / 2160p), matching the Resolution picker's own names.
+    var activeStreamShorthand: String? {
+        guard isStreaming, activeStreamHeight > 0 else { return nil }
+        var short = "\(activeStreamHeight)p"
+        if activeStreamFps > 0 { short += "\(activeStreamFps)" }
+        if nativeHDRActive { short += " HDR" }
+        return short
     }
 
     // MARK: - Hero verb (state-aware primary action)
@@ -171,6 +193,13 @@ extension AppModel {
         }
     }
 
+    /// Every 10-bit profile, by the wire mask - the earlier hand-listed
+    /// Main10 pair left the 10-bit 4:4:4 profiles advertised, so an SDR
+    /// session could still negotiate 10-bit and inherit the BT.2020 mis-tag.
+    nonisolated static func stripTenBit(from formats: VideoFormats) -> VideoFormats {
+        formats.subtracting(.tenBit)
+    }
+
     /// Bridge our published quality settings into the engine's StreamConfig.
     /// The codec set is the probed client capability capped by the host's
     /// override (right-click → Codec; Automatic by default, which negotiates
@@ -207,7 +236,7 @@ extension AppModel {
         // the source instead of compensating for it, and 10-bit buys nothing
         // on an SDR pipeline. moonlight-qt masks the same way.
         if !cfg.hdr {
-            formats = formats.subtracting([.hevcMain10, .av1Main10])
+            formats = Self.stripTenBit(from: formats)
         }
         cfg.videoFormats = formats
         // Codec-aware wire budget (see wireBitrateKbps): the H.264-anchored dial

@@ -43,6 +43,7 @@ extension StreamSession {
         let onBackgroundedChanged: (@MainActor (Bool) -> Void)?
         let pipHotkeyProvider: @MainActor () -> HotkeyChord
         let autoPictureInPictureProvider: @MainActor () -> Bool
+        let keepAwakeProvider: @MainActor () -> KeepAwakePolicy
         let onPictureInPictureChanged: (@MainActor (Bool) -> Void)?
         let pipPointerProvider: @MainActor () -> Bool
     }
@@ -103,8 +104,13 @@ extension StreamSession {
         // computes that (`presentSuppressedState`) and emits only real edges;
         // the decoder uses it to stop misreading the intentional non-present
         // backlog as packet loss and to flush+resync on refocus.
-        win.onBackgroundedChanged = { backgrounded in
+        win.onBackgroundedChanged = { [weak self] backgrounded in
             onBackgroundedChanged?(backgrounded)
+            // The keep-awake follows the window under "Only while showing".
+            Task { [weak self] in
+                guard let self else { return }
+                await self.setWindowBackgrounded(backgrounded)
+            }
         }
         win.onPresentSuppressionChanged = { [weak dec] suppressed in
             dec?.setPresentSuppressed(suppressed)
@@ -327,6 +333,10 @@ extension StreamSession {
         // needed; AsyncStream.Continuation is Sendable + ordered.
         setup.2.onHDRActiveChanged = { [weak bridge] active in
             bridge?.eventContinuation?.yield(.hdrActive(active))
+        }
+        setup.2.onStreamFormat = { [weak bridge] width, height, fps, codec in
+            bridge?.eventContinuation?.yield(
+                .streamFormat(width: width, height: height, fps: fps, codec: codec))
         }
         // Re-wire the first-decoded-frame hook (set above for window
         // fade-in) to ALSO yield `.firstFrame` through the bridge now that

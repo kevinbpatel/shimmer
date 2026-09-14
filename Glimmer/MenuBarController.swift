@@ -56,22 +56,39 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     /// Precedence, worst news first:
     ///   error         -> the warning triangle alone (nothing else matters)
+    ///   streaming     -> the streamed app's own glyph, + the pad's battery %
+    ///   host running  -> that same app's glyph (there's a session to get back
+    ///                    to on the PC), + the pad's battery % when connected
     ///   pad connected -> the controller's own glyph + its battery percentage
-    ///   streaming     -> play.fill
     ///   idle          -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
     ///
-    /// The pad outranks `play.fill` deliberately: a live stream is already
-    /// obvious from the screen in front of you, whereas the percentage is the
-    /// one number you want mid-session and the one you'd otherwise open a
-    /// menu to see. A PlayStation pad gets the bundled DualSense mark with a
-    /// STEAM-style battery baked in (see MenuBarBatteryGlyph); anything else
-    /// gets Apple's generic controller symbol and the number as the title.
+    /// The icon says WHAT there is to play: the streamed app's glyph while a
+    /// session is live (Steam mark for Big Picture, each app's symbol
+    /// otherwise), AND while the host merely has the app up and waiting to
+    /// resume - `runningAppName`, the same host-truth the "X running" header
+    /// and the tile badge use, so the menu bar and the dropdown never disagree.
+    /// It reverts to the Eclipse mark once the PC is genuinely idle. This
+    /// outranks a bare connected pad: the app is the news; the battery it used
+    /// to own drops to a "NN%" suffix so the number's still there. A pad with
+    /// no app up still gets its own glyph - the bundled DualSense mark with a
+    /// STEAM-style battery baked in (MenuBarBatteryGlyph), or Apple's generic
+    /// controller symbol and the number.
     private func applyLabel() {
         guard let button = item.button else { return }
         button.imagePosition = .imageLeading
         button.title = ""
         if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
             button.image = Self.symbol(symbol)
+        } else if model.isStreaming {
+            button.image = statusGlyph(model.heroTargetApp) ?? Self.symbol("play.fill")
+            if let battery = model.menuBarControllerBattery {
+                button.title = " \(battery.percent)%"
+            }
+        } else if model.runningAppName != nil, let glyph = statusGlyph(model.heroTargetApp) {
+            button.image = glyph
+            if let battery = model.menuBarControllerBattery {
+                button.title = " \(battery.percent)%"
+            }
         } else if let battery = model.menuBarControllerBattery {
             if model.menuBarControllerGlyph == .playStation {
                 button.image = Self.asset(MenuBarBatteryGlyph.assetName(
@@ -80,10 +97,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 button.image = Self.symbol("gamecontroller.fill")
                 button.title = "\(battery.percent)%"
             }
-        } else if let symbol = model.menuBarSystemImageName {
-            button.image = Self.symbol(symbol)
         } else {
             button.image = Self.asset("MenuBarIcon")
+        }
+    }
+
+    /// The streamed app's glyph, sized for the status bar: an SF Symbol (the bar
+    /// fits it exactly as it fits play.fill) or the one bundled template mark a
+    /// symbol can't express (Steam), drawn at the menu-bar cap height so it tints
+    /// and inverts with the bar like every other status glyph.
+    private func statusGlyph(_ app: LibraryApp?) -> NSImage? {
+        guard let app else { return nil }
+        switch app.glyph {
+        case .symbol(let name): return Self.symbol(name)
+        case .asset(let name): return Self.asset(name, height: 15)
         }
     }
 
@@ -115,9 +142,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     menu.addItem(action("Picture in Picture", #selector(enterPictureInPicture),
                                         image: Self.symbol("pip.enter")))
                 }
+                // No "Quit <app>" here: ending a stream is a disconnect and the
+                // game stays up on the PC by design, and a quit row under the
+                // return row is an accident waiting to happen. Settings ›
+                // "Quit the game on the PC" is where the other preference lives.
             } else {
                 // Named AND iconed off the app this actually launches - the one
-                // you streamed here last, not a fixed "Desktop".
+                // you streamed here last, not a fixed "Desktop". If the PC still
+                // has it up from an earlier disconnect, this resumes it.
                 menu.addItem(action(model.heroActionLabel, #selector(streamHero),
                                     image: glyph(model.heroTargetApp) ?? Self.symbol("play.fill")))
             }
@@ -144,16 +176,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // user can't undo before starting the next one.
         menu.addItem(.separator())
         menu.addItem(.sectionHeader(title: "Stream Audio"))
-        menu.addItem(action(model.streamMuted ? "Unmute" : "Mute", #selector(toggleMute),
-                            image: Self.symbol(model.streamMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")))
+        // No glyphs in this group: macOS 26 lays the image column out per
+        // section, so one icon here would indent both rows.
+        menu.addItem(action(model.streamMuted ? "Unmute" : "Mute", #selector(toggleMute)))
+        // The submenu is the ladder alone: 100% down to 10%, the current rung
+        // checked. (Louder / Quieter rows sat above it for a while; two verbs
+        // over a list of the same values read as clutter.)
         let volume = NSMenu()
-        let louder = action("Louder", #selector(stepLouder), image: Self.symbol("speaker.plus"))
-        louder.isEnabled = model.streamVolume < 1
-        volume.addItem(louder)
-        let quieter = action("Quieter", #selector(stepQuieter), image: Self.symbol("speaker.minus"))
-        quieter.isEnabled = model.streamVolume > AppModel.minStreamVolume
-        volume.addItem(quieter)
-        volume.addItem(.separator())
         for level in AppModel.streamVolumeLevels {
             let rung = action("\(Int((level * 100).rounded()))%", #selector(setVolume))
             rung.representedObject = level
@@ -161,57 +190,43 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             volume.addItem(rung)
         }
         let volumeRow = NSMenuItem(title: "Volume: \(model.streamVolumePercent)%", action: nil, keyEquivalent: "")
-        volumeRow.image = Self.symbol(model.streamMuted ? "speaker.slash" : "speaker.wave.2")
         volumeRow.submenu = volume
         menu.addItem(volumeRow)
 
-        // Controller battery charm - whenever a pad reporting battery is
-        // connected (sampled on open). The glyph matches the label's so the
-        // two read as one thing.
-        if let battery = model.menuBarControllerBattery {
-            menu.addItem(.separator())
-            menu.addItem(.sectionHeader(title: "Controller"))
-            let charm = NSMenuItem(
-                title: "\(battery.percent)% battery\(battery.charging ? " · charging" : "")",
-                action: nil, keyEquivalent: "")
-            if battery.charging {
-                charm.image = Self.symbol("battery.100.bolt")
-            } else {
-                switch model.menuBarControllerGlyph {
-                case .playStation: charm.image = Self.asset("DualSenseGlyph", height: 11)
-                case .generic: charm.image = Self.symbol("gamecontroller.fill")
-                }
-            }
-            charm.isEnabled = false
-            menu.addItem(charm)
-        }
+        // Controller battery is shown by the menu-bar icon itself (the battery
+        // glyph on the status item), not repeated as a "N% battery" row here.
 
         // The window rows and Quit at the bottom - Tailscale's layout, where
         // the window is the exception, not the point. Both open the same
         // tabbed window: Settings on its tab, Open Shimmer on the last one.
         menu.addItem(.separator())
-        // Plain text, like Tailscale's. macOS 26 decorates a "Settings…"
-        // item with a gear on its own when the item has no image (the 27 SDK
-        // adds `preferredImageVisibility` for this); an explicit empty image
-        // is the one lever the 26 SDK offers, and it draws nothing.
-        // Both carry it, so the pair sits on the same text column as the rows
-        // above and the Quit row below rather than one hugging the left edge.
-        let settings = action("Settings…", #selector(openSettings), key: ",")
-        settings.image = NSImage(size: .zero)
-        menu.addItem(settings)
-        let open = action("Open Shimmer", #selector(openWindow))
-        open.image = NSImage(size: .zero)
-        menu.addItem(open)
+        // Plain text at the left edge, like Tailscale's. macOS 26 decorates a
+        // menu item with a gear of its own when its ACTION is named
+        // `openSettings` (measured: the title, the ⌘, and the exact standard
+        // title are all irrelevant - only that selector name draws one; the
+        // 27 SDK adds `preferredImageVisibility`). So the selector is not
+        // called that, and neither row carries an image - an empty image
+        // would suppress the gear but reserve the image column and indent.
+        menu.addItem(action("Settings…", #selector(showSettingsPage), key: ","))
+        menu.addItem(action("Open Shimmer", #selector(openWindow)))
         menu.addItem(.separator())
         // No "Check for Updates…" here, by request. Sparkle still checks on
         // its own at launch, and the command stays in the app menu.
-        menu.addItem(action("Quit Shimmer", #selector(quit), key: "q", image: Self.symbol("power")))
+        menu.addItem(action("Quit Shimmer", #selector(quit), key: "q"))
     }
 
     // MARK: - Actions
 
     @objc private func streamHero() {
         model.streamDefaultApp()
+        // Claim activation NOW, while the app is still .accessory: this click
+        // is the user-interaction grant cooperative activation needs, and it
+        // is good for a moment, not the seconds a connect takes. The model
+        // flips us to .regular a beat later (AppModel.isStreaming) - after
+        // this has landed, because AppKit drops an activate() issued in the
+        // same turn as a policy change. Active with no window yet is fine:
+        // the stream window then arrives in the active app's stage, in front,
+        // instead of behind whatever Stage Manager had up.
         NSApp.activate()
     }
 
@@ -225,17 +240,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleMute() { model.toggleStreamMute() }
-    @objc private func stepLouder() { model.stepStreamVolume(by: AppModel.streamVolumeStep) }
-    @objc private func stepQuieter() { model.stepStreamVolume(by: -AppModel.streamVolumeStep) }
 
     @objc private func setVolume(_ sender: NSMenuItem) {
         guard let level = sender.representedObject as? Double else { return }
         model.setStreamVolume(level)
     }
 
-    @objc private func openSettings() {
+    @objc private func showSettingsPage() {
         AppDelegate.openMainWindow?()
-        model.settingsTab = .settings
+        model.settingsTab = .stream
         NSApp.activate()
     }
 

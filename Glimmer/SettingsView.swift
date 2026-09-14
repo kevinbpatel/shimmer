@@ -35,7 +35,8 @@ struct AppShell: View {
             Divider()
             switch model.settingsTab {
             case .computers: ComputersTab()
-            case .settings: SettingsTabPage()
+            case .stream: StreamTabPage()
+            case .general: GeneralTabPage()
             case .about: AboutPane()
             }
         }
@@ -55,13 +56,23 @@ struct AppShell: View {
 /// rather than a pane per topic, and the gutter labels ("Resolution:",
 /// "Bitrate:") do the grouping that a sidebar would otherwise do; rules
 /// separate the broader areas.
-private struct SettingsTabPage: View {
+/// Everything about the stream itself - what it looks and sounds like and
+/// how it is shown - the way a game's Video / Audio pages read.
+private struct StreamTabPage: View {
     var body: some View {
         SettingsPageBody {
             StreamPane()
             SettingsRule()
             VideoPane()
-            SettingsRule()
+        }
+    }
+}
+
+/// The controls and the app around the stream: shortcuts, the pad, login,
+/// the Wi-Fi helper, troubleshooting, diagnostics.
+private struct GeneralTabPage: View {
+    var body: some View {
+        SettingsPageBody {
             ShortcutsPane()
             SettingsRule()
             AppPane()

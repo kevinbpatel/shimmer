@@ -21,22 +21,31 @@ import SwiftUI
 /// The pages the settings view can show. Raw values are persisted as the
 /// remembered tab, so leave them alone when renaming a title.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case computers, settings, about
+    case computers, stream, general, about
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .computers: return "Computers"
-        case .settings: return "Settings"
+        // The enum case stays `computers` (the --debug-open-settings rawValue
+        // and existing references); only the shown name changed to "Servers".
+        case .computers: return "Servers"
+        case .stream: return "Stream"
+        case .general: return "General"
         case .about: return "About"
         }
     }
 
     var symbol: String {
         switch self {
-        case .computers: return "display"
-        case .settings: return "slider.horizontal.3"
+        // A rack, matching the "Servers" name (Sunshine hosts) - and distinct
+        // from the "display"/"desktopcomputer" glyph the host rows and menu bar
+        // already use for a machine.
+        case .computers: return "server.rack"
+        // A screen with a play badge: the video you watch, not the Wi-Fi-looking
+        // radio waves. The sliders stay with the app-level General page.
+        case .stream: return "play.tv"
+        case .general: return "slider.horizontal.3"
         case .about: return "info.circle"
         }
     }
@@ -49,7 +58,10 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var windowHeight: CGFloat {
         switch self {
         case .computers: return 528 - 32
-        case .settings: return 588 - 32
+        // Stream carries eleven fields (two of them two rows tall); General
+        // seven. Sized so neither page scrolls.
+        case .stream: return 660 - 32
+        case .general: return 588 - 32
         case .about: return 540 - 32
         }
     }
@@ -202,6 +214,35 @@ struct SettingsField<Content: View>: View {
             }
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// An inline "macOS needs your approval" caption for the control it sits under:
+/// a small warning glyph and a short line of secondary text, with the action as
+/// an inline blue link right after the sentence - the way macOS itself writes
+/// permission help under a setting. No tinted box, no border, no button pinned
+/// to the far edge; the glyph + message flow as one line (concatenated Text, so
+/// the icon shares the text baseline) and the link hugs left beside it. Every
+/// permission prompt on the Settings pages uses it, so they match.
+struct SettingsNotice<Action: View>: View {
+    let icon: String
+    let message: String
+    var tint: Color = .orange
+    @ViewBuilder var action: () -> Action
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            (Text(Image(systemName: icon)).foregroundColor(tint)
+             + Text("  ")
+             + Text(message).foregroundColor(.secondary))
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            action()
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: 460, alignment: .leading)
     }
 }
 

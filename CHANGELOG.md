@@ -2,6 +2,110 @@
 
 ## Unreleased
 
+The "macOS needs your approval" warnings in Settings - Input Monitoring for the
+enhanced DualSense buttons, Login Items, the Wi-Fi helper - are a proper tinted
+callout now: the icon and message on the left, the button pinned to the right
+inside a rounded box, instead of an icon, orange text and a button floating in a
+loose row. All three share one component, so they match.
+
+Two Settings controls moved to where they belong: "Smooth out Wi-Fi stutter" is
+on the Stream tab now (it tunes the stream), and the stats overlay is on General
+next to Troubleshooting (it is a diagnostic, not a picture setting).
+
+Settings tabs: the machines tab is now "Servers" with a server-rack icon
+(clearer than "PCs", and its own glyph distinct from the host rows), and the
+Stream tab's Wi-Fi-looking radio-waves icon becomes a screen-with-play glyph
+that reads as the video you watch.
+
+The menu-bar dropdown drops the Stream detail section and the "N% battery"
+controller row - the header already says what is streaming, and the controller's
+charge shows on the menu-bar icon itself, so both were redundant.
+
+The menu-bar header's second line says what is streaming while a stream is live
+- "Streaming at 1080p60", with " HDR" when HDR is on - instead of a bare
+"Connected". It falls back to "Streaming" for the moment before the decoder has
+reported its format, and to the host's online/asleep status when idle as before.
+
+The Resolution picker drops the HiDPI option. It streamed an upscaled virtual
+"Looks like" size of the panel, which muddled the choice more than it helped;
+Match display and the explicit 720p/1080p/1440p/2160p sizes cover the ground.
+Anyone who had HiDPI selected is moved to Match display once, automatically.
+
+The stream window opens at the resolution's own size now, 1:1. A 1080p stream
+lands on exactly 1920x1080 physical pixels (960x540 points on a 2x display),
+1440p on 2560x1440, 4K on 3840x2160 - each stream pixel on one screen pixel, no
+upscaling blur, whatever you set the resolution to. It used to reopen at
+whatever size you last dragged the window to, which threw the pixel density off;
+now it always matches the stream, and only your window position is remembered.
+A resolution larger than the screen scales down to fit, keeping aspect.
+
+A controller that wakes a moment after the stream comes up now reaches the game
+on its own. A sleepy or low-battery DualSense can have its raw-HID link up (the
+PlayStation button works) while GameController has not yet handed the pad to
+Shimmer; the stream used to check for the pad once at connect and then only wait
+for a connect event, so a pad that appeared a beat late stayed dead until a full
+restart. The stream now re-scans for the pad for the first several seconds after
+it connects, so it - and its battery reading - self-heal within seconds.
+
+Under Stage Manager, a stream started from the menu bar opened behind
+whatever was focused. Shimmer was still a menu-bar-only app at that moment -
+no Dock icon, and, it turns out, no stage of its own - so the new window fell
+in behind the stage on screen, and a Cmd-Tab away from it had no way back.
+The app is a regular one now for as long as a stream is live (window, hidden,
+or Picture in Picture), and returns to the menu bar when the stream ends.
+The controller also reaches the host for the whole stream whether or not
+Shimmer is the app in front - as moonlight-qt does - instead of only while
+its window is focused or in Picture in Picture.
+
+The menu-bar controller mark says "charging" with a bolt you can see. It was
+Steam's bolt at Steam's size, lying on its side the way Big Picture's does -
+which reads there because it is white on a green fill, and did not read here
+because a menu-bar template gets one colour, leaving a 4pt speck punched out
+of a black fill. Now, while the pad is plugged in, the battery holds one solid
+upright bolt and nothing else; the level comes back the moment it's unplugged,
+and is always in the dropdown. The charge inside the battery also sits the
+same distance from the wall as the wall is thick, as Steam's does; on Retina it
+had a 3-pixel gap beside a 2-pixel wall.
+
+Settings is two pages now, the way a game's are: Stream (resolution, frame
+rate, bitrate, codec, HDR, how the stream is shown, Picture in Picture, audio,
+keep-awake, what happens when it ends, the stats overlay) and General
+(shortcuts, the controller, login, the Wi-Fi helper, troubleshooting). Neither
+scrolls. The tabs read PCs · Stream · General · About.
+
+Settings › Audio › "Prefer low latency over smoothness" caps the adaptive
+audio cushion at 60 ms on every link. The cushion exists to ride out Wi-Fi
+hiccups, and after one it can sit at 100 ms or more for minutes; with this on
+it takes the occasional blip instead. Off by default, and it lands on the
+running stream.
+
+Fix: choosing "HEVC" for a PC could still get an AV1 stream, and a stream with
+HDR off could still come as 10-bit. Both narrowings removed only the Main
+profiles and left the 4:4:4 ones advertised; they now remove whole families by
+the protocol's own masks.
+
+Shimmer declares Game Mode support. When a stream is full screen and in
+front, macOS 14+ can give it CPU/GPU priority and double the Bluetooth
+sampling rate for controllers and AirPods; it engages and disengages on its
+own, shows a controller icon in the menu bar while on, and that icon's menu is
+where it is turned off. Picture in Picture and window mode are untouched.
+
+Ending a stream no longer quits the game. A stop is a disconnect: the PC keeps
+the app running, the menu bar and library say "<app> running", and the next
+Stream click resumes it where it was (the host takes the new resolution and
+refresh on resume). Settings › "When the stream ends › Quit the game on the
+PC" restores the old behaviour. Apps a
+PC launches detached (a Steam Big Picture entry, say) were never Sunshine's to
+end and are unaffected either way.
+
+Whether a stream keeps the Mac awake is a choice now - Settings › "Keep the
+Mac awake": Always (what every build so far did), Only while showing, or
+Never. "Only while showing" follows the stream window: up and being played,
+the display stays on; hidden or parked in Picture in Picture, the Mac's own
+sleep rules apply. A change lands on the running stream. The App Nap opt-out
+that keeps a backgrounded stream at full priority is separate and unchanged
+(and no longer quietly forbids system sleep on its own).
+
 Shimmer starts in the menu bar. Every launch - Dock, Spotlight, login - comes
 up with no window and no Dock icon; "Open Shimmer" in the menu bar brings the
 window up when you want it. The one exception is a first run with no PC

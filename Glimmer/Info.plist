@@ -25,7 +25,14 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.utilities</string>
+	<string>public.app-category.games</string>
+	<!-- Game Mode (macOS 14+): CPU/GPU priority for the full-screen frontmost
+	     app and double the Bluetooth sampling rate for controllers and
+	     AirPods. Engages only while the stream window is full screen and
+	     frontmost; PiP and window mode are untouched. Needs the games
+	     category as well as the key (Apple DTS, forums thread 782343). -->
+	<key>LSSupportsGameMode</key>
+	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSHumanReadableCopyright</key>

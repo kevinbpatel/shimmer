@@ -53,14 +53,10 @@ extension InputForwarder {
             forName: .GCControllerDidConnect, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
                 // Newly-connected controller is the last one in the registry
-                // we haven't yet attached. Walk and pick up any unknowns -
-                // this also recovers from a missed observer fire.
-                for controller in GCController.controllers()
-                where self.attachedControllers[ObjectIdentifier(controller)] == nil {
-                    self.attach(gamepad: controller)
-                }
+                // we haven't yet attached. attachConnectedPads walks and picks
+                // up any unknowns - this also recovers from a missed observer fire.
+                self?.attachConnectedPads()
             }
         }
         disconnectObserver = NotificationCenter.default.addObserver(
@@ -96,6 +92,20 @@ extension InputForwarder {
         // start observing, so without this an already-paired controller is
         // never attached → never forwarded (the stream sees no controller at
         // all). The connect observer above only covers pads that arrive later.
+        attachConnectedPads()
+    }
+
+    /// Attach every connected pad we have not attached yet. Idempotent - the
+    /// per-controller `attachedControllers` guard skips pads we already have -
+    /// so it is safe to call repeatedly, which `setReady(true)` does on a short
+    /// schedule after the stream connects. A DualSense that registers with
+    /// GameController a beat AFTER the window comes up (a sleepy/low-battery pad
+    /// waking; its raw-HID link is up - the PS button works - but GameController
+    /// has not vended it yet) would otherwise be missed by both the one
+    /// session-start enumeration and the didConnect observer, and the stream
+    /// would show no controller until a full restart. This was the
+    /// "controller does nothing but the PS button" report of 2026-09-12.
+    func attachConnectedPads() {
         for controller in GCController.controllers()
         where attachedControllers[ObjectIdentifier(controller)] == nil {
             attach(gamepad: controller)

@@ -84,6 +84,8 @@ extension AppModel {
             log.notice("DEBUG automation: opening Settings on \(list.map(\.rawValue), privacy: .public)")
             for (i, pane) in list.enumerated() {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(i) * 3.0) { [weak self] in
+                    // The app starts in the menu bar, so the window has to be asked for.
+                    AppDelegate.openMainWindow?()
                     NSApp.activate()
                     self?.settingsTab = pane
                 }
