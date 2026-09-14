@@ -56,39 +56,28 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     /// Precedence, worst news first:
     ///   error         -> the warning triangle alone (nothing else matters)
-    ///   streaming     -> the streamed app's own glyph, + the pad's battery %
-    ///   host running  -> that same app's glyph (there's a session to get back
-    ///                    to on the PC), + the pad's battery % when connected
     ///   pad connected -> the controller's own glyph + its battery percentage
+    ///   streaming     -> the streamed app's own glyph (Steam mark for Big
+    ///                    Picture, each app's symbol otherwise)
+    ///   host running  -> that same app's glyph (a session on the PC waiting to
+    ///                    resume - `runningAppName`, the host-truth the "X
+    ///                    running" header and the tile badge use, so the menu
+    ///                    bar and dropdown never disagree)
     ///   idle          -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
     ///
-    /// The icon says WHAT there is to play: the streamed app's glyph while a
-    /// session is live (Steam mark for Big Picture, each app's symbol
-    /// otherwise), AND while the host merely has the app up and waiting to
-    /// resume - `runningAppName`, the same host-truth the "X running" header
-    /// and the tile badge use, so the menu bar and the dropdown never disagree.
-    /// It reverts to the Eclipse mark once the PC is genuinely idle. This
-    /// outranks a bare connected pad: the app is the news; the battery it used
-    /// to own drops to a "NN%" suffix so the number's still there. A pad with
-    /// no app up still gets its own glyph - the bundled DualSense mark with a
-    /// STEAM-style battery baked in (MenuBarBatteryGlyph), or Apple's generic
-    /// controller symbol and the number.
+    /// The pad outranks the app glyph: you're all but always holding the
+    /// controller while a session is up, so its battery - the one thing the
+    /// screen doesn't already show you - is what belongs there. A PlayStation
+    /// pad gets the bundled DualSense mark with a STEAM-style battery baked in
+    /// (MenuBarBatteryGlyph); anything else gets Apple's generic controller
+    /// symbol and the number. The app glyph (streaming or host-running) shows
+    /// only when NO pad is connected; otherwise it's the Eclipse mark.
     private func applyLabel() {
         guard let button = item.button else { return }
         button.imagePosition = .imageLeading
         button.title = ""
         if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
             button.image = Self.symbol(symbol)
-        } else if model.isStreaming {
-            button.image = statusGlyph(model.heroTargetApp) ?? Self.symbol("play.fill")
-            if let battery = model.menuBarControllerBattery {
-                button.title = " \(battery.percent)%"
-            }
-        } else if model.runningAppName != nil, let glyph = statusGlyph(model.heroTargetApp) {
-            button.image = glyph
-            if let battery = model.menuBarControllerBattery {
-                button.title = " \(battery.percent)%"
-            }
         } else if let battery = model.menuBarControllerBattery {
             if model.menuBarControllerGlyph == .playStation {
                 button.image = Self.asset(MenuBarBatteryGlyph.assetName(
@@ -97,6 +86,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 button.image = Self.symbol("gamecontroller.fill")
                 button.title = "\(battery.percent)%"
             }
+        } else if model.isStreaming {
+            button.image = statusGlyph(model.heroTargetApp) ?? Self.symbol("play.fill")
+        } else if model.runningAppName != nil, let glyph = statusGlyph(model.heroTargetApp) {
+            button.image = glyph
         } else {
             button.image = Self.asset("MenuBarIcon")
         }
