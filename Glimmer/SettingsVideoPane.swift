@@ -70,7 +70,7 @@ struct VideoPane: View {
                 if case .requiresApproval = awdl.state {
                     SettingsNotice(icon: "exclamationmark.triangle.fill",
                                    message: "macOS needs you to approve the Shimmer network helper.") {
-                        Button("Open Login Items") { awdl.openSystemSettings() }
+                        Button("Open Login Items…") { awdl.openSystemSettings() }
                     }
                 }
                 if case .unavailable(let why) = awdl.state {

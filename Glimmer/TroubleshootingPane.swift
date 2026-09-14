@@ -70,7 +70,7 @@ struct RawHIDControl: View {
                               ? "Finish the current stream first"
                               : "macOS applies Input Monitoring only when the app restarts")
                 } else {
-                    Button("Open Input Monitoring") {
+                    Button("Open Input Monitoring…") {
                         // Only advance to "Relaunch to finish" if we really did
                         // hand the user to System Settings; if the system prompt
                         // came up instead, answering it IS the step.

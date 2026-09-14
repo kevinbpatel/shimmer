@@ -50,7 +50,7 @@ struct AppPane: View {
                 if loginItemNeedsApproval {
                     SettingsNotice(icon: "exclamationmark.triangle.fill",
                                    message: "macOS needs you to approve Shimmer in Login Items.") {
-                        Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
+                        Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }
             }

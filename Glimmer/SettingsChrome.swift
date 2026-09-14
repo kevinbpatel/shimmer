@@ -217,12 +217,13 @@ struct SettingsField<Content: View>: View {
     }
 }
 
-/// A tinted inline callout for a "macOS needs your approval" warning: an icon
-/// and a short message on the left, the action button pinned to the trailing
-/// edge, inside a rounded tinted box. Reads as one intentional element instead
-/// of a floating icon + orange label + button. Every permission prompt on the
-/// Settings pages uses it, so they match. The message is drawn in the primary
-/// colour (readable on the tint) while the ICON carries the warning colour.
+/// An inline "macOS needs your approval" caption for the control it sits under:
+/// a small warning glyph and a short line of secondary text, with the action as
+/// an inline blue link right after the sentence - the way macOS itself writes
+/// permission help under a setting. No tinted box, no border, no button pinned
+/// to the far edge; the glyph + message flow as one line (concatenated Text, so
+/// the icon shares the text baseline) and the link hugs left beside it. Every
+/// permission prompt on the Settings pages uses it, so they match.
 struct SettingsNotice<Action: View>: View {
     let icon: String
     let message: String
@@ -230,23 +231,18 @@ struct SettingsNotice<Action: View>: View {
     @ViewBuilder var action: () -> Action
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(tint)
-            Text(message)
-                .font(.system(size: 12))
-                .foregroundStyle(.primary)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            (Text(Image(systemName: icon)).foregroundColor(tint)
+             + Text("  ")
+             + Text(message).foregroundColor(.secondary))
+                .font(.system(size: 11))
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 12)
             action()
-                .controlSize(.small)
+                .buttonStyle(.link)
+                .font(.system(size: 11))
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 10)
         .frame(maxWidth: 460, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(tint.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(tint.opacity(0.22)))
     }
 }
 
