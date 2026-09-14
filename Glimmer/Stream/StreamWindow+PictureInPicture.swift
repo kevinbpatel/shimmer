@@ -195,6 +195,16 @@ extension StreamWindow {
     /// front, then the shared foreground re-engage (which stops PiP).
     func returnFromPictureInPicture() {
         guard !didClose else { return }
+        // Window mode: restore the real frame + chrome + alpha BEFORE the window
+        // is activated and ordered front, so Stage Manager brings it onto the
+        // stage already at its saved place. The other order - order front, then
+        // let reengageForeground restore the frame - showed the window at the
+        // PiP panel's spot and then moved it to its saved frame, which Stage
+        // Manager animated as a "drift to centre, snap back to the left" glitch.
+        // exitPiPSourceMode is idempotent, so the call inside reengageForeground
+        // is then a no-op. The fullscreen-cover path keeps the original ordering:
+        // its restored frame is the whole screen, so there is nothing to drift.
+        if displayMode == .window { exitPiPSourceMode() }
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         reengageForeground()
