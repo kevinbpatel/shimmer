@@ -212,7 +212,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         // No "Check for Updates…" here, by request. Sparkle still checks on
         // its own at launch, and the command stays in the app menu.
-        menu.addItem(action("Quit Shimmer", #selector(quit), key: "q", image: Self.symbol("power")))
+        menu.addItem(action("Quit Shimmer", #selector(quit), key: "q"))
     }
 
     // MARK: - Actions
