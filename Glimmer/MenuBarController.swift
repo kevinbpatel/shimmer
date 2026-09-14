@@ -56,22 +56,30 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     /// Precedence, worst news first:
     ///   error         -> the warning triangle alone (nothing else matters)
+    ///   streaming     -> the streamed app's own glyph (Steam mark for Big
+    ///                    Picture, each app's symbol otherwise), with the pad's
+    ///                    battery % riding along as the title when one's connected
     ///   pad connected -> the controller's own glyph + its battery percentage
-    ///   streaming     -> play.fill
     ///   idle          -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
     ///
-    /// The pad outranks `play.fill` deliberately: a live stream is already
-    /// obvious from the screen in front of you, whereas the percentage is the
-    /// one number you want mid-session and the one you'd otherwise open a
-    /// menu to see. A PlayStation pad gets the bundled DualSense mark with a
-    /// STEAM-style battery baked in (see MenuBarBatteryGlyph); anything else
-    /// gets Apple's generic controller symbol and the number as the title.
+    /// Streaming outranks the bare pad now: the icon says WHAT you're streaming
+    /// (the one thing the menu bar can show that the screen doesn't already make
+    /// obvious the instant you look away from it), while the battery it used to
+    /// own drops to a "NN%" suffix so the number you'd open the menu for is still
+    /// there. Off-stream a connected PlayStation pad still gets the bundled
+    /// DualSense mark with a STEAM-style battery baked in (see MenuBarBatteryGlyph);
+    /// anything else gets Apple's generic controller symbol and the number.
     private func applyLabel() {
         guard let button = item.button else { return }
         button.imagePosition = .imageLeading
         button.title = ""
         if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
             button.image = Self.symbol(symbol)
+        } else if model.isStreaming {
+            button.image = statusGlyph(model.heroTargetApp) ?? Self.symbol("play.fill")
+            if let battery = model.menuBarControllerBattery {
+                button.title = " \(battery.percent)%"
+            }
         } else if let battery = model.menuBarControllerBattery {
             if model.menuBarControllerGlyph == .playStation {
                 button.image = Self.asset(MenuBarBatteryGlyph.assetName(
@@ -80,10 +88,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 button.image = Self.symbol("gamecontroller.fill")
                 button.title = "\(battery.percent)%"
             }
-        } else if let symbol = model.menuBarSystemImageName {
-            button.image = Self.symbol(symbol)
         } else {
             button.image = Self.asset("MenuBarIcon")
+        }
+    }
+
+    /// The streamed app's glyph, sized for the status bar: an SF Symbol (the bar
+    /// fits it exactly as it fits play.fill) or the one bundled template mark a
+    /// symbol can't express (Steam), drawn at the menu-bar cap height so it tints
+    /// and inverts with the bar like every other status glyph.
+    private func statusGlyph(_ app: LibraryApp?) -> NSImage? {
+        guard let app else { return nil }
+        switch app.glyph {
+        case .symbol(let name): return Self.symbol(name)
+        case .asset(let name): return Self.asset(name, height: 15)
         }
     }
 
