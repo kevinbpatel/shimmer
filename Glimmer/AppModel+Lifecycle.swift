@@ -118,6 +118,13 @@ extension AppModel {
                 // triggering event NOT being a mouse click so the launcher
                 // stays reachable mid-stream.
                 guard self.isStreaming, self.nativeStreamBackgrounded else { return }
+                // Not while Picture in Picture is up. PiP is "backgrounded" by
+                // construction (the window is hidden), but the user chose the
+                // corner deliberately - an accidental Cmd-Tab that happens to
+                // land on us must not collapse it back into the window. The
+                // PiP panel's own return button and the menu bar's "Back to X"
+                // are the ways back (and a Dock-icon click, which is explicit).
+                guard !self.nativeStreamPictureInPicture else { return }
                 // Resume on Cmd-Tab, not a window click. currentEvent is nil for both,
                 // so the mouse button is the tell: a click-to-activate still has it down.
                 let evType = NSApp.currentEvent?.type

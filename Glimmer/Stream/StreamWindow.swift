@@ -254,6 +254,10 @@ public final class StreamWindow {
     /// content) and the frame autosave name (so the tiny source frame is never
     /// persisted as "the user's window"). Restored by exitPiPSourceMode().
     var savedChromeBeforePiP: (aspect: NSSize, minSize: NSSize, autosaveName: String)?
+    /// The window's collection behaviour before PiP mirror-source mode swapped
+    /// it for `.auxiliary` (see `applyPiPSourceCollectionBehavior`). nil when
+    /// not in source mode.
+    var savedCollectionBehaviorBeforePiP: NSWindow.CollectionBehavior?
     /// Observer on the PiP panel's content view frame, so the mirror source
     /// window tracks PiP window resizes and keeps filling it 1:1.
     var pipPanelFrameObserver: NSObjectProtocol?
