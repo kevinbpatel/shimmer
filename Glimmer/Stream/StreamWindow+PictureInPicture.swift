@@ -272,6 +272,19 @@ extension StreamWindow {
     func enterPiPSourceMode() {
         guard !pipSourceMode else { return }
         pipSourceMode = true
+        // Make the invisible source look like a floating tool panel to the
+        // window manager, not an app window. Stage Manager tiles every
+        // on-screen window it MANAGES - and it does so whether the app is
+        // .regular or .accessory (measured: the ghost tile survived the
+        // accessory flip). What it leaves alone are floating-level,
+        // stationary / transient windows (palettes, panels) - the shape the
+        // borderless fullscreen cover already has (.canJoinAllSpaces +
+        // .stationary at a high level). Window mode's titled window is a
+        // plain managed window, so reshape it for the duration of source
+        // mode and restore on exit.
+        savedShapeBeforePiP = (window.level, window.collectionBehavior)
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .transient, .ignoresCycle]
+        window.level = .floating
         savedFrameBeforePiP = window.frame
         // Window mode (upstream's titled stream window) locks the content
         // aspect, enforces a minimum size, and autosaves the frame - all three
@@ -400,6 +413,11 @@ extension StreamWindow {
             pipPanelFrameObserver = nil
         }
         window.ignoresMouseEvents = false
+        if let shape = savedShapeBeforePiP {
+            window.collectionBehavior = shape.behavior
+            window.level = shape.level
+            savedShapeBeforePiP = nil
+        }
         if let chrome = savedChromeBeforePiP {
             window.contentAspectRatio = chrome.aspect
             window.contentMinSize = chrome.minSize
