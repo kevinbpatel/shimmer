@@ -102,7 +102,7 @@ extension StreamWindow {
                 // Fall back to a clean hidden state, same as the failure path.
                 if self.pipSourceMode {
                     self.window.orderOut(nil)
-                    self.exitPiPSourceMode()
+                    self.exitPiPSourceMode(restoreAlpha: false)
                 }
                 self.onPictureInPictureChanged?(false)
                 self.publishPresentSuppression()
@@ -153,7 +153,7 @@ extension StreamWindow {
             // the window out. Put the pacer back on the view link.
             if self.pipSourceMode {
                 self.window.orderOut(nil)
-                self.exitPiPSourceMode()
+                self.exitPiPSourceMode(restoreAlpha: false)
             }
             self.onPictureInPictureChanged?(false)
             self.publishPresentSuppression()
@@ -184,7 +184,7 @@ extension StreamWindow {
                 // source mode also swaps the window's level and collection
                 // behaviour (each a window-server round trip).
                 self.window.orderOut(nil)
-                self.exitPiPSourceMode()
+                self.exitPiPSourceMode(restoreAlpha: false)
             }
             // × close engages the normal hidden-window suppression; return is a
             // no-op on an unchanged value.
@@ -401,7 +401,15 @@ extension StreamWindow {
     /// caller orders the window front (return) or out (× close). The frame is
     /// restored with display:false so a hide path never flashes the fullscreen
     /// content before ordering out.
-    func exitPiPSourceMode() {
+    /// `restoreAlpha: false` is for the HIDE paths (× close, start failed, start
+    /// timeout): they order the window out first, and AppKit batches window-
+    /// server updates per run-loop turn - an `alphaValue = 1` issued in the
+    /// same turn as the order-out can be composited before the order-out
+    /// lands, flashing the empty full-size window for a frame (measured on
+    /// the mini: one blank white frame at the × moment). A window at alpha 0
+    /// cannot paint whatever else changes, so those callers keep alpha 0 here
+    /// and restore it on the NEXT turn, once the order-out is committed.
+    func exitPiPSourceMode(restoreAlpha: Bool = true) {
         guard pipSourceMode else { return }
         pipSourceMode = false
         onPictureInPicturePanelChanged?(nil)
@@ -432,7 +440,11 @@ extension StreamWindow {
         // frame restore (a 0.4pt-short layer at the top of the screen); pin the
         // view back to its superview.
         if let superview = displayView.superview { displayView.frame = superview.bounds }
-        window.alphaValue = 1
+        if restoreAlpha {
+            window.alphaValue = 1
+        } else {
+            DispatchQueue.main.async { [weak self] in self?.window.alphaValue = 1 }
+        }
     }
 
     // MARK: - Debug probe
