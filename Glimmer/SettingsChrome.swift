@@ -232,9 +232,9 @@ struct SettingsNotice<Action: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            (Text(Image(systemName: icon)).foregroundColor(tint)
-             + Text("  ")
-             + Text(message).foregroundColor(.secondary))
+            // Interpolating Text into Text keeps each segment's own colour and
+            // shares one baseline; `Text + Text` is deprecated since macOS 26.
+            Text("\(Text(Image(systemName: icon)).foregroundColor(tint))  \(Text(message).foregroundColor(.secondary))")
                 .font(.system(size: 11))
                 .fixedSize(horizontal: false, vertical: true)
             action()
