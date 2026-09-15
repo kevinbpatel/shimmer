@@ -252,6 +252,7 @@ install: release
 	echo "▶ Installing Shimmer.app to $(GLIMMER_APP_DST)..."; \
 	if [ -d "$(GLIMMER_APP_DST)" ]; then echo "  removing existing $(GLIMMER_APP_DST)"; rm -rf "$(GLIMMER_APP_DST)"; fi; \
 	cp -R "$$SRC" "$(GLIMMER_APP_DST)"; \
+	$(MAKE) --no-print-directory unregister-build-products; \
 	COMMIT=$$(sed -nE 's/.*static let commit = "([^"]+)".*/\1/p' Glimmer/BuildInfo.generated.swift); \
 	echo "  ✓ installed build $$COMMIT"; \
 	if pgrep -x Shimmer >/dev/null 2>&1; then \
@@ -259,6 +260,37 @@ install: release
 		echo "    fully QUIT (⌘Q) and relaunch. Run 'make reinstall' to do it automatically."; \
 	fi; \
 	$(MAKE) --no-print-directory reset-stale-tcc
+
+# The login item ("Be ready at login") is a helper app registered by bundle id;
+# launchd resolves that id to a PATH through LaunchServices at spawn time and
+# pins the job to the helper's cdhash taken at registration. Spotlight indexes
+# the build directory, so every build leaves LaunchServices with extra copies
+# of the same bundle id - the helper target's own product
+# (Products/<cfg>/Shimmer Login Helper.app), the one nested in the build-dir
+# Shimmer.app, and the build-dir app itself - and it happily resolves the
+# login item to one of THOSE. Their cdhash never matches the installed
+# helper's, so launchd refuses the spawn (`launchctl print` shows `job state =
+# spawn failed`, `last exit reason = OS_REASON_CODESIGNING`, `last exit code =
+# 78: EX_CONFIG`, thousands of `runs`) while SMAppService still reports the
+# item "enabled" - i.e. login launch silently never happens. Measured on
+# 2026-09-14: with the stray copies unregistered and the item re-registered,
+# launchd spawned the helper cleanly (exit 0). So: after every install, drop
+# the build-dir registrations and re-register the installed bundle. The app's
+# LoginItemManager.reconcile() then re-registers whenever the installed
+# helper's cdhash changed, giving launchd a requirement that matches.
+.PHONY: unregister-build-products
+unregister-build-products:
+	@LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister; \
+	for cfg in Debug Release; do \
+		P="$(DERIVED)/Build/Products/$$cfg"; \
+		for b in "$$P/Shimmer Login Helper.app" \
+		         "$$P/Shimmer.app/Contents/Library/LoginItems/Shimmer Login Helper.app" \
+		         "$$P/Shimmer.app"; do \
+			[ -d "$$b" ] && "$$LSR" -u "$$b" >/dev/null 2>&1 || true; \
+		done; \
+	done; \
+	"$$LSR" -f "$(GLIMMER_APP_DST)" >/dev/null 2>&1 || true; \
+	echo "  ✓ LaunchServices: build-dir copies unregistered, installed bundle registered"
 
 # TCC pins a privacy grant to the app's code requirement. With a Developer ID
 # signature that is a stable Team ID and a grant survives forever - but an ADHOC
