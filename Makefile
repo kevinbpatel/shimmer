@@ -38,7 +38,12 @@
 
 GLIMMER_APP_DST ?= /Applications/Shimmer.app
 CONFIG          ?= Debug
-DERIVED         := $(CURDIR)/build
+# `.noindex`: Spotlight skips folders with that suffix, so LaunchServices never
+# learns about the build products in here. That matters for the login item:
+# launchd resolves the helper by BUNDLE ID through LaunchServices, and a
+# Spotlight-registered build-dir copy (same id, different cdhash) hijacks the
+# lookup and the spawn fails code-signing - see unregister-build-products.
+DERIVED         := $(CURDIR)/build.noindex
 GLIMMER_APP_SRC := $(DERIVED)/Build/Products/$(CONFIG)/Shimmer.app
 OPENSSL_PREFIX  := $(shell brew --prefix openssl@3)
 OPUS_PREFIX     := $(shell brew --prefix opus)
@@ -208,7 +213,7 @@ ensure-signing:
 # sandboxed installer XPC), and Apple deprecated it for distribution. The helper
 # signs each nested component preserving its own entitlements, the app last.
 # Build the AWDL helper daemon with swiftc (system frameworks only - no openssl/
-# opus, so it doesn't need the StreamLib xcconfig). Output lives under build/.
+# opus, so it doesn't need the StreamLib xcconfig). Output lives under $(DERIVED).
 $(HELPER_BIN): $(HELPER_SRCS)
 	@echo "▶ Building AWDL helper (swiftc, $(HELPER_TARGET))..."
 	@mkdir -p $(DERIVED)
@@ -281,12 +286,14 @@ install: release
 .PHONY: unregister-build-products
 unregister-build-products:
 	@LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister; \
-	for cfg in Debug Release; do \
-		P="$(DERIVED)/Build/Products/$$cfg"; \
-		for b in "$$P/Shimmer Login Helper.app" \
-		         "$$P/Shimmer.app/Contents/Library/LoginItems/Shimmer Login Helper.app" \
-		         "$$P/Shimmer.app"; do \
-			[ -d "$$b" ] && "$$LSR" -u "$$b" >/dev/null 2>&1 || true; \
+	for root in "$(DERIVED)" "$(CURDIR)/build"; do \
+		for cfg in Debug Release; do \
+			P="$$root/Build/Products/$$cfg"; \
+			for b in "$$P/Shimmer Login Helper.app" \
+			         "$$P/Shimmer.app/Contents/Library/LoginItems/Shimmer Login Helper.app" \
+			         "$$P/Shimmer.app"; do \
+				[ -d "$$b" ] && "$$LSR" -u "$$b" >/dev/null 2>&1 || true; \
+			done; \
 		done; \
 	done; \
 	"$$LSR" -f "$(GLIMMER_APP_DST)" >/dev/null 2>&1 || true; \

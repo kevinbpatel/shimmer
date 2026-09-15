@@ -84,8 +84,17 @@ enum LoginItemManager {
         case .enabled:
             let current = helperCodeHash()
             let registered = UserDefaults.standard.string(forKey: registeredHelperHashKey)
-            if let current, current != registered {
-                Diag.notice("login item helper changed since registration (\(registered ?? "unrecorded") → \(current)) - re-registering so launchd refreshes its code requirement", "LoginItem")
+            let hashChanged = current != nil && current != registered
+            // Ad-hoc builds are deterministic: an identical rebuild reproduces
+            // the SAME cdhash, so "hash unchanged" alone can hide a requirement
+            // launchd derived while a stray build-dir copy of the helper was
+            // registered. Ask launchd directly; it is the one refusing to spawn.
+            let launchdBroken = launchdReportsSpawnFailure()
+            if hashChanged || launchdBroken {
+                let why = hashChanged
+                    ? "helper changed since registration (\(registered ?? "unrecorded") → \(current ?? "?"))"
+                    : "launchd reports the login item cannot spawn"
+                Diag.notice("login item \(why) - re-registering so launchd refreshes its code requirement", "LoginItem")
                 do { try helper.unregister() } catch {
                     Diag.error("login item unregister FAILED: \(error.localizedDescription)", "LoginItem")
                 }
@@ -99,6 +108,28 @@ enum LoginItemManager {
             Diag.notice("login item drifted (\(statusLabel(status))) - re-registering", "LoginItem")
             apply(launchAtLogin: true)
         }
+    }
+
+    /// Whether launchd says the login item job is in a failed state. launchd is
+    /// the component that refuses the spawn, and `launchctl print` is the only
+    /// public view of its verdict: `job state = spawn failed` / `last exit code
+    /// = 78: EX_CONFIG` mean the helper it resolved doesn't satisfy the
+    /// requirement it holds. Deliberately NOT keyed on the softer `needs LWCR
+    /// update` flag, which launchd shows in healthy states too. Any failure to
+    /// run or parse launchctl reads as "not broken" so this can never cause
+    /// churn on its own.
+    static func launchdReportsSpawnFailure() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["print", "gui/\(getuid())/\(helperBundleID)"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do { try process.run() } catch { return false }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0, let out = String(data: data, encoding: .utf8) else { return false }
+        return out.contains("job state = spawn failed") || out.contains("EX_CONFIG")
     }
 
     /// The installed helper's cdhash (Security's `kSecCodeInfoUnique`), hex -
