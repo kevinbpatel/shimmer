@@ -65,9 +65,6 @@ extension StreamWindow {
             // trapped inside AppKit on macOS 26.6 (window mode). Alpha 0 goes
             // on before the order-in so nothing flashes.
             window.alphaValue = 0
-            // Auxiliary before the order-in too, so Stage Manager never sees the
-            // invisible source arrive as a primary window (a momentary stage).
-            applyPiPSourceCollectionBehavior()
             window.orderFront(nil)
             enterPiPSourceMode()
             log.info("Picture in Picture from the hidden window - source put back on screen at alpha 0")
@@ -208,9 +205,19 @@ extension StreamWindow {
         // is then a no-op. The fullscreen-cover path keeps the original ordering:
         // its restored frame is the whole screen, so there is nothing to drift.
         if displayMode == .window { exitPiPSourceMode() }
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        reengageForeground()
+        // The app is `.accessory` during PiP (no Stage Manager tile, no
+        // Cmd-Tab entry). Go `.regular` FIRST and activate on the NEXT turn:
+        // AppKit drops an activate() issued in the same turn as a policy
+        // change, and an accessory app's window gets no stage and lands
+        // behind the focused one. beginPiPReturn holds `.regular` through
+        // AVKit's asynchronous stop so a becomeKey recheck can't undo it.
+        AppDelegate.beginPiPReturn()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.didClose else { return }
+            NSApp.activate()
+            self.window.makeKeyAndOrderFront(nil)
+            self.reengageForeground()
+        }
     }
 
     /// The renderer hard-fail self-heal rebuilt the display layer while PiP was
@@ -262,30 +269,9 @@ extension StreamWindow {
     /// the window on screen and pass-through. Called from the PiP hide path
     /// BEFORE PiP starts; the exact size is applied on didStart once the PiP
     /// window exists.
-    /// Stage Manager gives every PRIMARY window of a regular app a stage - and
-    /// while PiP is up our only window is the alpha-0 mirror source, so the
-    /// strip showed a ghost tile for it: the app icon over nothing. Marking
-    /// the source `.auxiliary` (the Stage Manager behaviour for windows that
-    /// ride along with a primary instead of owning a stage) for the duration
-    /// of source mode removes that tile; `.ignoresCycle` keeps the invisible
-    /// window out of Cmd-` cycling for the same reason. `.fullScreenPrimary`
-    /// (window mode) contradicts `.auxiliary`, so it is dropped and restored
-    /// with the rest in `exitPiPSourceMode`. Idempotent: the first call wins
-    /// the saved value, so the hidden-window entry path (which applies this
-    /// before ordering in) and `enterPiPSourceMode` compose.
-    func applyPiPSourceCollectionBehavior() {
-        guard savedCollectionBehaviorBeforePiP == nil else { return }
-        savedCollectionBehaviorBeforePiP = window.collectionBehavior
-        var behavior = window.collectionBehavior
-        behavior.remove([.primary, .fullScreenPrimary])
-        behavior.insert([.auxiliary, .ignoresCycle])
-        window.collectionBehavior = behavior
-    }
-
     func enterPiPSourceMode() {
         guard !pipSourceMode else { return }
         pipSourceMode = true
-        applyPiPSourceCollectionBehavior()
         savedFrameBeforePiP = window.frame
         // Window mode (upstream's titled stream window) locks the content
         // aspect, enforces a minimum size, and autosaves the frame - all three
@@ -414,10 +400,6 @@ extension StreamWindow {
             pipPanelFrameObserver = nil
         }
         window.ignoresMouseEvents = false
-        if let behavior = savedCollectionBehaviorBeforePiP {
-            window.collectionBehavior = behavior
-            savedCollectionBehaviorBeforePiP = nil
-        }
         if let chrome = savedChromeBeforePiP {
             window.contentAspectRatio = chrome.aspect
             window.contentMinSize = chrome.minSize

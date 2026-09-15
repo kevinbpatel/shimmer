@@ -56,6 +56,21 @@ public actor StreamSession {
         // would cross actor boundaries.
         let win = self.window
         await MainActor.run {
+            // Back from Picture in Picture: the app is `.accessory` for the
+            // whole of PiP, so it has to go `.regular` FIRST and activate on
+            // the NEXT run-loop turn (AppKit drops an activate() issued in the
+            // same turn as a policy change; an accessory app's window gets no
+            // stage and lands behind the focused one). Same sequence as
+            // StreamWindow.returnFromPictureInPicture, the PiP button's path.
+            if win?.isPictureInPictureActive == true {
+                AppDelegate.beginPiPReturn()
+                DispatchQueue.main.async {
+                    NSApp.activate()
+                    win?.window.makeKeyAndOrderFront(nil)
+                    win?.reengageForeground()
+                }
+                return
+            }
             // First bring the app forward - makeKeyAndOrderFront only makes a
             // window key if its app is active, and the menubar/launcher click
             // that drives this path may have left a different app frontmost.
