@@ -202,58 +202,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// stream START (seconds before the window shows) also sidesteps AppKit's
     /// habit of ignoring an `activate()` issued in the same runloop turn as a
     /// policy change.
-    /// Set while a return from Picture in Picture is in flight. The app has to
-    /// be `.regular` BEFORE it activates (an accessory app's window gets no
-    /// stage and lands behind the focused one), but AVKit reports the PiP stop
-    /// - which clears `nativeStreamPictureInPicture` - asynchronously, and a
-    /// becomeKey recheck landing in between would compute "still in PiP" and
-    /// flip us straight back to `.accessory`. This overrides the PiP bit for
-    /// that window; cleared when the model sees PiP end, or by a backstop.
-    @MainActor static var pipReturnInProgress = false
-
-    /// One rule for the activation policy:
-    ///   `.regular`   while the main window is open, or a stream is live AND
-    ///                not parked in Picture in Picture;
-    ///   `.accessory` otherwise - including for the whole of PiP.
-    /// PiP is `.accessory` on purpose: the app's only window is then the
-    /// invisible mirror source, and a regular app with an invisible window is
-    /// exactly what Stage Manager renders as a ghost tile (the app icon over
-    /// nothing) and what Cmd-Tab can land on by accident. An accessory app has
-    /// no tile, no Dock icon and no Cmd-Tab entry; the PiP panel itself is a
-    /// system window and unaffected. The ways back are the panel's return
-    /// button and the menu bar's "Back to X".
     @MainActor static func refreshActivationPolicy() {
         guard let app = NSApp else { return }   // hostless unit tests
         let mainOpen = app.windows.contains { $0.identifier?.rawValue == "main" && $0.isVisible }
         let streaming = boundManager?.isStreaming == true
-        let inPiP = boundManager?.nativeStreamPictureInPicture == true && !pipReturnInProgress
-        let wanted: NSApplication.ActivationPolicy = (mainOpen || (streaming && !inPiP)) ? .regular : .accessory
+        let wanted: NSApplication.ActivationPolicy = (mainOpen || streaming) ? .regular : .accessory
         guard app.activationPolicy() != wanted else { return }
         app.setActivationPolicy(wanted)
         Diag.info("activation policy → \(wanted == .regular ? "regular" : "accessory") "
-            + "(mainOpen=\(mainOpen) streaming=\(streaming) pip=\(inPiP))", "Launch")
-    }
-
-    /// Call at the START of a return from PiP, before anything activates:
-    /// flips to `.regular` now and holds it through the asynchronous PiP stop.
-    /// The caller must activate / order front on the NEXT run-loop turn -
-    /// AppKit drops an `activate()` issued in the same turn as a policy change.
-    @MainActor static func beginPiPReturn() {
-        pipReturnInProgress = true
-        refreshActivationPolicy()
-        // Backstop: a return whose PiP stop never reports (never observed)
-        // must not pin the override forever.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            MainActor.assumeIsolated { Self.endPiPReturn() }
-        }
-    }
-
-    /// The model saw PiP end (or the backstop fired): drop the override and
-    /// let the plain rule decide again. No-op when no return was in flight.
-    @MainActor static func endPiPReturn() {
-        guard pipReturnInProgress else { return }
-        pipReturnInProgress = false
-        refreshActivationPolicy()
+            + "(mainOpen=\(mainOpen) streaming=\(streaming))", "Launch")
     }
 
     /// NSWindow open/close observers wired in applicationWillFinishLaunching

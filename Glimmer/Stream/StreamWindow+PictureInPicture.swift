@@ -205,19 +205,9 @@ extension StreamWindow {
         // is then a no-op. The fullscreen-cover path keeps the original ordering:
         // its restored frame is the whole screen, so there is nothing to drift.
         if displayMode == .window { exitPiPSourceMode() }
-        // The app is `.accessory` during PiP (no Stage Manager tile, no
-        // Cmd-Tab entry). Go `.regular` FIRST and activate on the NEXT turn:
-        // AppKit drops an activate() issued in the same turn as a policy
-        // change, and an accessory app's window gets no stage and lands
-        // behind the focused one. beginPiPReturn holds `.regular` through
-        // AVKit's asynchronous stop so a becomeKey recheck can't undo it.
-        AppDelegate.beginPiPReturn()
-        DispatchQueue.main.async { [weak self] in
-            guard let self, !self.didClose else { return }
-            NSApp.activate()
-            self.window.makeKeyAndOrderFront(nil)
-            self.reengageForeground()
-        }
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        reengageForeground()
     }
 
     /// The renderer hard-fail self-heal rebuilt the display layer while PiP was

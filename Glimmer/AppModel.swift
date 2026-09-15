@@ -311,19 +311,7 @@ final class AppModel {
     /// True while the running stream is showing in the system Picture in
     /// Picture window (the fullscreen window is hidden). Drives the menu-bar
     /// items. Set from the session's PiP edge callback.
-    var nativeStreamPictureInPicture: Bool = false {
-        // The app is `.accessory` for the whole of PiP - see
-        // AppDelegate.refreshActivationPolicy. Applied a beat later like
-        // `isStreaming` (never in the same turn as an activate()). PiP ending
-        // also releases the return-in-progress override, if one was held.
-        didSet {
-            guard nativeStreamPictureInPicture != oldValue else { return }
-            if !nativeStreamPictureInPicture { AppDelegate.endPiPReturn() }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                MainActor.assumeIsolated { AppDelegate.refreshActivationPolicy() }
-            }
-        }
-    }
+    var nativeStreamPictureInPicture: Bool = false
 
     /// Pop the running stream out into Picture in Picture (menu bar entry
     /// point). No-op when nothing is streaming.
