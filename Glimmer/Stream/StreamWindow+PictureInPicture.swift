@@ -101,8 +101,8 @@ extension StreamWindow {
                 self.pictureInPicturePending = false
                 // Fall back to a clean hidden state, same as the failure path.
                 if self.pipSourceMode {
-                    self.exitPiPSourceMode()
                     self.window.orderOut(nil)
+                    self.exitPiPSourceMode()
                 }
                 self.onPictureInPictureChanged?(false)
                 self.publishPresentSuppression()
@@ -152,8 +152,8 @@ extension StreamWindow {
             // leave mirror-source mode (restore the fullscreen frame) and order
             // the window out. Put the pacer back on the view link.
             if self.pipSourceMode {
-                self.exitPiPSourceMode()
                 self.window.orderOut(nil)
+                self.exitPiPSourceMode()
             }
             self.onPictureInPictureChanged?(false)
             self.publishPresentSuppression()
@@ -176,8 +176,15 @@ extension StreamWindow {
             // full size. (On the return path reengageForeground already left
             // source mode and isBackgrounded is false, so this is skipped.)
             if self.isBackgrounded {
-                self.exitPiPSourceMode()
+                // ORDER OUT FIRST, while the source is still alpha 0, then restore
+                // its frame / chrome / alpha off screen. The other order let a
+                // composited frame of the full-size window - AVKit's placeholder
+                // ("This video is playing in picture in picture") - flash for an
+                // instant between alpha 1 and the order-out, especially now that
+                // source mode also swaps the window's level and collection
+                // behaviour (each a window-server round trip).
                 self.window.orderOut(nil)
+                self.exitPiPSourceMode()
             }
             // × close engages the normal hidden-window suppression; return is a
             // no-op on an unchanged value.
