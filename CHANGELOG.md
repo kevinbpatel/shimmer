@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+The menu bar has an "End Stream" row while a stream is live: it ends the
+stream and leaves Shimmer running. Ending it this way follows "Quit the game on
+the PC" like every other way of ending a stream. "Picture in Picture" stays in
+the menu while the stream is already in Picture in Picture, greyed out, instead
+of disappearing.
+
 "Keep the Mac awake" is a single toggle again (on while streaming, or off)
 instead of a three-way Always / Only while showing / Never control. A saved
 "Only while showing" choice becomes on.

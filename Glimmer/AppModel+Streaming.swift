@@ -518,7 +518,17 @@ extension AppModel {
         Self.connectCapsuleShown = true
     }
 
-    /// Abort an in-flight connect - the connecting capsule's click action
+    /// End the live stream without quitting Shimmer - the menu bar's "End
+    /// Stream" row. Routes through the session's own teardown exactly like
+    /// the quit hotkey does, so there is still one cleanup site; whether the
+    /// game is also quit on the PC follows Settings › "Quit the game on the
+    /// PC", the same as any other way of ending a stream.
+    func endStream() {
+        guard isStreaming, let session = nativeSession else { return }
+        Diag.notice("User ended the stream from the menu bar", "Stream")
+        Task { await session.stop() }
+    }
+
     /// (and its ⎋ shortcut). Routes through the SESSION's own teardown so
     /// there is exactly ONE cleanup site: stop() interrupts the handshake,
     /// start() returns or throws, and the single cleanup in stream()'s Task

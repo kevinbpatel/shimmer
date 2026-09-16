@@ -131,14 +131,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                                       ?? Self.symbol("arrow.up.left.and.arrow.down.right"))
                 live.isEnabled = model.nativeStreamBackgrounded
                 menu.addItem(live)
-                if !model.nativeStreamPictureInPicture {
-                    menu.addItem(action("Picture in Picture", #selector(enterPictureInPicture),
-                                        image: Self.symbol("pip.enter")))
-                }
-                // No "Quit <app>" here: ending a stream is a disconnect and the
-                // game stays up on the PC by design, and a quit row under the
-                // return row is an accident waiting to happen. Settings ›
-                // "Quit the game on the PC" is where the other preference lives.
+                // Always listed while streaming; greyed out once the stream is
+                // already in Picture in Picture, so the row reads as state
+                // rather than vanishing.
+                let pip = action("Picture in Picture", #selector(enterPictureInPicture),
+                                 image: Self.symbol("pip.enter"))
+                pip.isEnabled = !model.nativeStreamPictureInPicture
+                menu.addItem(pip)
+                // End the stream, not Shimmer. A disconnect: the game stays up
+                // on the PC unless Settings › "Quit the game on the PC" is on,
+                // and "Back to X" is not offered again because the session is
+                // gone - the hero row relaunches / resumes it.
+                menu.addItem(action("End Stream", #selector(endStream),
+                                    image: Self.symbol("stop.circle")))
             } else {
                 // Named AND iconed off the app this actually launches - the one
                 // you streamed here last, not a fixed "Desktop". If the PC still
@@ -225,6 +230,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func resumeStream() { model.resumeStreamWindow() }
     @objc private func enterPictureInPicture() { model.enterPictureInPicture() }
+    @objc private func endStream() { model.endStream() }
 
     @objc private func switchHost(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String,
