@@ -104,6 +104,7 @@ extension StreamWindow {
     /// own the balanced show; this never fights them (it only ever hides).
     func reengageForeground() {
         guard !didClose else { return }
+        PiPTrace.log("reengageForeground backgrounded=\(isBackgrounded)", window)
         isBackgrounded = false
         // Leave PiP mirror-source mode first: restore the fullscreen frame,
         // alpha, and event handling before we re-elevate and show. Idempotent

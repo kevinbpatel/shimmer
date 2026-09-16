@@ -34,6 +34,24 @@ import AppKit
 import GameController
 import os.log
 
+/// Debug-only file trace for the PiP hide / return paths, gated on the
+/// `--debug-pip-probe` knob (never on for a normal launch). The unified log
+/// can be unavailable on a test machine; this appends one line per decision
+/// to /tmp/shimmer-pip-trace.log so a sequence can be reconstructed exactly.
+enum PiPTrace {
+    static let enabled: Bool = ProcessInfo.processInfo.arguments.contains { $0.hasPrefix("--debug-pip-probe") }
+        || ProcessInfo.processInfo.environment["GLIMMER_DEBUG_PIP_PROBE"] != nil
+    private static let fmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss.SSS"; return f }()
+    @MainActor static func log(_ what: String, _ w: NSWindow? = nil) {
+        guard enabled else { return }
+        var line = "\(fmt.string(from: Date())) \(what) active=\(NSApp.isActive)"
+        if let w { line += " key=\(w.isKeyWindow) visible=\(w.isVisible) alpha=\(w.alphaValue) level=\(w.level.rawValue) frame=\(Int(w.frame.origin.x)),\(Int(w.frame.origin.y)) \(Int(w.frame.width))x\(Int(w.frame.height))" }
+        line += "\n"
+        if let h = FileHandle(forWritingAtPath: "/tmp/shimmer-pip-trace.log") { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); h.closeFile() }
+        else { FileManager.default.createFile(atPath: "/tmp/shimmer-pip-trace.log", contents: line.data(using: .utf8)) }
+    }
+}
+
 extension StreamWindow {
 
     // MARK: - Entry
@@ -42,6 +60,7 @@ extension StreamWindow {
     /// fullscreen window first if it is up (same teardown as a Cmd-Tab-away).
     /// No-op when PiP is already up / starting, or when AVKit can't start it.
     public func enterPictureInPicture() {
+        PiPTrace.log("enterPictureInPicture backgrounded=\(isBackgrounded) active=\(isPictureInPictureActive) pending=\(pictureInPicturePending) possible=\(pictureInPicture.isPossible)", window)
         guard !didClose, !isPictureInPictureActive, !pictureInPicturePending else { return }
         guard pictureInPicture.isPossible else {
             log.notice("Picture in Picture requested but not possible (another app may own it)")
@@ -164,8 +183,9 @@ extension StreamWindow {
             // is a no-op here because AVKit is already stopping it.
             self?.returnFromPictureInPicture()
         }
-        pictureInPicture.onDidStop = { [weak self] _ in
+        pictureInPicture.onDidStop = { [weak self] restoreRequested in
             guard let self, !self.didClose else { return }
+            PiPTrace.log("onDidStop restoreRequested=\(restoreRequested) backgrounded=\(self.isBackgrounded) inFlight=\(self.pipReturnInFlight)", self.window)
             self.setPictureInPictureActive(false)
             self.pictureInPicturePaused = false
             self.restoreBackgroundControllerEvents()
@@ -189,6 +209,8 @@ extension StreamWindow {
             // × close engages the normal hidden-window suppression; return is a
             // no-op on an unchanged value.
             self.publishPresentSuppression()
+            // Return: presentation is owned by awaitActivationThenPresent (window
+            // mode) / the immediate path (fullscreen); nothing to do here.
         }
         pictureInPicture.onPauseChanged = { [weak self] paused in
             guard let self, !self.didClose else { return }
@@ -202,19 +224,92 @@ extension StreamWindow {
     /// front, then the shared foreground re-engage (which stops PiP).
     func returnFromPictureInPicture() {
         guard !didClose else { return }
-        // Window mode: restore the real frame + chrome + alpha BEFORE the window
-        // is activated and ordered front, so Stage Manager brings it onto the
-        // stage already at its saved place. The other order - order front, then
-        // let reengageForeground restore the frame - showed the window at the
-        // PiP panel's spot and then moved it to its saved frame, which Stage
-        // Manager animated as a "drift to centre, snap back to the left" glitch.
-        // exitPiPSourceMode is idempotent, so the call inside reengageForeground
-        // is then a no-op. The fullscreen-cover path keeps the original ordering:
-        // its restored frame is the whole screen, so there is nothing to drift.
-        if displayMode == .window { exitPiPSourceMode() }
+        PiPTrace.log("returnFromPictureInPicture backgrounded=\(isBackgrounded) sourceMode=\(pipSourceMode)", window)
+        pipReturnInFlight = true
+        // Backstop: a stop that never reports must not pin the flag forever.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            MainActor.assumeIsolated { self?.pipReturnInFlight = false }
+        }
+        if displayMode == .window {
+            // Sequencing, measured on macOS 27 with real HID clicks on the
+            // panel's return control: the `NSApp.activate()` issued while
+            // AVKit's PiP panel is still alive / closing is dropped - the app
+            // is still inactive seconds later, its window on screen but not
+            // key, and Stage Manager files an inactive app's window into the
+            // strip on the next interaction. Activation only sticks when
+            // re-requested after the panel is gone (~0.9 s after the click).
+            // Therefore: restore the frame + alpha now (AVKit's fly-back needs
+            // a visible target) but KEEP the floating / transient panel shape,
+            // which Stage Manager never stages; keep asking for activation
+            // until it is real; only then restore the normal shape and make
+            // the window key + front, so it lands on the now-active app's
+            // own stage.
+            exitPiPSourceMode(restoreShape: false)
+            // The return has begun: the window is on screen at alpha 1 and is
+            // no longer "parked". Say so NOW - onDidStop treats a still-
+            // backgrounded window as the × close and orders it out (measured:
+            // that emptied the stage and starved activation for 3 s). The rest
+            // of the foreground re-engage (cursor, level, presentation) runs in
+            // presentReturnedWindow once the app is genuinely active.
+            isBackgrounded = false
+            publishPresentSuppression()
+            onBackgroundedChanged?(false)
+            NSApp.activate()
+            awaitActivationThenPresent(attempt: 0)
+            return
+        }
+        // Fullscreen cover: level above the menu bar, stationary - Stage
+        // Manager doesn't manage it, the immediate path has always worked.
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         reengageForeground()
+    }
+
+    /// Poll for genuine activation (up to ~3 s, re-requesting every 400 ms -
+    /// early requests are refused while the panel winds down), then present.
+    /// On timeout present anyway: an on-screen window the user can click
+    /// beats one that never comes back.
+    func awaitActivationThenPresent(attempt: Int) {
+        guard !didClose else { return }
+        if NSApp.isActive || attempt >= 30 {
+            PiPTrace.log("awaitActivation done attempt=\(attempt)", window)
+            presentReturnedWindow()
+            return
+        }
+        if attempt % 4 == 0 { NSApp.activate() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            MainActor.assumeIsolated { self?.awaitActivationThenPresent(attempt: attempt + 1) }
+        }
+    }
+
+    /// Put the window's level + collection behaviour back to what they were
+    /// before source mode reshaped it as a floating, unmanaged panel. No-op
+    /// when already restored.
+    func restorePiPSourceShape() {
+        guard let shape = savedShapeBeforePiP else { return }
+        window.collectionBehavior = shape.behavior
+        window.level = shape.level
+        savedShapeBeforePiP = nil
+    }
+
+    /// The second half of a window-mode return: back to the normal window
+    /// shape, key + front, foreground re-engaged. Idempotent.
+    /// The second half of a window-mode return: back to the normal window
+    /// shape, key + front, foreground re-engaged. Idempotent. Runs only once
+    /// the app is genuinely active (or the wait timed out), so the primary
+    /// window lands on the now-active app's own Stage Manager stage instead
+    /// of being filed into the strip.
+    func presentReturnedWindow() {
+        guard !didClose else { return }
+        restorePiPSourceShape()
+        resignGeneration &+= 1
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        reengageForeground()
+        PiPTrace.log("presentReturnedWindow: presented", window)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            MainActor.assumeIsolated { self?.pipReturnInFlight = false }
+        }
     }
 
     /// The renderer hard-fail self-heal rebuilt the display layer while PiP was
@@ -409,7 +504,8 @@ extension StreamWindow {
     /// the mini: one blank white frame at the × moment). A window at alpha 0
     /// cannot paint whatever else changes, so those callers keep alpha 0 here
     /// and restore it on the NEXT turn, once the order-out is committed.
-    func exitPiPSourceMode(restoreAlpha: Bool = true) {
+    func exitPiPSourceMode(restoreAlpha: Bool = true, restoreShape: Bool = true) {
+        PiPTrace.log("exitPiPSourceMode restoreAlpha=\(restoreAlpha) restoreShape=\(restoreShape) sourceMode=\(pipSourceMode)", window)
         guard pipSourceMode else { return }
         pipSourceMode = false
         onPictureInPicturePanelChanged?(nil)
@@ -418,11 +514,7 @@ extension StreamWindow {
             pipPanelFrameObserver = nil
         }
         window.ignoresMouseEvents = false
-        if let shape = savedShapeBeforePiP {
-            window.collectionBehavior = shape.behavior
-            window.level = shape.level
-            savedShapeBeforePiP = nil
-        }
+        if restoreShape { restorePiPSourceShape() }
         if let chrome = savedChromeBeforePiP {
             window.contentAspectRatio = chrome.aspect
             window.contentMinSize = chrome.minSize
