@@ -37,15 +37,60 @@ extension AppModel {
     /// that apart from our own orphaned session - both are just `currentgame`
     /// - and every Moonlight client resumes on a name match too.
     func requestStream(app: LibraryApp, on host: Host) {
-        if !isStreaming,
-           let live = hostLiveStatus, live.hostID == host.id,
-           Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
-           case .streamingApp(let occupant) = live.state,
-           Self.isTakeover(occupant: occupant, launching: app.name) {
-            pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant)
+        guard !isStreaming else { stream(app: app, on: host); return }  // stream() logs + ignores
+        if let live = hostLiveStatus, live.hostID == host.id,
+           Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale {
+            let occupant: String?
+            switch live.state {
+            case .streamingApp(let name): occupant = name
+            case .streamingUnknownApp: occupant = Self.unknownOccupantName
+            default: occupant = nil
+            }
+            if Self.isTakeover(occupant: occupant, launching: app.name) {
+                pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant ?? "")
+                return
+            }
+            stream(app: app, on: host)
             return
         }
-        stream(app: app, on: host)
+        // No fresh snapshot - the first seconds after launch, or the poller
+        // paused. Deciding from nothing streamed straight through, and the
+        // session's own launch plan then /cancel'd whatever the host was
+        // running (measured: a test launch from a second Mac ended a game
+        // being played from the first). Ask the host now; it is one
+        // /serverinfo, well under the connect time.
+        let info = nativeServerInfo(for: host)
+        Task { [weak self] in
+            let client = NetworkClient(server: info)
+            let fresh = try? await client.fetchServerInfo()
+            await client.shutdown()
+            guard let self else { return }
+            guard !self.isStreaming, self.pendingTakeover == nil else { return }
+            guard let fresh else {
+                // Unreachable: let the session report that in its own words.
+                self.stream(app: app, on: host)
+                return
+            }
+            let occupant = Self.occupantName(currentGameID: fresh.currentGameID, apps: host.apps)
+            if Self.isTakeover(occupant: occupant, launching: app.name) {
+                Diag.notice("Takeover check: \(host.displayName) is running \(occupant ?? "?") - asking before launching \(app.name)", "Stream")
+                self.pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant ?? "")
+                return
+            }
+            self.stream(app: app, on: host)
+        }
+    }
+
+    /// What the takeover dialog calls an app the host reports by an id we
+    /// have no name for (a stale app list).
+    nonisolated static let unknownOccupantName = "another app"
+
+    /// The host's running app by name, from its /serverinfo `currentgame`:
+    /// nil when idle, the library name when known, `unknownOccupantName`
+    /// when the id is not in the stored list (still someone's session).
+    nonisolated static func occupantName(currentGameID: Int, apps: [LibraryApp]) -> String? {
+        guard currentGameID != 0 else { return nil }
+        return apps.first(where: { $0.id == currentGameID })?.name ?? unknownOccupantName
     }
 
     /// Does starting `appName` cost the host's current session? Only when some
