@@ -56,6 +56,13 @@ public actor StreamSession {
         // would cross actor boundaries.
         let win = self.window
         await MainActor.run {
+            // Back from Picture in Picture: one return path for both the PiP
+            // panel's button and this menu-bar row, so the in-flight guard and
+            // the didStop re-assert apply here too.
+            if win?.isPictureInPictureActive == true {
+                win?.returnFromPictureInPicture()
+                return
+            }
             // First bring the app forward - makeKeyAndOrderFront only makes a
             // window key if its app is active, and the menubar/launcher click
             // that drives this path may have left a different app frontmost.

@@ -20,7 +20,20 @@ HEADER_SEARCH_PATHS = $(inherited) $(GLIMMER_REPO_ROOT) $(OPENSSL_PREFIX)/includ
 // Homebrew OpenSSL + Opus libs.
 LIBRARY_SEARCH_PATHS = $(inherited) $(OPENSSL_PREFIX)/lib $(OPUS_PREFIX)/lib
 
-OTHER_LDFLAGS = $(inherited) -lssl -lcrypto -lz -lopus
+// Link the C libraries into the APP (and its test bundle) only. This file is
+// passed on the xcodebuild command line, so it applies to every target and
+// OVERRIDES target-level settings - a per-target opt-out in the pbxproj can't
+// win. Indirecting through $(PRODUCT_MODULE_NAME) keys the flags to the
+// targets that need them: Glimmer / GlimmerTests get the libs, and the Login
+// Helper (Shimmer_Login_Helper, AppKit + Foundation only) resolves to nothing.
+// It used to inherit these and carried absolute /opt/homebrew dylib links that
+// Hardened Runtime library validation refuses at launch (different Team ID),
+// so the helper crashed in dyld every login and "Be ready at login" silently
+// did nothing. embed-dylibs.sh only rewrites the main binary - by design; the
+// helper must simply not link them.
+STREAMLIB_LDFLAGS_Glimmer = -lssl -lcrypto -lz -lopus
+STREAMLIB_LDFLAGS_GlimmerTests = -lssl -lcrypto -lz -lopus
+OTHER_LDFLAGS = $(inherited) $(STREAMLIB_LDFLAGS_$(PRODUCT_MODULE_NAME))
 
 // Apple Silicon only. Homebrew's openssl@3 / opus are arm64-only, so a universal
 // (arm64 + x86_64) link fails on the x86_64 slice with undefined OpenSSL symbols.

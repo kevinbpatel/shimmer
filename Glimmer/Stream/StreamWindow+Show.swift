@@ -325,6 +325,7 @@ extension StreamWindow {
             // While the window is the alpha-0 PiP mirror source, its key/resign
             // transitions are meaningless (it's intentionally invisible); the
             // return-from-PiP paths (PiP button / Dock / menu) drive foreground.
+            PiPTrace.log("resignKey received inFlight=\(self.pipReturnInFlight) backgrounded=\(self.isBackgrounded)", self.window)
             guard !self.pipSourceMode else { return }
             // DEBOUNCE the resign. A genuine Cmd-Tab-away / app deactivation
             // resigns the stream window AND keeps it resigned. A transient
@@ -359,6 +360,14 @@ extension StreamWindow {
                             Stream window still active/key after resign debounce - teardown cancelled \
                             (stream stays foregrounded)
                             """)
+                        return
+                    }
+                    // A resign while a return from Picture in Picture is in
+                    // flight is AVKit closing its panel, not the user leaving:
+                    // the didStop handler re-asserts key/front. Never tear down.
+                    PiPTrace.log("resign debounce fired inFlight=\(self.pipReturnInFlight)", self.window)
+                    guard !self.pipReturnInFlight else {
+                        self.log.info("Stream window resign during PiP return - teardown skipped")
                         return
                     }
                     // Confirmed genuine background (Cmd-Tab-away / app
@@ -528,6 +537,7 @@ extension StreamWindow {
     /// never uncovered for a frame. didBecomeKey's reengageForeground() reverses
     /// all of this on the way back in.
     func backgroundStreamWindow() {
+        PiPTrace.log("backgroundStreamWindow", window)
         // Pop out to Picture in Picture instead of just vanishing, when the
         // user wants that (Settings › Streaming) and it can start. The PiP path
         // keeps the window on screen (alpha 0) as the 1:1 mirror source; the
@@ -550,6 +560,7 @@ extension StreamWindow {
     /// didStart, shrunk to the PiP window's size. When false the window is
     /// ordered out as before (plain Cmd-Tab-away with no pop-out).
     func hideStreamWindow(forPictureInPicture: Bool = false) {
+        PiPTrace.log("hideStreamWindow forPiP=\(forPictureInPicture) backgrounded=\(isBackgrounded)", window)
         guard !isBackgrounded else { return }
         isBackgrounded = true
         // Cursor: restore so the user can interact with whatever app they

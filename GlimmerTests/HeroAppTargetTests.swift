@@ -90,6 +90,21 @@ struct HeroAppTargetTests {
         #expect(AppModel.isTakeover(occupant: "Desktop", launching: "Low Res Desktop"))
     }
 
+    /// The host's own `currentgame` names the occupant when the poller has no
+    /// fresh snapshot (first seconds after launch): idle is nobody, a known id
+    /// is that app, an unknown id is still someone's session.
+    @Test func occupantResolvesFromTheHostsCurrentGame() {
+        let apps = [
+            LibraryApp(id: 881448767, name: "Desktop", hdr: true, hidden: false),
+            LibraryApp(id: 1093255277, name: "Steam Big Picture", hdr: true, hidden: false),
+        ]
+        #expect(AppModel.occupantName(currentGameID: 0, apps: apps) == nil)
+        #expect(AppModel.occupantName(currentGameID: 1093255277, apps: apps) == "Steam Big Picture")
+        #expect(AppModel.occupantName(currentGameID: 424242, apps: apps) == AppModel.unknownOccupantName)
+        // And an unknown occupant is a takeover for any app we could launch.
+        #expect(AppModel.isTakeover(occupant: AppModel.unknownOccupantName, launching: "Desktop"))
+    }
+
     @Test func anIdleHostIsNeverATakeover() {
         #expect(!AppModel.isTakeover(occupant: nil, launching: "Desktop"))
         #expect(!AppModel.isTakeover(occupant: "", launching: "Desktop"))

@@ -106,7 +106,7 @@ extension StreamSession {
         // backlog as packet loss and to flush+resync on refocus.
         win.onBackgroundedChanged = { [weak self] backgrounded in
             onBackgroundedChanged?(backgrounded)
-            // The keep-awake follows the window under "Only while showing".
+            // The session re-checks the keep-awake on the shown / hidden edge.
             Task { [weak self] in
                 guard let self else { return }
                 await self.setWindowBackgrounded(backgrounded)

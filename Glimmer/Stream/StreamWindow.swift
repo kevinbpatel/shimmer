@@ -254,6 +254,9 @@ public final class StreamWindow {
     /// content) and the frame autosave name (so the tiny source frame is never
     /// persisted as "the user's window"). Restored by exitPiPSourceMode().
     var savedChromeBeforePiP: (aspect: NSSize, minSize: NSSize, autosaveName: String)?
+    /// The window's level + collection behaviour before PiP mirror-source
+    /// mode reshaped it as a floating, unmanaged panel (see `enterPiPSourceMode`).
+    var savedShapeBeforePiP: (level: NSWindow.Level, behavior: NSWindow.CollectionBehavior)?
     /// Observer on the PiP panel's content view frame, so the mirror source
     /// window tracks PiP window resizes and keeps filling it 1:1.
     var pipPanelFrameObserver: NSObjectProtocol?
@@ -313,6 +316,13 @@ public final class StreamWindow {
     /// token changed (a becomeKey landed) or the app never actually
     /// deactivated. Bumped by BOTH observers so the later event always wins.
     var resignGeneration = 0
+    /// True from the start of a return from Picture in Picture until AVKit has
+    /// reported the stop and the window has been re-asserted key. While set, a
+    /// resign of the stream window is NOT a Cmd-Tab-away: AVKit's panel close
+    /// and the deferred activation can cost the freshly-shown window key status
+    /// for a moment, and the 0.2 s resign teardown would background it again
+    /// (and pop it straight back out to Picture in Picture).
+    var pipReturnInFlight = false
 
     /// Called once the window is on screen and key. InputForwarder uses this
     /// to install its StreamInputView as the window's first responder.
@@ -424,7 +434,9 @@ public final class StreamWindow {
         // to record their stream they can use the host PC's own recording
         // tools, where the underlying stream is unencrypted bytes the host
         // owns - Glimmer is not the right place to expose that.
-        window.sharingType = .none
+        // (`--debug-pip-probe` launches make it read-only so the automated
+        // screen captures used to verify PiP placement can see the window.)
+        window.sharingType = PiPTrace.enabled ? .readOnly : .none
 
         let view = DisplayContainerView(frame: screen.frame)
 

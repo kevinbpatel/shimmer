@@ -184,19 +184,12 @@ struct StreamPane: View {
             }
 
             // A pad doesn't reset the Mac's idle timer, so a stream being
-            // played would dim and sleep without this - but a stream parked
-            // in a corner while you read is no reason to hold the display
-            // open. "Only while showing" follows the stream window: up →
-            // awake; hidden or in Picture in Picture → the Mac's own rules.
+            // played would dim and sleep without this. Off means the Mac's
+            // own rules apply even mid-stream.
             SettingsField("Keep the Mac awake") {
-                Picker("", selection: $model.keepAwakePolicy) {
-                    ForEach(KeepAwakePolicy.allCases) { policy in
-                        Text(policy.displayName).tag(policy)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .settingsControl()
+                Toggle("While streaming", isOn: Binding(
+                    get: { model.keepAwakePolicy.isOn },
+                    set: { model.keepAwakePolicy = KeepAwakePolicy(isOn: $0) }))
             }
 
         }
