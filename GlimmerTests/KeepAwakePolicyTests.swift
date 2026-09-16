@@ -19,7 +19,8 @@ struct KeepAwakePolicyTests {
 
     @Test func rawValuesResolveAndUnknownLandsOnTheDefault() {
         #expect(KeepAwakePolicy.persisted(rawValue: "never") == .never)
-        #expect(KeepAwakePolicy.persisted(rawValue: "whileShowing") == .whileShowing)
+        // The retired three-way middle value migrates to "on".
+        #expect(KeepAwakePolicy.persisted(rawValue: "whileShowing") == .always)
         #expect(KeepAwakePolicy.persisted(rawValue: "sometimes") == .always)
     }
 
@@ -33,11 +34,11 @@ struct KeepAwakePolicyTests {
         #expect(!KeepAwakePolicy.never.holdsSleepAssertion(windowShowing: false))
     }
 
-    @Test func whileShowingFollowsTheWindow() {
-        // Up and being played → awake; hidden or parked in Picture in Picture
-        // (the window is backgrounded either way) → the Mac's own rules.
-        #expect(KeepAwakePolicy.whileShowing.holdsSleepAssertion(windowShowing: true))
-        #expect(!KeepAwakePolicy.whileShowing.holdsSleepAssertion(windowShowing: false))
+    @Test func toggleMapsOnToAlwaysAndOffToNever() {
+        #expect(KeepAwakePolicy(isOn: true) == .always)
+        #expect(KeepAwakePolicy(isOn: false) == .never)
+        #expect(KeepAwakePolicy.always.isOn)
+        #expect(!KeepAwakePolicy.never.isOn)
     }
 
     @Test func everyPolicyHasAName() {

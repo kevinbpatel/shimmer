@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+"Keep the Mac awake" is a single toggle again (on while streaming, or off)
+instead of a three-way Always / Only while showing / Never control. A saved
+"Only while showing" choice becomes on.
+
 The "macOS needs your approval" warnings in Settings - Input Monitoring for the
 enhanced DualSense buttons, Login Items, the Wi-Fi helper - are a proper tinted
 callout now: the icon and message on the left, the button pinned to the right

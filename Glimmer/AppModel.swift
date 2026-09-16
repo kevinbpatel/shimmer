@@ -351,9 +351,8 @@ final class AppModel {
                 preferLowAudioLatency ? AudioDecoder.lowLatencyCushionCeilingMs : nil)
         }
     }
-    /// Whether a live stream keeps the Mac and its display awake - always,
-    /// only while the stream window is up, or never. Pushed to the running
-    /// session so a change lands mid-stream.
+    /// Whether a live stream keeps the Mac and its display awake (always or
+    /// never). Pushed to the running session so a change lands mid-stream.
     var keepAwakePolicy: KeepAwakePolicy = KeepAwakePolicy.defaultPolicy {
         didSet {
             UserDefaults.standard.set(keepAwakePolicy.rawValue, forKey: KeepAwakePolicy.defaultsKey)
