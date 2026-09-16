@@ -271,13 +271,13 @@ extension StreamWindow {
     /// beats one that never comes back.
     func awaitActivationThenPresent(attempt: Int) {
         guard !didClose else { return }
-        if NSApp.isActive || attempt >= 30 {
+        if NSApp.isActive || attempt >= 60 {
             PiPTrace.log("awaitActivation done attempt=\(attempt)", window)
             presentReturnedWindow()
             return
         }
-        if attempt % 4 == 0 { NSApp.activate() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        NSApp.activate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             MainActor.assumeIsolated { self?.awaitActivationThenPresent(attempt: attempt + 1) }
         }
     }
