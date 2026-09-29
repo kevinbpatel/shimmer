@@ -84,6 +84,11 @@ public struct StreamConfig: Sendable {
     /// in Glimmer before the capture gate).
     public var captureSysKeys: Bool = false
 
+    /// When true, no mouse motion, click, or scroll is forwarded to the host
+    /// and the pointer is never captured or hidden. The session's starting
+    /// value; a mid-stream change arrives via `StreamSession.setMouseInputDisabled`.
+    public var mouseInputDisabled: Bool = false
+
     /// On notched MacBooks, whether the fullscreen stream window covers
     /// the entire panel (including the 37pt notch reserve zone) or stops
     /// at the safe-area boundary. Default true. See `StreamWindow.coversNotch`.

@@ -222,6 +222,7 @@ extension AppModel {
         // Always the richest layout this Mac's default output can take.
         cfg.audio = .bestForCurrentOutput()
         cfg.captureSysKeys = captureSysKeys
+        cfg.mouseInputDisabled = mouseInputDisabled
         // The notch choice only means something on a notched panel; elsewhere
         // the session always takes the borderless cover (see
         // effectiveStreamCoversNotch for the issue this closes).

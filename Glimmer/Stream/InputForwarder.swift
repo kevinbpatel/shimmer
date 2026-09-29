@@ -281,6 +281,12 @@ public final class InputForwarder {
     /// the default ⌃⌥Q, which carries no Cmd and so never reaches the gate.
     public var captureSysKeys: Bool = false
 
+    /// Settings › "Disable mouse input". Gates `forwardsMouseEvents` (which
+    /// every StreamView mouse handler checks), `enterCapturedMode` and the
+    /// window-mode grab, and the PiP pointer mirror. Seeded at session start;
+    /// flip it live with `setMouseInputDisabled(_:)`.
+    public var mouseInputDisabled: Bool = false
+
     /// Set to true once the native backend's `connectionStarted` callback has
     /// fired. Until then send calls return -2 (input stream not yet
     /// initialized). Honouring this flag avoids a noisy log stream during the

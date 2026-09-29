@@ -93,6 +93,18 @@ public actor StreamSession {
             win?.enterPictureInPicture()
         }
     }
+    /// Settings › "Disable mouse input" flipped mid-stream (the menu bar row).
+    /// Both halves at once: the forwarder stops sending and lets go of the
+    /// pointer, the window shows it.
+    public func setMouseInputDisabled(_ disabled: Bool) async {
+        let win = self.window
+        let inp = self.input
+        await MainActor.run {
+            inp?.setMouseInputDisabled(disabled)
+            win?.setMouseInputDisabled(disabled)
+        }
+    }
+
     var input: InputForwarder?
     var network: NetworkClient?
 

@@ -124,6 +124,10 @@ public final class StreamWindow {
     /// relative-aim engagement (`isMouseCaptured`).
     var didHideCursor = false
 
+    /// Settings › "Disable mouse input": the pointer stays a normal, visible
+    /// Mac pointer for the whole session, so `setCursorHidden(true)` refuses.
+    var mouseInputDisabled = false
+
     /// Observers that track stream-window key status. We hide the cursor only
     /// while the stream window is key; on Cmd-Tab-away the window resigns key
     /// status and we restore the cursor globally so the user can interact

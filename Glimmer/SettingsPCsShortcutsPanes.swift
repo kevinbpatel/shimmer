@@ -25,6 +25,10 @@ struct ShortcutsPane: View {
                 Toggle("Use ⌘ shortcuts inside the game", isOn: $model.captureSysKeys)
             }
 
+            SettingsField("Mouse") {
+                Toggle("Disable mouse input", isOn: $model.mouseInputDisabled)
+            }
+
             SettingsRule()
 
             SettingsField("Controller quit") {

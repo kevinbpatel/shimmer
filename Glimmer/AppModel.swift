@@ -324,6 +324,18 @@ final class AppModel {
     var captureSysKeys: Bool = false {
         didSet { UserDefaults.standard.set(captureSysKeys, forKey: "captureSysKeys") }
     }
+    /// Settings › "Disable mouse input" (also the menu bar's Disable/Enable
+    /// Mouse row): nothing from the mouse reaches the host, and the stream
+    /// never grabs or hides the pointer - so controller-only play can Cmd-Tab
+    /// in and out without the pointer getting trapped. Pushed to the running
+    /// stream. Off by default.
+    var mouseInputDisabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(mouseInputDisabled, forKey: "mouseInputDisabled")
+            let disabled = mouseInputDisabled
+            Task { [weak self] in await self?.nativeSession?.setMouseInputDisabled(disabled) }
+        }
+    }
     /// Full-screen streams always cover the whole panel, notch included, so a
     /// panel-native stream renders 1:1. This was a switch; it is a constant now
     /// because the answer was always yes - which is why it defaulted on.
@@ -651,6 +663,7 @@ final class AppModel {
         }
         customHDR = Self.persistedBool("customHDR") ?? customHDR
         captureSysKeys = Self.persistedBool("captureSysKeys") ?? captureSysKeys
+        mouseInputDisabled = Self.persistedBool("mouseInputDisabled") ?? mouseInputDisabled
         // Registered default (GlimmerApp) answers the absent-key case; an
         // unrecognised raw value lands on the default rather than guessing.
         streamDisplayMode = StreamDisplayMode.persisted(
