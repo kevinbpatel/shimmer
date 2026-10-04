@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Mouse input can be turned off: "Disable mouse input" in Settings (next to the
+⌘ shortcuts toggle), or "Disable Mouse" / "Enable Mouse" in the menu-bar
+dropdown. With it off, nothing from the mouse or trackpad reaches the PC and
+the stream never grabs or hides the Mac pointer - so controller-only play can
+Cmd-Tab in and out without the pointer getting trapped. The menu row applies to
+a live stream immediately.
+
 The menu bar has an "End Stream" row while a stream is live: it ends the
 stream and leaves Shimmer running. Ending it this way follows "Quit the game on
 the PC" like every other way of ending a stream. "Picture in Picture" stays in

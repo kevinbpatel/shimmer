@@ -141,7 +141,9 @@ extension InputForwarder {
     /// and we don't use it. Resets the sub-pixel residual so the first post-focus
     /// mouseMoved doesn't carry stale fractional pixels. Re-entrant.
     func enterCapturedMode() {
-        guard !isMouseCaptured else { return }
+        // With mouse input disabled the pointer is never the game's - no
+        // disassociate, no hide - so Cmd-Tabbing back can't trap it.
+        guard !isMouseCaptured, !mouseInputDisabled else { return }
         mouseResidualX = 0
         mouseResidualY = 0
         // Reset the Cruise inter-batch clock AND the windowed-velocity accums
@@ -249,6 +251,28 @@ extension InputForwarder {
                 enterCapturedMode()
             }
         }
+    }
+
+    /// Flip "Disable mouse input" on a live session. Disabling lets go of a
+    /// grabbed pointer (buttons the host holds are released first, keys are
+    /// left alone); enabling grabs again only if the stream is the thing in
+    /// front, by the same rule a Cmd-Tab back uses.
+    func setMouseInputDisabled(_ disabled: Bool) {
+        guard disabled != mouseInputDisabled else { return }
+        mouseInputDisabled = disabled
+        if disabled {
+            raiseHeldMouseButtons(reason: "mouse input disabled")
+            cancelEscapeHold()
+            exitCapturedMode()
+            stopPiPPointerMirror()
+        } else if window?.isKeyWindow == true, !pipSuspended {
+            if isWindowMode {
+                captureIfPointerIsOverTheStreamView(reason: "mouse input enabled")
+            } else {
+                enterCapturedMode()
+            }
+        }
+        log.info("Input: mouse forwarding \(disabled ? "disabled" : "enabled", privacy: .public)")
     }
 
     func installGestureSuppressionMonitor() {

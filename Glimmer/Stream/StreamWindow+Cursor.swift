@@ -34,13 +34,30 @@ extension StreamWindow {
     /// owner.
     func setCursorHidden(_ hidden: Bool) {
         if hidden {
-            guard !didHideCursor else { return }
+            guard !didHideCursor, !mouseInputDisabled else { return }
             CGDisplayHideCursor(CGMainDisplayID())
             didHideCursor = true
         } else {
             guard didHideCursor else { return }
             CGDisplayShowCursor(CGMainDisplayID())
             didHideCursor = false
+        }
+    }
+
+    /// Flip "Disable mouse input" on a live session. Disabling shows the
+    /// pointer and the arrow over the picture at once; enabling re-hides it
+    /// only when a full-screen stream is the thing in front (window mode's
+    /// cursor follows the capture edge the forwarder reports instead).
+    func setMouseInputDisabled(_ disabled: Bool) {
+        mouseInputDisabled = disabled
+        guard !didClose else { return }
+        let view = window.contentView as? StreamInputView
+        if disabled {
+            setCursorHidden(false)
+            view?.setTransparentCursorEnabled(false)
+        } else if displayMode == .fullScreen, !isBackgrounded, window.isKeyWindow {
+            view?.setTransparentCursorEnabled(true)
+            setCursorHidden(true)
         }
     }
 
@@ -128,7 +145,9 @@ extension StreamWindow {
             return
         }
         // Cursor: re-hide. Idempotent + latch-balanced via the single owner -
-        // hides iff currently shown, capping the count at 1.
+        // hides iff currently shown, capping the count at 1. A no-op with mouse
+        // input disabled, which also keeps the arrow over the picture.
+        (window.contentView as? StreamInputView)?.setTransparentCursorEnabled(!mouseInputDisabled)
         setCursorHidden(true)
         // Belt-and-braces: if the WindowServer had the system cursor drawn at
         // the moment we re-hid (it was visible while backgrounded), the per-view

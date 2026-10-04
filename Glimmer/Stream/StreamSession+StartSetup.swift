@@ -221,6 +221,7 @@ extension StreamSession {
         // for system keys would surprise the user (Cmd-Tab suddenly
         // stops working mid-game, etc.).
         inp.captureSysKeys = config.captureSysKeys
+        inp.mouseInputDisabled = config.mouseInputDisabled
         // Cruise ceiling is derived from the stream width (4K→2.0, 1080p→1.0 inert).
         inp.cruiseGMax = CruiseTraversal.gMax(forStreamWidth: config.width)
         // Window mode: the pointer is grabbed into relative capture while it
@@ -242,6 +243,9 @@ extension StreamSession {
             inp?.setWindowMode(mode == .window)
         }
         inp.attach(to: win.window)
+        // After attach: the window's half turns off the transparent-cursor
+        // backstop on the StreamInputView attach just installed.
+        win.setMouseInputDisabled(config.mouseInputDisabled)
         // The window installs first responder only after it has
         // become key AND finished its enter-fullscreen transition.
         // macOS resets the responder chain during fullscreen Space

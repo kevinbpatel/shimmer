@@ -138,6 +138,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                                  image: Self.symbol("pip.enter"))
                 pip.isEnabled = !model.nativeStreamPictureInPicture
                 menu.addItem(pip)
+                menu.addItem(mouseInputRow())
                 // End the stream, not Shimmer. A disconnect: the game stays up
                 // on the PC unless Settings › "Quit the game on the PC" is on,
                 // and "Back to X" is not offered again because the session is
@@ -150,6 +151,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 // has it up from an earlier disconnect, this resumes it.
                 menu.addItem(action(model.heroActionLabel, #selector(streamHero),
                                     image: glyph(model.heroTargetApp) ?? Self.symbol("play.fill")))
+                menu.addItem(mouseInputRow())
             }
             if model.hosts.count > 1 {
                 let switcher = NSMenu()
@@ -239,6 +241,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func toggleMute() { model.toggleStreamMute() }
+
+    /// Same verb-flip as the Mute row. Listed idle too: the choice persists,
+    /// so it can be set before the next stream as well as during one.
+    private func mouseInputRow() -> NSMenuItem {
+        action(model.mouseInputDisabled ? "Enable Mouse" : "Disable Mouse",
+               #selector(toggleMouseInput), image: Self.symbol("computermouse"))
+    }
+
+    @objc private func toggleMouseInput() { model.mouseInputDisabled.toggle() }
 
     @objc private func setVolume(_ sender: NSMenuItem) {
         guard let level = sender.representedObject as? Double else { return }

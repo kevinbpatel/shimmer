@@ -121,3 +121,25 @@ final class PairedPathFailureClassificationTests: XCTestCase {
         XCTAssertTrue(text.hasPrefix("The PC"))
     }
 }
+
+/// Which saved addresses a host is tried at, and in what order: home first,
+/// then the manual one (a Tailscale IP when away), blanks and repeats dropped.
+struct HostCandidateAddressTests {
+
+    private func host(local: String?, manual: String?) -> Glimmer.Host {
+        Glimmer.Host(id: "h", name: "bazzite", customName: nil, localAddress: local,
+             manualAddress: manual, apps: [], lastConnected: nil, serverCertPEM: nil,
+             appVersion: nil, gfeVersion: nil, macAddress: nil, lunaDeviceId: nil)
+    }
+
+    @Test func homeAddressComesBeforeTheManualOne() {
+        #expect(AppModel.candidateAddresses(for: host(local: "192.168.1.44", manual: "100.88.77.66"))
+                == ["192.168.1.44", "100.88.77.66"])
+    }
+
+    @Test func blanksAndDuplicatesAreDropped() {
+        #expect(AppModel.candidateAddresses(for: host(local: "", manual: " 100.88.77.66 ")) == ["100.88.77.66"])
+        #expect(AppModel.candidateAddresses(for: host(local: "10.0.0.2", manual: "10.0.0.2")) == ["10.0.0.2"])
+        #expect(AppModel.candidateAddresses(for: host(local: nil, manual: nil)).isEmpty)
+    }
+}

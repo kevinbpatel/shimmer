@@ -149,25 +149,40 @@ extension AppModel {
         // Snapshot the host on MainActor so we can hand its address etc.
         // off to the background work without crossing the actor boundary
         // with a non-Sendable type.
-        let snapshot: (id: String, address: String, info: ServerInfo)? = await MainActor.run { [weak self] in
+        let snapshot: (id: String, candidates: [String], info: ServerInfo)? = await MainActor.run { [weak self] in
             guard let self else { return nil }
             guard let host = self.selectedHost, host.id == expectedHostID else { return nil }
             let info = self.nativeServerInfo(for: host)
-            return (host.id, info.address, info)
+            let candidates = Self.candidateAddresses(for: host)
+            return (host.id, candidates.isEmpty ? [info.address] : candidates, info)
         }
-        guard let snap = snapshot else { return }
+        guard var snap = snapshot else { return }
 
         // Step 1: TCP probe to host's HTTP port. This is the cheapest signal
         // we have for "is the box answering on the network" - if this fails
         // there's no point in trying /serverinfo (which would tack on TLS +
         // a longer timeout). It also gives us a free RTT for the chip.
-        let probe = await HostReachability.measureRTT(
-            host: snap.address,
-            port: snap.info.httpPort,
-            timeoutMs: 2_000
-        )
-
-        if Task.isCancelled { return }
+        // Each saved address in turn (home first, then e.g. Tailscale); the
+        // first to answer becomes the address every connection dials.
+        var probe = HostReachability.Outcome.unreachable
+        for address in snap.candidates {
+            probe = await HostReachability.measureRTT(
+                host: address,
+                port: snap.info.httpPort,
+                timeoutMs: 2_000
+            )
+            if Task.isCancelled { return }
+            if case .reachable = probe {
+                snap.info.address = address
+                await MainActor.run { [weak self] in
+                    if self?.reachableAddressByHost[snap.id] != address {
+                        self?.reachableAddressByHost[snap.id] = address
+                        Diag.info("Host reachable at \(address)", "Stream")
+                    }
+                }
+                break
+            }
+        }
 
         switch probe {
         case .unreachable:

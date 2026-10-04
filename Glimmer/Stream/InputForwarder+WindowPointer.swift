@@ -30,6 +30,10 @@ extension InputForwarder {
 
     /// Whether mouse events reach the host right now.
     ///
+    /// `mouseInputDisabled` (Settings › "Disable mouse input") wins over
+    /// everything else below - it's a session-wide off switch, not a capture
+    /// state.
+    ///
     /// Full screen: always - capture there tracks key status and the window
     /// orders out when it resigns, so the view only receives events while it
     /// owns the input.
@@ -40,6 +44,7 @@ extension InputForwarder {
     /// stream window on the way to another app would drag the host's cursor
     /// around behind the user's back.
     var forwardsMouseEvents: Bool {
+        guard !mouseInputDisabled else { return false }
         guard isWindowMode else { return true }
         return window?.isKeyWindow ?? false
     }
@@ -86,7 +91,8 @@ extension InputForwarder {
     /// input, so a pointer sweeping over a background stream window on its way
     /// somewhere else would vanish into a game the user is not looking at.
     func capturePointer(reason: String) {
-        guard isWindowMode, !isMouseCaptured, let window, window.isKeyWindow else { return }
+        guard isWindowMode, !isMouseCaptured, !mouseInputDisabled,
+              let window, window.isKeyWindow else { return }
         log.info("Pointer capture requested (\(reason, privacy: .public))")
         // Clear the latch as the grab lands: it exists to keep a release from
         // being undone, and the pointer is captured again, so the question it
@@ -125,7 +131,7 @@ extension InputForwarder {
         exitCapturedMode()
     }
 
-    private func raiseHeldMouseButtons(reason: String) {
+    func raiseHeldMouseButtons(reason: String) {
         guard isReady, !heldMouseButtons.isEmpty else { return }
         for button in heldMouseButtons {
             let rc = backend?.sendMouseButton(

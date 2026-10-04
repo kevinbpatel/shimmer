@@ -34,7 +34,7 @@ extension InputForwarder {
     /// with nil whenever PiP ends by any route. Idempotent.
     func setPiPPointerPanel(_ panel: NSWindow?) {
         guard let panel else { stopPiPPointerMirror(); return }
-        guard pipPointerEnabledProvider() else { return }
+        guard pipPointerEnabledProvider(), !mouseInputDisabled else { return }
         guard panel !== pipPointerPanel else { return }
         stopPiPPointerMirror()
         pipPointerPanel = panel

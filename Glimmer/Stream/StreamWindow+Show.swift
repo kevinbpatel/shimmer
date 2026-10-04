@@ -542,7 +542,10 @@ extension StreamWindow {
         // user wants that (Settings › Streaming) and it can start. The PiP path
         // keeps the window on screen (alpha 0) as the 1:1 mirror source; the
         // plain path orders it out.
-        let usePiP = autoPictureInPictureProvider() && pictureInPicture.isPossible
+        // Not before the first frame: with no video size AVKit's PiP view lays
+        // out at NaN and AppKit traps. The window just hides instead.
+        let usePiP = !awaitingFirstFrameFadeIn
+            && autoPictureInPictureProvider() && pictureInPicture.isPossible
         hideStreamWindow(forPictureInPicture: usePiP)
         if usePiP {
             startPictureInPictureNow()

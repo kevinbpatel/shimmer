@@ -116,7 +116,7 @@ extension AppModel {
     /// never re-fires and the glyph keeps classifying the route to the dead
     /// IP until a host switch or relaunch.
     var selectedHostRouteAddress: String? {
-        selectedHost.map { $0.localAddress ?? $0.manualAddress ?? $0.name }
+        selectedHost.map { dialAddress(for: $0) }
     }
 
     /// Re-point the readiness chip's route monitor at the currently selected
