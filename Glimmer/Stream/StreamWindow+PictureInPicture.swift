@@ -62,6 +62,13 @@ extension StreamWindow {
     public func enterPictureInPicture() {
         PiPTrace.log("enterPictureInPicture backgrounded=\(isBackgrounded) active=\(isPictureInPictureActive) pending=\(pictureInPicturePending) possible=\(pictureInPicture.isPossible)", window)
         guard !didClose, !isPictureInPictureActive, !pictureInPicturePending else { return }
+        // Before the first frame the layer has no video size, and AVKit's PiP
+        // host view lays out at a NaN origin - AppKit traps on it (crash
+        // 2026-10-04: a switch-away a second after Stream).
+        guard !awaitingFirstFrameFadeIn else {
+            log.notice("Picture in Picture requested before the first frame - ignored")
+            return
+        }
         guard pictureInPicture.isPossible else {
             log.notice("Picture in Picture requested but not possible (another app may own it)")
             return
