@@ -255,6 +255,26 @@ extension AppModel {
         return app.isEmpty ? hostName : "\(hostName) - \(app)"
     }
 
+    /// Every saved address for a host, home address first: on the home network
+    /// it is the direct path, and the manual one (often a Tailscale IP) is the
+    /// way in from anywhere else.
+    nonisolated static func candidateAddresses(for host: Host) -> [String] {
+        var seen = Set<String>()
+        return [host.localAddress, host.manualAddress]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// The address to connect to: whichever saved one the poller last
+    /// reached, else the first saved one, else the hostname.
+    func dialAddress(for host: Host) -> String {
+        let candidates = Self.candidateAddresses(for: host)
+        if let reached = reachableAddressByHost[host.id], candidates.contains(reached) {
+            return reached
+        }
+        return candidates.first ?? host.name
+    }
+
     /// Convert a paired Host into the engine's ServerInfo. The
     /// serverCertPEM seeds TLS pinning so we don't have to re-discover it
     /// over HTTP first. We prefer Glimmer's own persisted pin (written by
@@ -264,7 +284,7 @@ extension AppModel {
     /// in this app's lifetime. Internal so HostStatusPoller.swift can call it.
     func nativeServerInfo(for host: Host) -> ServerInfo {
         var info = ServerInfo(
-            address: host.localAddress ?? host.manualAddress ?? host.name,
+            address: dialAddress(for: host),
             uniqueId: host.id,
             serverName: host.displayName
         )

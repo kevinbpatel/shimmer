@@ -536,6 +536,12 @@ final class AppModel {
     /// resets it when re-arming for a (possibly different) host.
     @ObservationIgnored var hostUnreachableStreak = 0
 
+    /// Per host, the saved address the status poller last reached. A host can
+    /// carry a home (local) address and a manual one such as its Tailscale IP;
+    /// away from home only the manual one answers. Observed so the route glyph
+    /// re-points when it flips.
+    var reachableAddressByHost: [String: String] = [:]
+
     /// Number of consecutive unreachable probes required before the chip
     /// asserts `.asleep`. Sub-threshold misses publish NOTHING (the chip holds
     /// its last-good status - see `publishUnreachable`), so this is purely the
