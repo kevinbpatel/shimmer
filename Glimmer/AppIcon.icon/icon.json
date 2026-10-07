@@ -3,18 +3,12 @@
     {
       "value": {
         "linear-gradient": [
-          "display-p3:0.39502,0.05441,0.58496,1.00000",
-          "display-p3:0.00000,0.00000,0.00000,1.00000"
+          "display-p3:0.33000,0.70000,1.00000,1.00000",
+          "display-p3:0.04000,0.20000,0.66000,1.00000"
         ],
         "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
-          }
+          "start": { "x": 0.5, "y": 0 },
+          "stop": { "x": 0.5, "y": 1 }
         }
       }
     },
@@ -22,18 +16,12 @@
       "appearance": "dark",
       "value": {
         "linear-gradient": [
-          "display-p3:0.41415,0.05891,0.61035,1.00000",
-          "display-p3:0.00000,0.00000,0.00000,1.00000"
+          "display-p3:0.16000,0.42000,0.86000,1.00000",
+          "display-p3:0.01000,0.06000,0.24000,1.00000"
         ],
         "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
-          }
+          "start": { "x": 0.5, "y": 0 },
+          "stop": { "x": 0.5, "y": 1 }
         }
       }
     }
@@ -41,24 +29,18 @@
   "groups": [
     {
       "layers": [
-        {
-          "image-name": "eclipse-mark.png",
-          "name": "eclipse mark",
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [0, -39]
-          }
-        }
+        { "image-name": "pip.svg", "name": "pip" }
       ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0
-      },
-      "translucency": {
-        "enabled": false,
-        "value": 0
-      }
+      "shadow": { "kind": "neutral", "opacity": 0.5 },
+      "translucency": { "enabled": true, "value": 0.2 }
+    },
+    {
+      "layers": [
+        { "image-name": "sparkle.svg", "name": "sparkle" },
+        { "image-name": "screen.svg", "name": "screen" }
+      ],
+      "shadow": { "kind": "neutral", "opacity": 0.5 },
+      "translucency": { "enabled": true, "value": 0.4 }
     }
   ],
   "supported-platforms": {
