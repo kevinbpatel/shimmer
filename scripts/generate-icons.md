@@ -1,11 +1,15 @@
 # `generate-icons.swift` - design notes
 
 **What actually ships is not this.** The app icon is `Glimmer/AppIcon.icon`, a
-hand-authored Icon Composer bundle: one `eclipse-mark.png` layer over a
-violet-to-black vertical gradient declared in `icon.json`, with a slightly
-brighter dark specialization. There is no `AppIcon.appiconset` in
+hand-authored Icon Composer bundle: three vector layers (`screen.svg`,
+`pip.svg`, and `sparkle.svg`) over a blue vertical gradient declared in
+`icon.json`, with a deeper blue dark specialization. There is no `AppIcon.appiconset` in
 `Assets.xcassets` any more. `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` plus
 `CFBundleIconName` in `Info.plist` is what resolves it.
+
+Export the README artwork from the shipping bundle with
+`./scripts/export-shimmer-icon.sh`. This updates `docs/assets/icon-512.png`;
+the app itself uses the Icon Composer bundle directly.
 
 `generate-icons.swift` is the generator for the previous moon-and-sparkles
 design. It still runs, and the rationale below is worth keeping because the
