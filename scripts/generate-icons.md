@@ -5,8 +5,10 @@ square-based glass pyramid on purple, with warmer incoming light and richer
 gold, cyan and violet gradients. The selected shading-only treatment keeps
 the spectrum continuous, with stronger colour through the faces. A brighter
 violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
-the background. Default and Dark both use this purple fill; the porcelain
-variant was retired.
+the background in Default/Light. Dark uses a near-black violet fill
+(Display P3 `#0E0A17`) for stronger separation in the dark appearance. The
+artwork and native glass settings are shared. The porcelain variant was
+retired.
 
 The Composer document has four groups: restrained spectrum colour retention,
 the glass shell, rear faces and base seam, and the aligned light artwork.
