@@ -2,16 +2,21 @@
 
 **The shipping icon is `Glimmer/AppIcon.icon`.** It is the selected aligned
 square-based glass pyramid on purple, with warmer incoming light and richer
-gold, cyan and violet gradients. Default and Dark both use the purple fill;
-the porcelain variant was retired.
+gold, cyan and violet gradients. The selected shading-only treatment keeps
+the spectrum continuous, with stronger colour through the faces. A brighter
+violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
+the background. Default and Dark both use this purple fill; the porcelain
+variant was retired.
 
 The Composer document has four groups: restrained spectrum colour retention,
 the glass shell, rear faces and base seam, and the aligned light artwork.
 The shell is a raster asset with native inside specular lighting and
-translucency. The beam boundaries, gradients, rear facets and base seam are
-editable SVG. Material blur and screen-space refraction are disabled to keep
-the selected ray geometry crisp. The colour-retention overlay is inset from
-the bevels so it preserves their highlights.
+translucency (0.40, with the shell layer at full opacity). The beam boundaries,
+gradients, rear facets and base seam are editable SVG. Material blur and
+screen-space refraction are disabled to keep
+the selected ray geometry crisp. The colour-retention overlay uses restrained
+transmission gradients across the faces and is inset from the bevels so it
+preserves their highlights. The rays have no facet offsets or bends.
 
 Xcode compiles this document into appearance-aware icon stacks using
 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. No flattened replacement icon

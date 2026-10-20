@@ -4,7 +4,7 @@
       "name": "Restrained colour through the glass",
       "layers": [
         {
-          "name": "Spectrum colour retention, clear of the bevels",
+          "name": "Continuous spectrum with restrained face transmission",
           "image-name": "retained-spectrum.svg",
           "glass": false
         }
@@ -39,14 +39,14 @@
               -9.729652774869109
             ]
           },
-          "opacity": 0.94
+          "opacity": 1.0
         }
       ],
       "lighting": "combined",
       "specular": "inside",
       "translucency": {
         "enabled": true,
-        "value": 0.62
+        "value": 0.4
       },
       "refractivity": {
         "enabled": false,
@@ -123,13 +123,13 @@
   "fill-specializations": [
     {
       "value": {
-        "solid": "display-p3:0.239216,0.113725,0.647059,1"
+        "solid": "display-p3:0.313725,0.141176,0.741176,1"
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "solid": "display-p3:0.239216,0.113725,0.647059,1"
+        "solid": "display-p3:0.313725,0.141176,0.741176,1"
       }
     }
   ],
