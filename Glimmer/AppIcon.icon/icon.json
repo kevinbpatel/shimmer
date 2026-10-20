@@ -1,50 +1,143 @@
 {
+  "groups": [
+    {
+      "name": "Restrained colour through the glass",
+      "layers": [
+        {
+          "name": "Spectrum colour retention, clear of the bevels",
+          "image-name": "retained-spectrum.svg",
+          "glass": false
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    },
+    {
+      "name": "Polished blue glass \u2014 inside edge lighting",
+      "layers": [
+        {
+          "name": "Clean glass shell \u2014 one continuous bevel",
+          "image-name": "glass-shell.png",
+          "glass": true,
+          "position": {
+            "scale": 0.75125277486911,
+            "translation-in-points": [
+              -19.638509738219895,
+              -9.729652774869109
+            ]
+          },
+          "opacity": 0.94
+        }
+      ],
+      "lighting": "combined",
+      "specular": "inside",
+      "translucency": {
+        "enabled": true,
+        "value": 0.62
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.018
+      },
+      "blur-material": 0
+    },
+    {
+      "name": "Rear faces \u2014 apex to far base corner",
+      "layers": [
+        {
+          "name": "Rear seam \u2014 3.2 pt, tapered ends",
+          "image-name": "anatomy.svg",
+          "glass": false
+        },
+        {
+          "name": "Rear left face \u2014 tonal depth",
+          "image-name": "rear-left-face.svg",
+          "glass": false
+        },
+        {
+          "name": "Rear right face \u2014 tonal depth",
+          "image-name": "rear-right-face.svg",
+          "glass": false
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    },
+    {
+      "name": "Shared white-to-spectrum geometry",
+      "layers": [
+        {
+          "name": "Continuous optical path",
+          "image-name": "light.svg",
+          "glass": false
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    }
+  ],
   "fill-specializations": [
     {
       "value": {
-        "linear-gradient": [
-          "display-p3:0.33000,0.70000,1.00000,1.00000",
-          "display-p3:0.04000,0.20000,0.66000,1.00000"
-        ],
-        "orientation": {
-          "start": { "x": 0.5, "y": 0 },
-          "stop": { "x": 0.5, "y": 1 }
-        }
+        "solid": "display-p3:0.239216,0.113725,0.647059,1"
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "linear-gradient": [
-          "display-p3:0.16000,0.42000,0.86000,1.00000",
-          "display-p3:0.01000,0.06000,0.24000,1.00000"
-        ],
-        "orientation": {
-          "start": { "x": 0.5, "y": 0 },
-          "stop": { "x": 0.5, "y": 1 }
-        }
+        "solid": "display-p3:0.239216,0.113725,0.647059,1"
       }
     }
   ],
-  "groups": [
-    {
-      "layers": [
-        { "image-name": "pip.svg", "name": "pip" }
-      ],
-      "shadow": { "kind": "neutral", "opacity": 0.5 },
-      "translucency": { "enabled": true, "value": 0.2 }
-    },
-    {
-      "layers": [
-        { "image-name": "sparkle.svg", "name": "sparkle" },
-        { "image-name": "screen.svg", "name": "screen" }
-      ],
-      "shadow": { "kind": "neutral", "opacity": 0.5 },
-      "translucency": { "enabled": true, "value": 0.4 }
-    }
-  ],
   "supported-platforms": {
-    "circles": ["watchOS"],
     "squares": "shared"
-  }
+  },
+  "features": [
+    "refractivity",
+    "specular-location"
+  ]
 }

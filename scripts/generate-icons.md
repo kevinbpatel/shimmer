@@ -1,15 +1,31 @@
-# `generate-icons.swift` - design notes
+# App icon and legacy generator notes
 
-**What actually ships is not this.** The app icon is `Glimmer/AppIcon.icon`, a
-hand-authored Icon Composer bundle: three vector layers (`screen.svg`,
-`pip.svg`, and `sparkle.svg`) over a blue vertical gradient declared in
-`icon.json`, with a deeper blue dark specialization. There is no `AppIcon.appiconset` in
-`Assets.xcassets` any more. `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` plus
-`CFBundleIconName` in `Info.plist` is what resolves it.
+**The shipping icon is `Glimmer/AppIcon.icon`.** It is the selected aligned
+square-based glass pyramid on purple, with warmer incoming light and richer
+gold, cyan and violet gradients. Default and Dark both use the purple fill;
+the porcelain variant was retired.
 
-Export the README artwork from the shipping bundle with
-`./scripts/export-shimmer-icon.sh`. This updates `docs/assets/icon-512.png`;
-the app itself uses the Icon Composer bundle directly.
+The Composer document has four groups: restrained spectrum colour retention,
+the glass shell, rear faces and base seam, and the aligned light artwork.
+The shell is a raster asset with native inside specular lighting and
+translucency. The beam boundaries, gradients, rear facets and base seam are
+editable SVG. Material blur and screen-space refraction are disabled to keep
+the selected ray geometry crisp. The colour-retention overlay is inset from
+the bevels so it preserves their highlights.
+
+Xcode compiles this document into appearance-aware icon stacks using
+`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. No flattened replacement icon
+or Finder custom icon is needed.
+
+The shipping Composer document is the editable source consumed directly by
+the app build. Open `Glimmer/AppIcon.icon` in Icon Composer to adjust the
+material. Beam gradients live in `Assets/light.svg`; their colour-retention
+counterparts live in `Assets/retained-spectrum.svg`. Keep those palettes in
+sync when tuning the light. The icon does not depend on the exploratory
+studies under `output/`.
+
+Export the README icon with `./scripts/export-shimmer-icon.sh`. The export
+uses Icon Composer's macOS 27 design generation, matching the approved icon.
 
 `generate-icons.swift` is the generator for the previous moon-and-sparkles
 design. It still runs, and the rationale below is worth keeping because the
