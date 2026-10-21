@@ -3,6 +3,85 @@ import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func failedReadingBreaksTheTraceEvenBetweenCloselySpacedSamples() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 2, capturedAt: now), at: now)
+        history.record(nil, at: now.addingTimeInterval(1))
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 3,
+                             capturedAt: now.addingTimeInterval(2)), at: now.addingTimeInterval(2))
+        #expect(history.segments(maxGap: 3.5).map(\.count) == [1, 1])
+    }
+
+    @Test @MainActor func diagnosticIsIdleUntilRequestedAndAutomaticallyFinishes() async {
+        let test = HostLatencyTest(limit: 3, interval: .zero)
+        #expect(!test.hasRun && !test.isRunning && test.attempts == 0)
+        var calls = 0
+        test.start(hostID: "pc", address: "host") { calls += 1; return Double(calls) }
+        #expect(await eventually { test.completed })
+        #expect(!test.isRunning && test.hasRun)
+        #expect(calls == 3 && test.history.readings.count == 3)
+        #expect(test.latestDescription == "3 ms")
+    }
+
+    @Test @MainActor func stoppingDiagnosticRejectsALateUncancellableResult() async {
+        let test = HostLatencyTest(limit: 1)
+        let gate = LatencySampleGate()
+        test.start(hostID: "old", address: "old-host") { await gate.read() }
+        #expect(await eventually { gate.waiting })
+        test.stop()
+        gate.resume(50)
+        #expect(await eventually { gate.returned })
+        #expect(!test.isRunning && test.attempts == 0)
+        #expect(test.history.readings.isEmpty && test.latestReading == nil)
+    }
+
+    @Test @MainActor func restartingDiagnosticCannotMixResultsFromDifferentHosts() async {
+        let test = HostLatencyTest(limit: 1)
+        let gate = LatencySampleGate()
+        test.start(hostID: "old", address: "old-host") { await gate.read() }
+        #expect(await eventually { gate.waiting })
+        test.start(hostID: "new", address: "new-host") { 2 }
+        #expect(await eventually { test.completed })
+        gate.resume(99)
+        #expect(await eventually { gate.returned })
+        #expect(test.history.readings.count == 1)
+        #expect(test.latestReading?.hostID == "new")
+        #expect(test.latestDescription == "2 ms")
+        test.reset()
+        #expect(!test.hasRun && test.history.readings.isEmpty)
+    }
+
+    @Test @MainActor func failedDiagnosticDoesNotClaimZeroLatency() async {
+        let test = HostLatencyTest(limit: 1)
+        test.start(hostID: "pc", address: "host") { nil }
+        #expect(await eventually { test.completed })
+        #expect(test.attempts == 1 && test.history.readings.isEmpty)
+        #expect(test.latestDescription == "Unavailable")
+    }
+
+    @Test func tcpProbeRejectsInvalidPortsWithoutTrapping() async {
+        for port in [-1, 0, 65536, Int.max] {
+            #expect(await HostReachability.measureRTT(host: "unused.invalid", port: port) == .unreachable)
+        }
+    }
+
+    @Test func cancelledTCPProbeDoesNotBeginNetworkWork() async {
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await HostReachability.measureRTT(host: "unused.invalid")
+        }
+        #expect(await task.value == .unreachable)
+    }
+
+    @MainActor private func eventually(_ condition: @MainActor () -> Bool) async -> Bool {
+        for _ in 0..<400 {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return condition()
+    }
+
     @Test func historySummaryUsesOnlyActualMeasurementsInTheVisibleMinute() {
         let now = Date(timeIntervalSince1970: 1000)
         var history = HostLatencyHistory()
@@ -160,5 +239,21 @@ struct HostConnectionTests {
             #expect(reading.text(forHost: "pc", address: "host", at: now,
                                  notBefore: .distantPast, maxAge: 3) == "<1 ms")
         }
+    }
+}
+
+@MainActor
+private final class LatencySampleGate {
+    private var continuation: CheckedContinuation<Double?, Never>?
+    var waiting: Bool { continuation != nil }
+    private(set) var returned = false
+    func read() async -> Double? {
+        let value = await withCheckedContinuation { continuation = $0 }
+        returned = true
+        return value
+    }
+    func resume(_ value: Double?) {
+        continuation?.resume(returning: value)
+        continuation = nil
     }
 }

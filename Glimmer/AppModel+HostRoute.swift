@@ -285,6 +285,7 @@ struct HostLatencyReading {
 struct HostLatencyHistory {
     static let duration: TimeInterval = 60
     private(set) var readings: [HostLatencyReading] = []
+    private var missingReadings: [Date] = []
 
     struct Statistics {
         let minimum: Double
@@ -304,6 +305,13 @@ struct HostLatencyHistory {
 
     mutating func record(_ reading: HostLatencyReading?, at now: Date) {
         readings.removeAll { $0.capturedAt < now.addingTimeInterval(-Self.duration) || $0.capturedAt > now }
+        missingReadings.removeAll { $0 < now.addingTimeInterval(-Self.duration) || $0 > now }
+        if reading == nil, let previous = readings.last,
+           now > previous.capturedAt,
+           !(missingReadings.last.map { $0 > previous.capturedAt } ?? false) {
+            missingReadings.append(now)
+            if missingReadings.count > 120 { missingReadings.removeFirst(missingReadings.count - 120) }
+        }
         guard let reading,
               reading.text(forHost: reading.hostID, address: reading.address, at: now,
                            notBefore: now.addingTimeInterval(-Self.duration), maxAge: Self.duration) != nil,
@@ -316,12 +324,91 @@ struct HostLatencyHistory {
     func segments(maxGap: TimeInterval) -> [[HostLatencyReading]] {
         readings.reduce(into: []) { segments, reading in
             if let previous = segments.last?.last,
-               reading.capturedAt.timeIntervalSince(previous.capturedAt) <= maxGap {
+               reading.capturedAt.timeIntervalSince(previous.capturedAt) <= maxGap,
+               !missingReadings.contains(where: { $0 > previous.capturedAt && $0 <= reading.capturedAt }) {
                 segments[segments.count - 1].append(reading)
             } else {
                 segments.append([reading])
             }
         }
+    }
+}
+
+/// Owns only the user-requested diagnostic. Stopping or replacing a test
+/// cancels its sampler and prevents any late result from entering a new test.
+@MainActor
+@Observable
+final class HostLatencyTest {
+    private(set) var isRunning = false
+    private(set) var hasRun = false
+    private(set) var completed = false
+    private(set) var attempts = 0
+    private(set) var history = HostLatencyHistory()
+    private(set) var latestReading: HostLatencyReading?
+    private(set) var sampledAt = Date.now
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var generation = 0
+    private let limit: Int
+    private let interval: Duration
+
+    init(limit: Int = 30, interval: Duration = .seconds(1)) {
+        self.limit = max(1, limit)
+        self.interval = interval
+    }
+
+    var latestDescription: String {
+        guard let reading = latestReading else { return isRunning && attempts == 0 ? "Testing…" : "Unavailable" }
+        return reading.text(forHost: reading.hostID, address: reading.address, at: sampledAt,
+                            notBefore: .distantPast, maxAge: HostLatencyHistory.duration) ?? "Unavailable"
+    }
+
+    func start(hostID: String, address: String, sample: @escaping @MainActor () async -> Double?) {
+        reset()
+        hasRun = true
+        isRunning = true
+        let run = generation
+        task = Task { [weak self] in
+            guard let self else { return }
+            for index in 0..<self.limit {
+                guard !Task.isCancelled, self.generation == run else { return }
+                let value = await sample()
+                guard !Task.isCancelled, self.generation == run else { return }
+                self.sampledAt = .now
+                self.attempts += 1
+                let reading = value.map {
+                    HostLatencyReading(hostID: hostID, address: address, milliseconds: $0, capturedAt: self.sampledAt)
+                }
+                self.latestReading = reading.flatMap {
+                    $0.text(forHost: hostID, address: address, at: self.sampledAt,
+                            notBefore: .distantPast, maxAge: HostLatencyHistory.duration) == nil ? nil : $0
+                }
+                self.history.record(self.latestReading, at: self.sampledAt)
+                if index + 1 < self.limit {
+                    do { try await Task.sleep(for: self.interval) } catch { return }
+                }
+            }
+            guard self.generation == run else { return }
+            self.isRunning = false
+            self.completed = true
+            self.task = nil
+        }
+    }
+
+    func stop() {
+        generation += 1
+        task?.cancel()
+        task = nil
+        isRunning = false
+        sampledAt = .now
+    }
+
+    func reset() {
+        stop()
+        hasRun = false
+        completed = false
+        attempts = 0
+        history = HostLatencyHistory()
+        latestReading = nil
     }
 }
 

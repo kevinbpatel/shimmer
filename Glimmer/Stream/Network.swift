@@ -69,7 +69,8 @@ public enum HostReachability {
     public static func measureRTT(host: String,
                                   port: Int = 47989,
                                   timeoutMs: Int = 2_000) async -> Outcome {
-        guard let nwPort = NWEndpoint.Port(rawValue: UInt16(port)) else {
+        guard !Task.isCancelled, let rawPort = UInt16(exactly: port), rawPort > 0,
+              let nwPort = NWEndpoint.Port(rawValue: rawPort) else {
             return .unreachable
         }
         // Tighter TCP knobs so a dead host folds to .unreachable in seconds
@@ -93,39 +94,48 @@ public enum HostReachability {
         // clean async result. `Once` guards against the (rare) case where
         // multiple terminal states fire - e.g. `.failed` after `.cancelled` -
         // which would otherwise resume the continuation twice and trap.
-        let outcome: Outcome = await withCheckedContinuation { cont in
-            let once = OnceResumer(cont: cont)
-            conn.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    let elapsedNs = DispatchTime.now().uptimeNanoseconds &- start.uptimeNanoseconds
-                    let ms = Int((Double(elapsedNs) / 1_000_000.0).rounded())
-                    once.resume(with: .reachable(rttMs: ms))
-                    conn.cancel()
-                case .failed, .cancelled:
-                    once.resume(with: .unreachable)
-                case .waiting:
-                    // Waiting means we couldn't form the connection (host
-                    // refused / unreachable / firewalled). The Network
-                    // framework will keep retrying indefinitely; we don't
-                    // care - treat as unreachable and tear down.
-                    once.resume(with: .unreachable)
-                    conn.cancel()
-                default:
-                    break
+        let outcome: Outcome = await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                let once = OnceResumer(cont: cont)
+                conn.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        let elapsedNs = DispatchTime.now().uptimeNanoseconds &- start.uptimeNanoseconds
+                        let ms = Int((Double(elapsedNs) / 1_000_000.0).rounded())
+                        once.resume(with: .reachable(rttMs: ms))
+                        conn.cancel()
+                    case .failed, .cancelled:
+                        once.resume(with: .unreachable)
+                    case .waiting:
+                        // Waiting means we couldn't form the connection (host
+                        // refused / unreachable / firewalled). The Network
+                        // framework will keep retrying indefinitely; we don't
+                        // care - treat as unreachable and tear down.
+                        once.resume(with: .unreachable)
+                        conn.cancel()
+                    default:
+                        break
+                    }
                 }
-            }
-            conn.start(queue: .global(qos: .utility))
+                guard !Task.isCancelled else {
+                    once.resume(with: .unreachable)
+                    conn.cancel()
+                    return
+                }
+                conn.start(queue: .global(qos: .utility))
 
-            // Hard ceiling: if the OS never fires a terminal state within our
-            // budget (e.g. SYN-ACK lost on a stale route), we still want the
-            // chip poller to make progress.
-            let deadlineMs = max(250, timeoutMs)
-            DispatchQueue.global(qos: .utility)
-                .asyncAfter(deadline: .now() + .milliseconds(deadlineMs)) {
-                    once.resume(with: .unreachable)
-                    conn.cancel()
-                }
+                // Hard ceiling: if the OS never fires a terminal state within our
+                // budget (e.g. SYN-ACK lost on a stale route), we still want the
+                // chip poller to make progress.
+                let deadlineMs = max(250, timeoutMs)
+                DispatchQueue.global(qos: .utility)
+                    .asyncAfter(deadline: .now() + .milliseconds(deadlineMs)) {
+                        once.resume(with: .unreachable)
+                        conn.cancel()
+                    }
+            }
+        } onCancel: {
+            conn.cancel()
         }
         return outcome
     }

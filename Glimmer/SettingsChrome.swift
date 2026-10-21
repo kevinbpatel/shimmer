@@ -57,7 +57,8 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     /// asks for, even with `.fullSizeContentView`, so subtract it here.
     var windowHeight: CGFloat {
         switch self {
-        case .computers: return 528 - 32
+        // Leave room for the optional latency test without clipping its chart.
+        case .computers: return 580 - 32
         // Stream carries eleven fields (two of them two rows tall); General
         // seven. Sized so neither page scrolls.
         case .stream: return 660 - 32

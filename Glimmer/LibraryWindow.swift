@@ -20,8 +20,7 @@ struct ComputersTab: View {
     @State private var showPairSheet = false
     @State private var showUnpairConfirm = false
     @State private var search = ""
-    @State private var liveLatency: HostLatencyReading?
-    @State private var latencyHistory = HostLatencyHistory()
+    @State private var latencyTest = HostLatencyTest()
 
     private struct LatencyScope: Equatable {
         let hostID: String?
@@ -29,6 +28,12 @@ struct ComputersTab: View {
         let routeChangedAt: Date
         let streaming: Bool
         let streamHostID: String?
+    }
+
+    private var latencyScope: LatencyScope {
+        LatencyScope(hostID: model.selectedHost?.id, address: model.selectedHostRouteAddress,
+                     routeChangedAt: model.hostRoute.changedAt, streaming: model.isStreaming,
+                     streamHostID: model.activeStreamHostID)
     }
 
     /// Selection is the host ID, not the Host: Host is a value type the store
@@ -63,13 +68,8 @@ struct ComputersTab: View {
             PairSheet(initialAddress: "")
                 .presentationBackground(.thinMaterial)
         }
-        .task(id: LatencyScope(hostID: model.selectedHost?.id,
-                              address: model.selectedHostRouteAddress,
-                              routeChangedAt: model.hostRoute.changedAt,
-                              streaming: model.isStreaming,
-                              streamHostID: model.activeStreamHostID)) {
-            await sampleLatencyHistory()
-        }
+        .onChange(of: latencyScope) { latencyTest.reset() }
+        .onDisappear { latencyTest.reset() }
         .confirmationDialog("Remove this PC?", isPresented: $showUnpairConfirm, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 if let host = model.selectedHost { model.unpair(host) }
@@ -176,8 +176,23 @@ struct ComputersTab: View {
                                 .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
                         }
 
-                        NetworkHistoryGraph(history: latencyHistory, streaming: model.isStreaming,
-                                            currentValue: { model.latencyDescription(liveReading: liveLatency, at: $0) })
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Latency").font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button(latencyTest.isRunning ? "Stop" : "Test latency") {
+                                    if latencyTest.isRunning { latencyTest.stop() }
+                                    else { startLatencyTest() }
+                                }
+                                .buttonStyle(.link)
+                                .disabled(model.isStreaming && model.activeStreamHostID != host.id)
+                            }
+                            if latencyTest.hasRun {
+                                NetworkHistoryGraph(test: latencyTest, streaming: model.isStreaming)
+                            }
+                        }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 18)
                     }
                     .padding(.top, 22)
@@ -204,25 +219,21 @@ struct ComputersTab: View {
         }
     }
 
-    private func sampleLatencyHistory() async {
-        liveLatency = nil
-        latencyHistory = HostLatencyHistory()
-        guard let hostID = model.selectedHost?.id,
+    private func startLatencyTest() {
+        guard let host = model.selectedHost,
               let address = model.selectedHostRouteAddress else { return }
-        let routeChangedAt = model.hostRoute.changedAt
-        let streaming = model.isStreaming
-        while !Task.isCancelled {
-            let value = streaming && model.activeStreamHostID == hostID && model.streamPhase == .streaming
-                ? await model.nativeSession?.networkRoundTripMilliseconds() : nil
-            guard !Task.isCancelled, model.isStreaming == streaming,
-                  model.selectedHost?.id == hostID, model.hostRoute.changedAt == routeChangedAt,
-                  model.selectedHostRouteAddress == address else { return }
-            liveLatency = value.map {
-                HostLatencyReading(hostID: hostID, address: address, milliseconds: $0, capturedAt: .now)
+        let scope = latencyScope
+        let port = model.nativeServerInfo(for: host).httpPort
+        latencyTest.start(hostID: host.id, address: address) {
+            guard latencyScope == scope else { return nil }
+            if scope.streaming {
+                guard model.activeStreamHostID == host.id, model.streamPhase == .streaming else { return nil }
+                return await model.nativeSession?.networkRoundTripMilliseconds()
             }
-            let now = Date.now
-            latencyHistory.record(model.currentLatencyReading(liveReading: liveLatency, at: now), at: now)
-            do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            switch await HostReachability.measureRTT(host: address, port: port) {
+            case .reachable(let ms): return Double(ms)
+            case .unreachable: return nil
+            }
         }
     }
 
@@ -260,88 +271,85 @@ struct ComputersTab: View {
     }
 }
 
-/// One plot, with Activity Monitor's cyan trace and pale fill. It belongs to
-/// the detail content, sharing its margins, rather than a separate footer.
+/// An opt-in Tailscale-style diagnostic: a quiet result header, blue trace,
+/// and readable millisecond labels on the right. Completed results are frozen.
 private struct NetworkHistoryGraph: View {
-    let history: HostLatencyHistory
+    let test: HostLatencyTest
     let streaming: Bool
-    let currentValue: (Date) -> String
-
-    private let cyan = Color(red: 0, green: 0.73, blue: 0.90)
+    private let blue = Color(red: 0.27, green: 0.47, blue: 0.91)
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-            let stats = history.statistics(at: timeline.date)
-            let ceiling = max(10, ceil((stats?.maximum ?? 0) * 1.15 / 5) * 5)
-            VStack(spacing: 7) {
-                ZStack {
-                    Text(streaming ? "ROUND-TRIP" : "RESPONSE TIME")
-                        .font(.system(size: 11, weight: .semibold))
-                    HStack {
-                        Spacer()
-                        Text(currentValue(timeline.date))
-                            .font(.system(size: 11)).monospacedDigit()
-                            .foregroundStyle(cyan)
-                    }
+        let now = test.sampledAt
+        let maximum = test.history.statistics(at: now)?.maximum ?? 0
+        let ceiling = max(10, ceil(maximum * 1.15 / 10) * 10)
+        let start = max(now.addingTimeInterval(-HostLatencyHistory.duration),
+                        min(now.addingTimeInterval(-10), test.history.readings.first?.capturedAt ?? now))
+        VStack(alignment: .leading, spacing: 7) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text(streaming ? "Stream round-trip" : "TCP response time")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(test.latestDescription)
+                        .fontWeight(.semibold).monospacedDigit()
                 }
+                .font(.system(size: 12))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
                 Divider()
                 Chart {
-                    RuleMark(y: .value("Baseline", 0))
-                        .foregroundStyle(cyan.opacity(0.35))
-                        .lineStyle(StrokeStyle(lineWidth: 0.5))
-                    ForEach(Array(history.segments(maxGap: streaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2).enumerated()), id: \.offset) { index, segment in
+                    ForEach(Array(test.history.segments(maxGap: 3.5).enumerated()), id: \.offset) { index, segment in
                         ForEach(Array(segment.enumerated()), id: \.offset) { _, reading in
-                            AreaMark(x: .value("Time", reading.capturedAt),
-                                     yStart: .value("Milliseconds", 0),
-                                     yEnd: .value("Milliseconds", reading.milliseconds),
-                                     series: .value("Segment", index))
-                                .foregroundStyle(cyan.opacity(0.20))
-                                .interpolationMethod(.linear)
                             LineMark(x: .value("Time", reading.capturedAt),
                                      y: .value("Milliseconds", reading.milliseconds),
                                      series: .value("Segment", index))
-                                .foregroundStyle(cyan)
-                                .lineStyle(StrokeStyle(lineWidth: 1.2))
-                                .interpolationMethod(.linear)
+                                .foregroundStyle(blue)
+                                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .interpolationMethod(.monotone)
                             if segment.count == 1 {
                                 PointMark(x: .value("Time", reading.capturedAt),
                                           y: .value("Milliseconds", reading.milliseconds))
-                                    .foregroundStyle(cyan).symbolSize(7)
+                                    .foregroundStyle(blue).symbolSize(10)
                             }
                         }
                     }
                 }
-                .chartXScale(domain: timeline.date.addingTimeInterval(-HostLatencyHistory.duration)...timeline.date)
+                .chartXScale(domain: start...now)
                 .chartYScale(domain: 0...ceiling)
                 .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .chartLegend(.hidden)
-                .chartPlotStyle { plot in plot.clipped() }
-                .overlay(alignment: .topLeading) {
-                    if stats == nil {
-                        Text("Waiting for measurements")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                            .padding(.top, 5)
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                        AxisValueLabel {
+                            if let ms = value.as(Double.self) {
+                                Text("\(ms.formatted(.number.precision(.fractionLength(0))))ms")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                            }
+                        }
                     }
                 }
-                .accessibilityLabel("Last minute of network timing")
-                HStack {
-                    Text("60 sec")
-                    Spacer()
-                    Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
+                .chartLegend(.hidden)
+                .chartPlotStyle { plot in plot.clipped() }
+                .frame(height: 100)
+                .overlay(alignment: .center) {
+                    if test.history.readings.isEmpty {
+                        Text(test.isRunning ? "Waiting for a response…" : "No measurements available")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
                 }
-                .font(.system(size: 9)).foregroundStyle(.secondary)
+                .accessibilityLabel("Latency test history in milliseconds")
+                .padding(12)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-            .frame(height: 132)
+            .frame(maxWidth: .infinity)
             .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
+            Text(test.isRunning ? "Testing up to 30 readings…" : test.completed ? "Test complete" : "Stopped")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
         }
         .help(streaming
-              ? "Network round-trip time from the stream transport over this view’s last minute. Missing readings leave gaps. Excludes game, capture, encoding, decoding, and display delay."
-              : "TCP connection setup time to the server, including DNS if needed. Shows this view’s last minute of actual checks, about 10 seconds apart. Missing readings leave gaps. History resets when the host, path, or measurement type changes.")
+              ? "Network round-trip time from the current stream. Reads the existing transport estimator without extra probes. Excludes game, capture, encoding, decoding, and display delay."
+              : "Measures TCP connection setup time to this server, including DNS if needed. Runs only when started, for up to 30 readings. Stop cancels the test. This is not ICMP ping or end-to-end input latency.")
     }
 }
 
