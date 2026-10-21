@@ -5,8 +5,16 @@
       "layers": [
         {
           "name": "Continuous spectrum with restrained face transmission",
-          "image-name": "retained-spectrum.svg",
-          "glass": false
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "retained-spectrum.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "retained-spectrum-dark.svg"
+            }
+          ]
         }
       ],
       "lighting": "combined",
@@ -39,15 +47,19 @@
               -9.729652774869109
             ]
           },
-          "opacity": 1.0
+          "opacity-specializations": [
+            {
+              "value": 1.0
+            },
+            {
+              "appearance": "dark",
+              "value": 0.98
+            }
+          ]
         }
       ],
       "lighting": "combined",
       "specular": "inside",
-      "translucency": {
-        "enabled": true,
-        "value": 0.4
-      },
       "refractivity": {
         "enabled": false,
         "strength": 0,
@@ -57,25 +69,64 @@
         "kind": "layer-color",
         "opacity": 0.018
       },
-      "blur-material": 0
+      "blur-material": 0,
+      "translucency-specializations": [
+        {
+          "value": {
+            "enabled": true,
+            "value": 0.4
+          }
+        },
+        {
+          "appearance": "dark",
+          "value": {
+            "enabled": true,
+            "value": 0.46
+          }
+        }
+      ]
     },
     {
       "name": "Rear faces \u2014 apex to far base corner",
       "layers": [
         {
           "name": "Rear seam \u2014 3.2 pt, tapered ends",
-          "image-name": "anatomy.svg",
-          "glass": false
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "anatomy.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "anatomy-dark.svg"
+            }
+          ]
         },
         {
           "name": "Rear left face \u2014 tonal depth",
-          "image-name": "rear-left-face.svg",
-          "glass": false
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "rear-left-face.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "rear-left-face-dark.svg"
+            }
+          ]
         },
         {
           "name": "Rear right face \u2014 tonal depth",
-          "image-name": "rear-right-face.svg",
-          "glass": false
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "rear-right-face.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "rear-right-face-dark.svg"
+            }
+          ]
         }
       ],
       "lighting": "combined",
@@ -99,8 +150,16 @@
       "layers": [
         {
           "name": "Continuous optical path",
-          "image-name": "light.svg",
-          "glass": false
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "light.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "light-dark.svg"
+            }
+          ]
         }
       ],
       "lighting": "combined",
@@ -129,7 +188,7 @@
     {
       "appearance": "dark",
       "value": {
-        "solid": "display-p3:0.054902,0.039216,0.090196,1"
+        "solid": "display-p3:0.109804,0.109804,0.117647,1"
       }
     }
   ],

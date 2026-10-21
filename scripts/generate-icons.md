@@ -5,16 +5,17 @@ square-based glass pyramid on purple, with warmer incoming light and richer
 gold, cyan and violet gradients. The selected shading-only treatment keeps
 the spectrum continuous, with stronger colour through the faces. A brighter
 violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
-the background in Default/Light. Dark uses a near-black violet fill
-(Display P3 `#0E0A17`) for stronger separation in the dark appearance. The
-artwork and native glass settings are shared. The porcelain variant was
-retired.
+the background in Default/Light. Dark uses a neutral charcoal fill
+(Display P3 `#1C1C1E`), with a coordinated pearl entry beam and warmer amber,
+softer aqua and cooler violet rays. Dark also has quieter rear-face colours
+and its own native glass translucency (0.46) and shell opacity (0.98).
+The pyramid geometry is shared. The porcelain variant was retired.
 
 The Composer document has four groups: restrained spectrum colour retention,
 the glass shell, rear faces and base seam, and the aligned light artwork.
 The shell is a raster asset with native inside specular lighting and
-translucency (0.40, with the shell layer at full opacity). The beam boundaries,
-gradients, rear facets and base seam are editable SVG. Material blur and
+translucency (0.40 in Default, with the shell layer at full opacity). The beam
+boundaries, gradients, rear facets and base seam are editable SVG. Material blur and
 screen-space refraction are disabled to keep
 the selected ray geometry crisp. The colour-retention overlay uses restrained
 transmission gradients across the faces and is inset from the bevels so it
@@ -30,6 +31,14 @@ material. Beam gradients live in `Assets/light.svg`; their colour-retention
 counterparts live in `Assets/retained-spectrum.svg`. Keep those palettes in
 sync when tuning the light. The icon does not depend on the exploratory
 studies under `output/`.
+
+Dark artwork is supplied through native `image-name-specializations` on the
+same layers. The matching `*-dark.svg` assets tune the beams, transmitted
+colour, rear faces and base seam. Native material overrides use
+`translucency-specializations` and `opacity-specializations`. Keep the default
+and Dark paths and transforms aligned when editing: this is an appearance
+palette, not a different pyramid construction. The Default export is unchanged
+by these Dark overrides.
 
 Export the README icon with `./scripts/export-shimmer-icon.sh`. The export
 uses Icon Composer's macOS 27 design generation, matching the approved icon.
