@@ -133,32 +133,7 @@ struct ComputersTab: View {
                             Text(host.localAddress ?? host.manualAddress ?? host.name)
                                 .textSelection(.enabled)
                         }
-                        field("Status") {
-                            HStack(spacing: 7) {
-                                Circle().fill(statusColor).frame(width: 9, height: 9)
-                                Text(statusText)
-                                // The only part of the old streaming card worth
-                                // keeping: a way back to a running stream. The
-                                // rest of that card - a big "Streaming" plate
-                                // naming the app and the PC - said what this
-                                // row, the disabled app buttons and their help
-                                // text already say, while covering the pane it
-                                // was reporting on.
-                                if model.isStreaming {
-                                    Button("Show the stream") { model.resumeStreamWindow() }
-                                        .controlSize(.small)
-                                        .padding(.leading, 3)
-                                }
-                            }
-                        }
-                        if let played = host.lastPlayedDescription {
-                            // The stored string reads "last played 5 hours ago",
-                            // which repeats the label in a two-column list.
-                            let trimmed = played.hasPrefix("last played ")
-                                ? String(played.dropFirst("last played ".count))
-                                : played
-                            field("Last played") { Text(trimmed).foregroundStyle(.secondary) }
-                        }
+                        activityRows(for: host)
                     }
                     .padding(.top, 22)
                     .padding(.horizontal, 16)
@@ -198,20 +173,34 @@ struct ComputersTab: View {
         }
     }
 
-    private var statusColor: Color {
-        guard let live = model.hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return .secondary.opacity(0.55)
-        }
-        switch live.state {
-        case .asleep: return .red
-        case .certMismatch: return .orange
-        case .unknown: return .secondary.opacity(0.55)
-        case .idle, .streamingApp, .streamingUnknownApp: return .green
+    private func activityRows(for host: Host) -> some View {
+        // Relative dates and expired host snapshots must update even when
+        // no other observable property changes (for example after sleep).
+        TimelineView(.periodic(from: .now, by: 10)) { context in
+            VStack(alignment: .leading, spacing: 12) {
+                field("Status") {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(model.hostStatusIndicator(for: host.id, at: context.date).color)
+                            .frame(width: 9, height: 9)
+                        Text(model.hostStatusLine(for: host.id, at: context.date))
+                        if model.isStreaming, model.activeStreamHostID == host.id,
+                           model.activeStreamHasVideo {
+                            Button("Show the stream") { model.resumeStreamWindow() }
+                                .controlSize(.small)
+                                .padding(.leading, 3)
+                        }
+                    }
+                    .help("The host session identifies the streaming app, not the game currently being played.")
+                }
+                field("Last streamed") {
+                    Text(model.lastStreamedDescription(for: host, at: context.date))
+                        .foregroundStyle(.secondary)
+                        .help("Most recent stream from this Mac. Play on other devices is not included.")
+                }
+            }
         }
     }
-
-    private var statusText: String { model.selectedHostStatusLine }
 
     private var searchField: some View {
         HStack(spacing: 6) {
@@ -231,7 +220,6 @@ struct ComputersTab: View {
         .padding(.vertical, 5)
         .background(Color.primary.opacity(0.07), in: Capsule())
     }
-
 }
 
 // MARK: - Sidebar row
@@ -243,23 +231,6 @@ private struct HostRow: View {
     let selected: Bool
     @Environment(AppModel.self) private var model
 
-    /// Liveness is only ever polled for the SELECTED host (HostStatusPoller),
-    /// so that is the only one this can honestly colour. Every other row gets
-    /// the "unknown" grey rather than a guess.
-    private var dotColor: Color {
-        guard host.id == model.selectedHost?.id else { return .secondary.opacity(0.55) }
-        guard let live = model.hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return .secondary.opacity(0.55)
-        }
-        switch live.state {
-        case .asleep: return .red
-        case .certMismatch: return .orange
-        case .unknown: return .secondary.opacity(0.55)
-        case .idle, .streamingApp, .streamingUnknownApp: return .green
-        }
-    }
-
     var body: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
@@ -270,11 +241,13 @@ private struct HostRow: View {
                         Image(systemName: "display")
                             .font(.system(size: 13, weight: .regular))
                             .foregroundStyle(Color.accentColor))
-                Circle()
-                    .fill(dotColor)
-                    .frame(width: 9, height: 9)
-                    .overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
-                    .offset(x: 1, y: 1)
+                TimelineView(.periodic(from: .now, by: 10)) { context in
+                    Circle()
+                        .fill(model.hostStatusIndicator(for: host.id, at: context.date).color)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
+                        .offset(x: 1, y: 1)
+                }
             }
             VStack(alignment: .leading, spacing: 0) {
                 Text(host.displayName)
@@ -324,6 +297,17 @@ struct AppGlyphIcon: View {
                 // Matched to the cap height of the symbols beside it, so a
                 // bundled mark and an SF Symbol sit on the same line.
                 .frame(width: size, height: size)
+        }
+    }
+}
+
+private extension HostStatusIndicator {
+    var color: Color {
+        switch self {
+        case .neutral: return .secondary.opacity(0.55)
+        case .online: return .green
+        case .attention: return .orange
+        case .offline: return .red
         }
     }
 }

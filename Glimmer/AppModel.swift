@@ -189,6 +189,10 @@ final class AppModel {
     /// transitional state. See `StreamPhase` for the case set.
     var streamPhase: StreamPhase = .idle
 
+    var activeStreamHostID: String?
+    /// A handshake or failed launch is not streaming history.
+    var activeStreamHasVideo = false
+
     /// True when a stream is running but its window has been orderOut'd
     /// because the user Cmd-Tabbed away. The launcher UI shows a "Back to
     /// stream" affordance while this is true. Set by the StreamWindow's

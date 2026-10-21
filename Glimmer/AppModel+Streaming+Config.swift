@@ -44,36 +44,6 @@ extension AppModel {
         requestStream(app: app, on: host)
     }
 
-    /// One line on the selected PC, for the menu bar header and the library's
-    /// readiness chip: what the last fresh /serverinfo said, or "Connected"
-    /// while THIS Mac is streaming it (the poller is paused then, so the
-    /// snapshot would only age out to "Checking…").
-    var selectedHostStatusLine: String {
-        if isStreaming {
-            // While live, the header's second line says what is actually
-            // streaming, at a glance: "Streaming at 1080p60", plus " HDR" when
-            // HDR is on. Just "Streaming" for the ~1s before the decoder has
-            // reported its format. The exact size + codec live in the Stream
-            // section below; this is the compact shorthand.
-            guard let short = activeStreamShorthand else { return "Streaming" }
-            return "Streaming at \(short)"
-        }
-        guard let live = hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else {
-            return "Checking…"
-        }
-        // Sunshine reports BUSY whenever an app is running, streamed or not -
-        // after our own disconnect the game is simply still up on the host.
-        switch live.state {
-        case .idle: return "Online"
-        case .streamingApp(let name): return "\(name) running"
-        case .streamingUnknownApp: return "An app is running"
-        case .asleep: return "Asleep or offline"
-        case .certMismatch: return "Trust needed - pair again"
-        case .unknown: return "Checking…"
-        }
-    }
-
     /// The menu bar's row for a LIVE session: what is streaming, and - when
     /// the window is hidden or in Picture in Picture - the way back to it.
     /// One row instead of a greyed-out "Stream X" plus a separate "Back to
@@ -113,8 +83,7 @@ extension AppModel {
     /// falling back to "the thing you last played" is a reasonable guess.
     var runningAppName: String? {
         guard let host = selectedHost,
-              let live = hostLiveStatus,
-              Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
+              let live = liveStatus(for: host.id),
               case .streamingApp(let name) = live.state,
               host.apps.contains(where: { $0.name == name })
         else { return nil }
@@ -130,8 +99,7 @@ extension AppModel {
     /// when neither is known - the button falls back to "Connect".
     var resumableAppName: String? {
         guard let host = selectedHost else { return nil }
-        if let live = hostLiveStatus,
-           Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale,
+        if let live = liveStatus(for: host.id),
            case .streamingApp(let name) = live.state,
            host.apps.contains(where: { $0.name == name }) {
             return name

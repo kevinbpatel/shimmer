@@ -201,8 +201,10 @@ extension NetworkClient {
         }
         // 0 = host idle, non-zero = app ID currently streaming. Drives the
         // launch-vs-resume decision in StreamSession.
+        server.reportsCurrentGame = false
         if let active = xml.int(forChild: "currentgame") {
             server.currentGameID = active
+            server.reportsCurrentGame = true
         }
         // Sunshine exposes the host certificate inline so a fresh client can
         // surface the cert hash to the user before pairing. GFE doesn't

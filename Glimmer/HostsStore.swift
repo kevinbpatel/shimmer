@@ -146,7 +146,8 @@ extension AppModel {
                 // Backfilled from /serverinfo's `<mac>` on every successful
                 // poll/pair (only learnable while the host is online).
                 macAddress: defaults.string(forKey: "hosts.\(i).mac"),
-                lunaDeviceId: defaults.string(forKey: "hosts.\(i).lunadevice")
+                lunaDeviceId: defaults.string(forKey: "hosts.\(i).lunadevice"),
+                lastStreamed: defaults.object(forKey: Self.lastStreamedKey(for: uuid)) as? Date
             ))
         }
 
@@ -359,6 +360,7 @@ extension AppModel {
         // File-store + legacy UserDefaults pinned cert.
         PinnedCertStore.delete(forHostID: host.id)
         defaults.removeObject(forKey: "glimmer.lastConnected.\(host.id)")
+        defaults.removeObject(forKey: Self.lastStreamedKey(for: host.id))
         HostCodecPreference.forget(hostID: host.id)
         if defaults.string(forKey: "glimmer.selectedHostID") == host.id {
             defaults.removeObject(forKey: "glimmer.selectedHostID")

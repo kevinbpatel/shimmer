@@ -19,7 +19,7 @@ struct Host: Identifiable, Hashable {
     let localAddress: String?
     let manualAddress: String?
     let apps: [LibraryApp]
-    let lastConnected: Date?
+    var lastConnected: Date?
     let serverCertPEM: String?    // pinned from moonlight-qt's hosts.N.srvcert (migration)
     let appVersion: String?
     let gfeVersion: String?
@@ -38,18 +38,17 @@ struct Host: Identifiable, Hashable {
     /// when a refreshed device list no longer contains it. nil = unbound.
     var lunaDeviceId: String?
 
+    /// Verified streaming history from this Mac. Legacy lastConnected values
+    /// also include failed attempts, so they must not populate this field.
+    var lastStreamed: Date?
+
     var displayName: String { customName ?? name }
 
-    var lastPlayedDescription: String? {
-        guard let last = lastConnected else { return nil }
+    func lastStreamedDescription(relativeTo now: Date) -> String? {
+        guard let last = lastStreamed else { return nil }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        // Lowercased - macOS HIG sentence-case convention for
-        // relative-time strings in secondary/footnote contexts. Apple's
-        // own Time Machine and Photos do "last opened 2 hours ago", not
-        // "Last opened 2 Hours Ago". Producing it lowercase at the source
-        // keeps every call site consistent.
-        return "last played \(formatter.localizedString(for: last, relativeTo: .now))"
+        return formatter.localizedString(for: min(last, now), relativeTo: now)
     }
 }
 
@@ -422,6 +421,8 @@ struct HostLiveStatus: Equatable {
         case unknown
         /// Host answered /serverinfo and reports no active session.
         case idle
+        /// TCP answered, but the host's session state could not be read.
+        case reachable
         /// Host is busy streaming an app we know the name of.
         case streamingApp(name: String)
         /// Host is busy streaming an app whose ID isn't in our cached
@@ -436,6 +437,13 @@ struct HostLiveStatus: Equatable {
         /// distinct amber "Trust needed" state whose tap re-pairs (re-pinning
         /// the new cert).
         case certMismatch
+
+        var hasSessionInformation: Bool {
+            switch self {
+            case .idle, .streamingApp, .streamingUnknownApp: return true
+            default: return false
+            }
+        }
     }
 
     /// UUID of the host this snapshot belongs to. Lets us discard stale
@@ -453,4 +461,11 @@ struct HostLiveStatus: Equatable {
     var capturedAt: Date
 
     static let stale: TimeInterval = 60
+
+    static func reportedState(currentGameID: Int?, appNamesByID: [Int: String]) -> State {
+        guard let id = currentGameID else { return .reachable }
+        guard id != 0 else { return .idle }
+        if let name = appNamesByID[id] { return .streamingApp(name: name) }
+        return .streamingUnknownApp(id: id)
+    }
 }
