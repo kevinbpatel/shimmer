@@ -1,0 +1,79 @@
+import Foundation
+import Testing
+@testable import Glimmer
+
+struct HostConnectionTests {
+    private let interfaces = [
+        HostRouteMonitor.InterfaceAddress(name: "utun2", address: "100.94.140.12"),
+        HostRouteMonitor.InterfaceAddress(name: "utun2", address: "fd7a:115c:a1e0::f635:8c0d"),
+        HostRouteMonitor.InterfaceAddress(name: "utun9", address: "100.70.1.2"),
+        HostRouteMonitor.InterfaceAddress(name: "en0", address: "192.168.50.10"),
+    ]
+
+    @Test func tailscaleIsIdentifiedOnTheSelectedIPv4OrIPv6Interface() {
+        for local in ["100.94.140.12", "fd7a:115c:a1e0::f635:8c0d",
+                      "FD7A:115C:A1E0:0:0:0:F635:8C0D%utun2"] {
+            #expect(HostRouteMonitor.isTailscale(localAddress: local, interfaces: interfaces))
+        }
+    }
+
+    @Test func anUnrelatedTailscaleInterfaceDoesNotRelabelOtherRoutes() {
+        for local in ["100.70.1.2", "192.168.50.10", "100.94.140.13", "", nil] as [String?] {
+            #expect(!HostRouteMonitor.isTailscale(localAddress: local, interfaces: interfaces))
+        }
+    }
+
+    @Test func cgnatAddressesAloneDoNotProveTailscale() {
+        #expect(!HostRouteMonitor.isTailscale(localAddress: "100.70.1.2", interfaces: [
+            .init(name: "utun9", address: "100.70.1.2"),
+            .init(name: "utun9", address: "fd00::1"),
+        ]))
+    }
+
+    @Test func ambiguousInterfaceOwnershipIsNotLabeledTailscale() {
+        let duplicate = interfaces + [.init(name: "utun9", address: "100.94.140.12")]
+        #expect(!HostRouteMonitor.isTailscale(localAddress: "100.94.140.12", interfaces: duplicate))
+    }
+
+    @Test func latencyRequiresTheSameHostAddressAndUnchangedRoute() {
+        let now = Date(timeIntervalSince1970: 1000)
+        let reading = HostLatencyReading(hostID: "bazzite", address: "192.168.50.44",
+                                         milliseconds: 12, capturedAt: now.addingTimeInterval(-2))
+        #expect(reading.text(forHost: "bazzite", address: "192.168.50.44", at: now,
+                             notBefore: now.addingTimeInterval(-3), maxAge: 3) == "12 ms")
+        #expect(reading.text(forHost: "another-host", address: "192.168.50.44", at: now,
+                             notBefore: .distantPast, maxAge: 3) == nil)
+        #expect(reading.text(forHost: "bazzite", address: "100.70.1.2", at: now,
+                             notBefore: .distantPast, maxAge: 3) == nil)
+        #expect(reading.text(forHost: "bazzite", address: "192.168.50.44", at: now,
+                             notBefore: now.addingTimeInterval(-1), maxAge: 3) == nil)
+    }
+
+    @Test func staleOrFutureLatencyNeverAppears() {
+        let now = Date(timeIntervalSince1970: 1000)
+        for offset in [-61.0, 1.0] {
+            let reading = HostLatencyReading(hostID: "pc", address: "host", milliseconds: 12,
+                                             capturedAt: now.addingTimeInterval(offset))
+            #expect(reading.text(forHost: "pc", address: "host", at: now,
+                                 notBefore: .distantPast, maxAge: 60) == nil)
+        }
+    }
+
+    @Test func invalidLatencyIsNotRenderedAsANumber() {
+        let now = Date(timeIntervalSince1970: 1000)
+        for ms in [Double.nan, .infinity, -.infinity, -1, Double(Int.max)] {
+            let reading = HostLatencyReading(hostID: "pc", address: "host", milliseconds: ms, capturedAt: now)
+            #expect(reading.text(forHost: "pc", address: "host", at: now,
+                                 notBefore: .distantPast, maxAge: 3) == nil)
+        }
+    }
+
+    @Test func subMillisecondLatencyIsShownWithoutClaimingAZeroDelay() {
+        let now = Date(timeIntervalSince1970: 1000)
+        for ms in [0.0, 0.2, 0.9] {
+            let reading = HostLatencyReading(hostID: "pc", address: "host", milliseconds: ms, capturedAt: now)
+            #expect(reading.text(forHost: "pc", address: "host", at: now,
+                                 notBefore: .distantPast, maxAge: 3) == "<1 ms")
+        }
+    }
+}

@@ -190,6 +190,7 @@ extension AppModel {
             return
 
         case .reachable(let rttMs):
+            let probedAt = Date()
             // Host answered → clear the unreachable streak so a later transient
             // miss starts counting from zero again.
             await MainActor.run { [weak self] in self?.hostUnreachableStreak = 0 }
@@ -222,7 +223,9 @@ extension AppModel {
                     state: state,
                     rttMs: rttMs,
                     sunshineVersion: info.appVersion,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             } catch let err as StreamError {
                 await client.shutdown()
@@ -243,7 +246,9 @@ extension AppModel {
                     state: state,
                     rttMs: rttMs,
                     sunshineVersion: nil,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             } catch {
                 await client.shutdown()
@@ -254,7 +259,9 @@ extension AppModel {
                     state: .reachable,
                     rttMs: rttMs,
                     sunshineVersion: nil,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             }
         }

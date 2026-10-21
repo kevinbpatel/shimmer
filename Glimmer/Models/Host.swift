@@ -459,6 +459,10 @@ struct HostLiveStatus: Equatable {
     /// "Streaming X" reading if the host stops answering - we don't want
     /// the chip lying about a half-hour-old session.
     var capturedAt: Date
+    /// The address actually probed, so a fallback from LAN to Tailscale cannot
+    /// inherit the previous route's latency reading.
+    var probedAddress: String? = nil
+    var probedAt: Date? = nil
 
     static let stale: TimeInterval = 60
 

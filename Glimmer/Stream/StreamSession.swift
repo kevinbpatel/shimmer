@@ -128,6 +128,12 @@ public actor StreamSession {
     /// nothing keeps sending to the dead one.
     var backend: StreamingBackend
 
+    /// Read the existing transport estimator; no extra probes or telemetry
+    /// recorder are needed for the Servers pane's live round-trip reading.
+    func networkRoundTripMilliseconds() -> Double? {
+        backend.estimatedRtt()?.rttMs
+    }
+
     // The retained session bridge. Created by start(), released by stop()
     // *after* stopConnection() drains the worker threads. See the top-of-file
     // comment for the lifetime contract.

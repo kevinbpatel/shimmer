@@ -21,6 +21,7 @@ import Foundation
 import Network
 import SwiftUI
 import Observation
+import Darwin
 
 /// Live wired/Wi-Fi classification of the kernel route toward one host.
 /// Owned by `AppModel` (see `hostRoute`), re-pointed by the launcher
@@ -34,10 +35,23 @@ final class HostRouteMonitor {
     /// not yet resolved) both render as NO glyph: absent knowledge stays
     /// unlabelled, never guessed.
     enum RouteClass {
-        case wired, wifi, tunnel, unknown
+        case wired, wifi, tailscale, tunnel, unknown
+
+        var label: String {
+            switch self {
+            case .wired: "Ethernet"
+            case .wifi: "Wi-Fi"
+            case .tailscale: "Tailscale"
+            case .tunnel: "VPN"
+            case .unknown: "Unknown network"
+            }
+        }
     }
 
     private(set) var routeClass: RouteClass = .unknown
+    private(set) var address: String?
+    private(set) var changedAt = Date.distantPast
+    private var routeIdentity = ""
 
     /// Chip glyph for the current route - bolt for wired, arcs for Wi-Fi,
     /// nothing when the route is a tunnel or unknown.
@@ -45,7 +59,7 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "bolt.fill"
         case .wifi: return "wifi"
-        case .tunnel, .unknown: return nil
+        case .tailscale, .tunnel, .unknown: return nil
         }
     }
 
@@ -54,7 +68,9 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "over Ethernet"
         case .wifi: return "over Wi-Fi"
-        case .tunnel, .unknown: return nil
+        case .tailscale: return "over Tailscale"
+        case .tunnel: return "over a VPN"
+        case .unknown: return nil
         }
     }
 
@@ -73,7 +89,10 @@ final class HostRouteMonitor {
         connection?.cancel()
         connection = nil
         generation += 1
+        self.address = address
         routeClass = .unknown
+        routeIdentity = ""
+        changedAt = .now
         guard let address, !address.isEmpty else { return }
 
         // The port is irrelevant to route selection (only the destination
@@ -84,13 +103,55 @@ final class HostRouteMonitor {
             // Classify on the monitor queue (cheap enum derivation), publish
             // on the main actor where SwiftUI observes `routeClass`.
             let fresh = Self.classify(path)
+            let identity = Self.identity(path)
             Task { @MainActor [weak self] in
                 guard let self, self.generation == gen else { return }
-                self.routeClass = fresh
+                self.publish(fresh, identity: identity)
+            }
+        }
+        // The local endpoint can be absent in the first path callback. Once
+        // ready it identifies the exact interface this connection selected.
+        conn.stateUpdateHandler = { [weak self, weak conn] state in
+            let fresh: RouteClass
+            let identity: String
+            switch state {
+            case .ready:
+                guard let path = conn?.currentPath else { return }
+                fresh = Self.classify(path)
+                identity = Self.identity(path)
+            case .failed, .waiting, .cancelled:
+                fresh = .unknown
+                identity = ""
+            default: return
+            }
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == gen else { return }
+                self.publish(fresh, identity: identity)
             }
         }
         conn.start(queue: queue)
         connection = conn
+    }
+
+    private func publish(_ fresh: RouteClass, identity: String) {
+        if routeClass != fresh || routeIdentity != identity { changedAt = .now }
+        routeClass = fresh
+        routeIdentity = identity
+    }
+
+    private nonisolated static func identity(_ path: NWPath) -> String {
+        path.availableInterfaces.map(\.name).joined(separator: ",")
+            + ":" + (localAddress(path) ?? "")
+    }
+
+    private nonisolated static func localAddress(_ path: NWPath) -> String? {
+        guard case .hostPort(let host, _) = path.localEndpoint else { return nil }
+        switch host {
+        case .ipv4(let ip): return ip.debugDescription
+        case .ipv6(let ip): return ip.debugDescription
+        case .name: return nil
+        @unknown default: return nil
+        }
     }
 
     /// NWPath → route class. Tunnel is checked FIRST: a host reached through
@@ -98,14 +159,99 @@ final class HostRouteMonitor {
     /// routed to (the same honesty rule the engine's exporter probe follows).
     private nonisolated static func classify(_ path: NWPath) -> RouteClass {
         guard path.status == .satisfied else { return .unknown }
-        if path.usesInterfaceType(.other) { return .tunnel }
+        if path.usesInterfaceType(.other) {
+            return isTailscale(localAddress: localAddress(path), interfaces: interfaceAddresses())
+                ? .tailscale : .tunnel
+        }
         if path.usesInterfaceType(.wiredEthernet) { return .wired }
         if path.usesInterfaceType(.wifi) { return .wifi }
         return .unknown
     }
+
+    struct InterfaceAddress: Sendable {
+        let name: String
+        let address: String
+    }
+
+    /// Positive evidence on the SELECTED interface, not a CGNAT destination or
+    /// an unrelated active VPN. Tailscale assigns fd7a:115c:a1e0::/48 locally.
+    nonisolated static func isTailscale(localAddress: String?, interfaces: [InterfaceAddress]) -> Bool {
+        guard let localAddress, let local = ipBytes(localAddress) else { return false }
+        let names = Set(interfaces.filter { ipBytes($0.address) == local }.map(\.name))
+        guard names.count == 1, let name = names.first else { return false }
+        let prefix: [UInt8] = [0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0]
+        return interfaces.contains {
+            $0.name == name && ipBytes($0.address)?.starts(with: prefix) == true
+        }
+    }
+
+    private nonisolated static func ipBytes(_ value: String) -> Data? {
+        let value = value.split(separator: "%", maxSplits: 1).first.map(String.init) ?? ""
+        if let ip = IPv4Address(value) { return ip.rawValue }
+        return IPv6Address(value)?.rawValue
+    }
+
+    private nonisolated static func interfaceAddresses() -> [InterfaceAddress] {
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return [] }
+        defer { freeifaddrs(first) }
+        var result: [InterfaceAddress] = []
+        var next: UnsafeMutablePointer<ifaddrs>? = first
+        while let item = next {
+            next = item.pointee.ifa_next
+            guard let address = item.pointee.ifa_addr,
+                  [AF_INET, AF_INET6].contains(Int32(address.pointee.sa_family)) else { continue }
+            var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(address, socklen_t(address.pointee.sa_len), &buffer,
+                              socklen_t(buffer.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+            result.append(InterfaceAddress(name: String(cString: item.pointee.ifa_name),
+                                           address: String(cString: buffer)))
+        }
+        return result
+    }
+}
+
+struct HostLatencyReading {
+    let hostID: String
+    let address: String
+    let milliseconds: Double
+    let capturedAt: Date
+
+    func text(forHost hostID: String, address: String, at now: Date,
+              notBefore: Date, maxAge: TimeInterval) -> String? {
+        guard self.hostID == hostID, self.address == address,
+              capturedAt >= notBefore, capturedAt <= now,
+              now.timeIntervalSince(capturedAt) <= maxAge,
+              milliseconds.isFinite, milliseconds >= 0,
+              milliseconds < Double(Int.max) else { return nil }
+        return milliseconds < 1 ? "<1 ms" : "\(Int(milliseconds.rounded())) ms"
+    }
 }
 
 extension AppModel {
+
+    func connectionDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
+        guard let host = selectedHost, let address = selectedHostRouteAddress else { return "Checking…" }
+        let route = hostRoute.address == address ? hostRoute.routeClass : .unknown
+        let reading: HostLatencyReading?
+        let maxAge: TimeInterval
+        if isStreaming {
+            reading = activeStreamHostID == host.id && streamPhase == .streaming ? liveReading : nil
+            maxAge = 3
+        } else if let status = hostLiveStatus, let ms = status.rttMs,
+                  let address = status.probedAddress, let probedAt = status.probedAt {
+            reading = HostLatencyReading(hostID: status.hostID, address: address,
+                                         milliseconds: Double(ms), capturedAt: probedAt)
+            maxAge = HostLiveStatus.stale
+        } else {
+            reading = nil
+            maxAge = 0
+        }
+        let latency = reading?.text(forHost: host.id, address: address, at: now,
+                                    notBefore: hostRoute.changedAt, maxAge: maxAge)
+        if route == .unknown && latency == nil { return "Checking…" }
+        return [route.label, latency].compactMap { $0 }.joined(separator: " · ")
+    }
 
     /// The destination `refreshHostRoute()` monitors for the current
     /// selection - the same fallback chain `nativeServerInfo(for:)` dials, so

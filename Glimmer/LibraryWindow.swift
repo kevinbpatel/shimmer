@@ -19,6 +19,7 @@ struct ComputersTab: View {
     @State private var showPairSheet = false
     @State private var showUnpairConfirm = false
     @State private var search = ""
+    @State private var liveLatency: HostLatencyReading?
 
     /// Selection is the host ID, not the Host: Host is a value type the store
     /// replaces wholesale on every refresh, so tagging rows with it would drop
@@ -51,6 +52,10 @@ struct ComputersTab: View {
         .sheet(isPresented: $showPairSheet) {
             PairSheet(initialAddress: "")
                 .presentationBackground(.thinMaterial)
+        }
+        .task(id: [model.selectedHost?.id, model.selectedHostRouteAddress,
+                   model.isStreaming ? model.activeStreamHostID : nil]) {
+            await sampleLiveLatency()
         }
         .confirmationDialog("Remove this PC?", isPresented: $showUnpairConfirm, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
@@ -138,8 +143,16 @@ struct ComputersTab: View {
                         }
 
                         field("Address") {
-                            Text(host.localAddress ?? host.manualAddress ?? host.name)
+                            Text(model.selectedHostRouteAddress ?? host.name)
                                 .textSelection(.enabled)
+                        }
+
+                        field("Connection") {
+                            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                                Text(model.connectionDescription(liveReading: liveLatency, at: .now))
+                                    .monospacedDigit()
+                            }
+                            .help("This Mac’s route to the server. Latency is measured TCP connection time while idle and network round-trip time while streaming; it is not total input-to-display latency.")
                         }
                     }
                     .padding(.top, 22)
@@ -163,6 +176,24 @@ struct ComputersTab: View {
             ContentUnavailableView("No PC selected",
                                    systemImage: "display",
                                    description: Text("Pick one on the left to see its apps."))
+        }
+    }
+
+    private func sampleLiveLatency() async {
+        liveLatency = nil
+        guard let hostID = model.selectedHost?.id,
+              let address = model.selectedHostRouteAddress,
+              model.isStreaming, model.activeStreamHostID == hostID else { return }
+        while !Task.isCancelled {
+            let value = model.streamPhase == .streaming
+                ? await model.nativeSession?.networkRoundTripMilliseconds() : nil
+            guard !Task.isCancelled, model.isStreaming,
+                  model.selectedHost?.id == hostID, model.activeStreamHostID == hostID,
+                  model.selectedHostRouteAddress == address else { return }
+            liveLatency = value.map {
+                HostLatencyReading(hostID: hostID, address: address, milliseconds: $0, capturedAt: .now)
+            }
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
         }
     }
 
