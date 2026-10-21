@@ -43,6 +43,10 @@ by these Dark overrides.
 
 Export the README icon with `./scripts/export-shimmer-icon.sh`. The export
 uses Icon Composer's macOS 27 design generation, matching the approved icon.
+The same command refreshes the About pane's `AboutAppIcon` image set at 1× and
+2×, with Default and Dark appearances. SwiftUI selects the image for the
+window's current appearance; regenerate these exports after editing the source
+icon. The app's Dock and Finder icon still uses the layered Composer document.
 
 `generate-icons.swift` is the generator for the previous moon-and-sparkles
 design. It still runs, and the rationale below is worth keeping because the
