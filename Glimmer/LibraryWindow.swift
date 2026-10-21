@@ -20,6 +20,15 @@ struct ComputersTab: View {
     @State private var showUnpairConfirm = false
     @State private var search = ""
     @State private var liveLatency: HostLatencyReading?
+    @State private var latencyHistory = HostLatencyHistory()
+
+    private struct LatencyScope: Equatable {
+        let hostID: String?
+        let address: String?
+        let routeChangedAt: Date
+        let streaming: Bool
+        let streamHostID: String?
+    }
 
     /// Selection is the host ID, not the Host: Host is a value type the store
     /// replaces wholesale on every refresh, so tagging rows with it would drop
@@ -53,9 +62,12 @@ struct ComputersTab: View {
             PairSheet(initialAddress: "")
                 .presentationBackground(.thinMaterial)
         }
-        .task(id: [model.selectedHost?.id, model.selectedHostRouteAddress,
-                   model.isStreaming ? model.activeStreamHostID : nil]) {
-            await sampleLiveLatency()
+        .task(id: LatencyScope(hostID: model.selectedHost?.id,
+                              address: model.selectedHostRouteAddress,
+                              routeChangedAt: model.hostRoute.changedAt,
+                              streaming: model.isStreaming,
+                              streamHostID: model.activeStreamHostID)) {
+            await sampleLatencyHistory()
         }
         .confirmationDialog("Remove this PC?", isPresented: $showUnpairConfirm, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
@@ -148,12 +160,14 @@ struct ComputersTab: View {
                         }
 
                         field("Connection") {
-                            Text(model.macConnectionDescription)
+                            HStack(spacing: 6) {
+                                if let symbol = model.macConnectionSymbol {
+                                    Image(systemName: symbol).foregroundStyle(.secondary)
+                                        .accessibilityHidden(true)
+                                }
+                                Text(model.macConnectionDescription)
+                            }
                                 .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
-                        }
-
-                        field("Route") {
-                            Text(model.hostRouteDescription)
                         }
 
                         field(model.isStreaming ? "Round-trip" : "Response time") {
@@ -164,6 +178,9 @@ struct ComputersTab: View {
                             .help(model.isStreaming
                                   ? "Network round-trip time measured by the live stream transport. Excludes game, capture, encoding, decoding, and display delay; this is not end-to-end input latency."
                                   : "Measured time to establish a TCP connection to the server, including any DNS and connection setup. This is not streaming or end-to-end input latency.")
+                            LatencyHistoryGraph(history: latencyHistory,
+                                                maxGap: model.isStreaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2)
+                                .frame(width: 210)
                         }
                     }
                     .padding(.top, 22)
@@ -190,20 +207,24 @@ struct ComputersTab: View {
         }
     }
 
-    private func sampleLiveLatency() async {
+    private func sampleLatencyHistory() async {
         liveLatency = nil
+        latencyHistory = HostLatencyHistory()
         guard let hostID = model.selectedHost?.id,
-              let address = model.selectedHostRouteAddress,
-              model.isStreaming, model.activeStreamHostID == hostID else { return }
+              let address = model.selectedHostRouteAddress else { return }
+        let routeChangedAt = model.hostRoute.changedAt
+        let streaming = model.isStreaming
         while !Task.isCancelled {
-            let value = model.streamPhase == .streaming
+            let value = streaming && model.activeStreamHostID == hostID && model.streamPhase == .streaming
                 ? await model.nativeSession?.networkRoundTripMilliseconds() : nil
-            guard !Task.isCancelled, model.isStreaming,
-                  model.selectedHost?.id == hostID, model.activeStreamHostID == hostID,
+            guard !Task.isCancelled, model.isStreaming == streaming,
+                  model.selectedHost?.id == hostID, model.hostRoute.changedAt == routeChangedAt,
                   model.selectedHostRouteAddress == address else { return }
             liveLatency = value.map {
                 HostLatencyReading(hostID: hostID, address: address, milliseconds: $0, capturedAt: .now)
             }
+            let now = Date.now
+            latencyHistory.record(model.currentLatencyReading(liveReading: liveLatency, at: now), at: now)
             do { try await Task.sleep(for: .seconds(1)) } catch { return }
         }
     }
@@ -239,6 +260,59 @@ struct ComputersTab: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(Color.primary.opacity(0.07), in: Capsule())
+    }
+}
+
+/// Fixed time and zero-based axes: a quiet connection stays quiet, while a
+/// spike keeps its actual height. Straight segments avoid invented smoothing.
+private struct LatencyHistoryGraph: View {
+    let history: HostLatencyHistory
+    let maxGap: TimeInterval
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let ceiling = max(10, ceil((history.readings.map(\.milliseconds).max() ?? 0) * 1.15 / 5) * 5)
+            VStack(spacing: 3) {
+                HStack {
+                    Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
+                    Spacer()
+                    if history.readings.isEmpty { Text("Collecting measurements…") }
+                }
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+                Canvas { context, size in
+                    let start = timeline.date.addingTimeInterval(-HostLatencyHistory.duration)
+                    var grid = Path()
+                    for fraction in [0.0, 0.5, 1.0] {
+                        let y = size.height * fraction
+                        grid.move(to: CGPoint(x: 0, y: y))
+                        grid.addLine(to: CGPoint(x: size.width, y: y))
+                    }
+                    context.stroke(grid, with: .color(.secondary.opacity(0.18)), lineWidth: 0.5)
+                    for segment in history.segments(maxGap: maxGap) {
+                        let points = segment.filter { $0.capturedAt >= start && $0.capturedAt <= timeline.date }.map {
+                            CGPoint(x: $0.capturedAt.timeIntervalSince(start) / HostLatencyHistory.duration * size.width,
+                                    y: size.height * (1 - $0.milliseconds / ceiling))
+                        }
+                        guard let first = points.first else { continue }
+                        if points.count == 1 {
+                            context.fill(Path(ellipseIn: CGRect(x: first.x - 1.5, y: first.y - 1.5, width: 3, height: 3)),
+                                         with: .color(.accentColor))
+                        } else {
+                            var line = Path(); line.addLines(points)
+                            context.stroke(line, with: .color(.accentColor),
+                                           style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                        }
+                    }
+                }
+                .frame(height: 40)
+                HStack { Text("60s ago"); Spacer(); Text("Now") }
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Last minute of network measurements")
+        .accessibilityValue(history.readings.isEmpty ? "No measurements yet" : "\(history.readings.count) measurements; gaps indicate missing data")
+        .help("Actual measurements from this view’s last minute, on a zero-based scale. Idle checks run about every 10 seconds; stream round-trip readings update every second. No extra probes are sent. History resets when the host, network path, or measurement type changes.")
     }
 }
 

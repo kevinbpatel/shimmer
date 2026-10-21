@@ -3,6 +3,52 @@ import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func historyRecordsEachMeasurementOnceAndExpiresOldSamples() {
+        let now = Date(timeIntervalSince1970: 1000)
+        let reading = HostLatencyReading(hostID: "pc", address: "host", milliseconds: 2, capturedAt: now)
+        var history = HostLatencyHistory()
+        history.record(reading, at: now)
+        history.record(reading, at: now.addingTimeInterval(1))
+        #expect(history.readings.count == 1)
+        #expect(history.readings.first?.capturedAt == now)
+        history.record(nil, at: now.addingTimeInterval(61))
+        #expect(history.readings.isEmpty)
+    }
+
+    @Test func historyRejectsInvalidFutureAndOutOfOrderMeasurements() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        for ms in [Double.nan, .infinity, -.infinity, -1, Double(Int.max)] {
+            history.record(.init(hostID: "pc", address: "host", milliseconds: ms, capturedAt: now), at: now)
+        }
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 2, capturedAt: now.addingTimeInterval(1)), at: now)
+        #expect(history.readings.isEmpty)
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 2, capturedAt: now), at: now)
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 3, capturedAt: now.addingTimeInterval(-1)), at: now)
+        #expect(history.readings.count == 1)
+    }
+
+    @Test func historyLeavesAGapWhenMeasurementsAreMissing() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        for offset in [-50.0, -40, -10, 0] {
+            history.record(.init(hostID: "pc", address: "host", milliseconds: 2,
+                                 capturedAt: now.addingTimeInterval(offset)), at: now)
+        }
+        #expect(history.segments(maxGap: 22).map(\.count) == [2, 2])
+        #expect(history.segments(maxGap: 3).map(\.count) == [1, 1, 1, 1])
+    }
+
+    @Test func historyStorageRemainsBoundedForHighFrequencySources() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        for index in 0..<200 {
+            history.record(.init(hostID: "pc", address: "host", milliseconds: 2,
+                                 capturedAt: now.addingTimeInterval(Double(index) / 100)), at: now.addingTimeInterval(2))
+        }
+        #expect(history.readings.count == 120)
+    }
+
     @Test func physicalConnectionIsIndependentOfTheTunnelLabel() {
         #expect(HostRouteMonitor.physicalLink(ethernet: true, wifi: false, cellular: false).label == "Ethernet")
         #expect(HostRouteMonitor.physicalLink(ethernet: false, wifi: true, cellular: false).label == "Wi-Fi")

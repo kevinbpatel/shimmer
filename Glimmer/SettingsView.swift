@@ -21,10 +21,9 @@ struct AppShell: View {
     @Environment(AppModel.self) private var model
 
     private var windowHeight: CGFloat {
-        // Paired servers have just the app controls and an address. Preserve
-        // their form styling and trim the unused height instead of enlarging
-        // the controls. The first-run pairing page keeps its original room.
-        if model.settingsTab == .computers, model.selectedHost != nil { return 420 - 32 }
+        // Keep the paired-server form compact, with room for the connection
+        // details and a small timing history. Pairing keeps its original room.
+        if model.settingsTab == .computers, model.selectedHost != nil { return 460 - 32 }
         return model.settingsTab.windowHeight
     }
 

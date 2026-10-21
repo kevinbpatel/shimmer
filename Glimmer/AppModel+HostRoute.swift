@@ -52,6 +52,15 @@ final class HostRouteMonitor {
     enum PhysicalLink {
         case wired, wifi, cellular, multiple, unknown
 
+        var symbol: String? {
+            switch self {
+            case .wired: "cable.connector.horizontal"
+            case .wifi: "wifi"
+            case .cellular: "antenna.radiowaves.left.and.right"
+            case .multiple, .unknown: nil
+            }
+        }
+
         var label: String {
             switch self {
             case .wired: "Ethernet"
@@ -270,25 +279,49 @@ struct HostLatencyReading {
     }
 }
 
+/// A short, in-memory history of actual measurements. UI refreshes must not
+/// duplicate a probe, stretch old data to "now", or connect across outages.
+struct HostLatencyHistory {
+    static let duration: TimeInterval = 60
+    private(set) var readings: [HostLatencyReading] = []
+
+    mutating func record(_ reading: HostLatencyReading?, at now: Date) {
+        readings.removeAll { $0.capturedAt < now.addingTimeInterval(-Self.duration) || $0.capturedAt > now }
+        guard let reading,
+              reading.text(forHost: reading.hostID, address: reading.address, at: now,
+                           notBefore: now.addingTimeInterval(-Self.duration), maxAge: Self.duration) != nil,
+              readings.last.map({ reading.capturedAt > $0.capturedAt }) ?? true else { return }
+        readings.append(reading)
+        // Bound storage even if an upstream source publishes unusually fast.
+        if readings.count > 120 { readings.removeFirst(readings.count - 120) }
+    }
+
+    func segments(maxGap: TimeInterval) -> [[HostLatencyReading]] {
+        readings.reduce(into: []) { segments, reading in
+            if let previous = segments.last?.last,
+               reading.capturedAt.timeIntervalSince(previous.capturedAt) <= maxGap {
+                segments[segments.count - 1].append(reading)
+            } else {
+                segments.append([reading])
+            }
+        }
+    }
+}
+
 extension AppModel {
+
+    var macConnectionSymbol: String? {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return nil }
+        return hostRoute.physicalLink.symbol
+    }
 
     var macConnectionDescription: String {
         guard let address = selectedHostRouteAddress, hostRoute.address == address else { return "Checking…" }
         return hostRoute.physicalLink.label
     }
 
-    var hostRouteDescription: String {
-        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return "Checking…" }
-        switch hostRoute.routeClass {
-        case .wired, .wifi, .cellular: return "Direct"
-        case .tailscale: return "Tailscale"
-        case .tunnel: return "VPN"
-        case .unknown: return "Checking…"
-        }
-    }
-
-    func latencyDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
-        guard let host = selectedHost, let address = selectedHostRouteAddress else { return "Unavailable" }
+    func currentLatencyReading(liveReading: HostLatencyReading?, at now: Date) -> HostLatencyReading? {
+        guard let host = selectedHost, let address = selectedHostRouteAddress else { return nil }
         let reading: HostLatencyReading?
         let maxAge: TimeInterval
         if isStreaming {
@@ -303,9 +336,15 @@ extension AppModel {
             reading = nil
             maxAge = 0
         }
-        let latency = reading?.text(forHost: host.id, address: address, at: now,
-                                    notBefore: hostRoute.changedAt, maxAge: maxAge)
-        return latency ?? "Unavailable"
+        guard reading?.text(forHost: host.id, address: address, at: now,
+                            notBefore: hostRoute.changedAt, maxAge: maxAge) != nil else { return nil }
+        return reading
+    }
+
+    func latencyDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
+        guard let reading = currentLatencyReading(liveReading: liveReading, at: now) else { return "Unavailable" }
+        return reading.text(forHost: reading.hostID, address: reading.address, at: now,
+                            notBefore: hostRoute.changedAt, maxAge: HostLiveStatus.stale) ?? "Unavailable"
     }
 
     /// The destination `refreshHostRoute()` monitors for the current
