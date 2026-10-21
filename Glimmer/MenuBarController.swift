@@ -29,6 +29,53 @@ enum MenuBarPreferences {
     }
 }
 
+/// Only meaningful status belongs in the menu bar. An idle app has no label,
+/// rather than a substitute logo or an invisible button taking up space.
+struct MenuBarPresentation: Equatable {
+    let glyph: LibraryApp.Glyph
+    let title: String
+    let assetHeight: CGFloat?
+
+    init?(warning: Bool, battery: (percent: Int, charging: Bool)?,
+          playStation: Bool, appGlyph: LibraryApp.Glyph?) {
+        if warning {
+            glyph = .symbol("exclamationmark.triangle.fill")
+            title = ""
+            assetHeight = nil
+        } else if let battery {
+            glyph = playStation
+                ? .asset(MenuBarBatteryGlyph.assetName(forPercent: battery.percent,
+                                                       charging: battery.charging))
+                : .symbol("gamecontroller.fill")
+            title = playStation ? "" : "\(battery.percent)%"
+            assetHeight = nil
+        } else if let appGlyph {
+            glyph = appGlyph
+            title = ""
+            assetHeight = 15
+        } else {
+            return nil
+        }
+    }
+}
+
+extension AppModel {
+    var menuBarPresentation: MenuBarPresentation? {
+        // A saved launch target alone is not a currently running app.
+        let appGlyph: LibraryApp.Glyph? = isStreaming
+            ? heroTargetApp?.glyph ?? .symbol("play.fill")
+            : runningAppName != nil ? heroTargetApp?.glyph : nil
+        return MenuBarPresentation(warning: nativeStreamError != nil,
+                                   battery: menuBarControllerBattery,
+                                   playStation: menuBarControllerGlyph == .playStation,
+                                   appGlyph: appGlyph)
+    }
+
+    var hasVisibleMenuBarItem: Bool {
+        showMenuBarItem && menuBarPresentation != nil
+    }
+}
+
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     /// Width the hosted rows lay out at; the standard items pad out to match.
@@ -41,6 +88,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     init(model: AppModel) {
         self.model = model
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.isVisible = false
         super.init()
         menu.delegate = self
         menu.autoenablesItems = false
@@ -71,7 +119,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     ///                    resume - `runningAppName`, the host-truth the "X
     ///                    running" header and the tile badge use, so the menu
     ///                    bar and dropdown never disagree)
-    ///   idle          -> a native pyramid symbol matching Shimmer's logo
+    ///   idle          -> no menu-bar item; the Dock remains available
     ///
     /// The pad outranks the app glyph: you're all but always holding the
     /// controller while a session is up, so its battery - the one thing the
@@ -79,43 +127,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// pad gets the bundled DualSense mark with a STEAM-style battery baked in
     /// (MenuBarBatteryGlyph); anything else gets Apple's generic controller
     /// symbol and the number. The app glyph (streaming or host-running) shows
-    /// only when NO pad is connected; otherwise idle uses the pyramid.
+    /// only when NO pad is connected. There is no idle logo.
     private func applyLabel() {
-        let visible = model.showMenuBarItem
+        let presentation = model.menuBarPresentation
+        let visible = model.showMenuBarItem && presentation != nil
+        // Establish the Dock fallback before an idle status item disappears.
+        AppDelegate.refreshActivationPolicy()
         if item.isVisible != visible { item.isVisible = visible }
-        guard visible, let button = item.button else { return }
+        guard visible, let presentation, let button = item.button else { return }
         button.setAccessibilityLabel("Shimmer")
         button.toolTip = "Shimmer"
         button.imagePosition = .imageLeading
-        button.title = ""
-        if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
-            button.image = Self.symbol(symbol)
-        } else if let battery = model.menuBarControllerBattery {
-            if model.menuBarControllerGlyph == .playStation {
-                button.image = Self.asset(MenuBarBatteryGlyph.assetName(
-                    forPercent: battery.percent, charging: battery.charging))
-            } else {
-                button.image = Self.symbol("gamecontroller.fill")
-                button.title = "\(battery.percent)%"
-            }
-        } else if model.isStreaming {
-            button.image = statusGlyph(model.heroTargetApp) ?? Self.symbol("play.fill")
-        } else if model.runningAppName != nil, let glyph = statusGlyph(model.heroTargetApp) {
-            button.image = glyph
-        } else {
-            button.image = Self.symbol("pyramid")
-        }
-    }
-
-    /// The streamed app's glyph, sized for the status bar: an SF Symbol (the bar
-    /// fits it exactly as it fits play.fill) or the one bundled template mark a
-    /// symbol can't express (Steam), drawn at the menu-bar cap height so it tints
-    /// and inverts with the bar like every other status glyph.
-    private func statusGlyph(_ app: LibraryApp?) -> NSImage? {
-        guard let app else { return nil }
-        switch app.glyph {
-        case .symbol(let name): return Self.symbol(name)
-        case .asset(let name): return Self.asset(name, height: 15)
+        button.title = presentation.title
+        switch presentation.glyph {
+        case .symbol(let name): button.image = Self.symbol(name)
+        case .asset(let name): button.image = Self.asset(name, height: presentation.assetHeight)
         }
     }
 

@@ -201,8 +201,8 @@ extension AppModel {
         }
     }
 
-    /// SF Symbol overrides for actionable errors and active streams. The
-    /// controller supplies the native pyramid symbol for Shimmer's idle state.
+    /// SF Symbol overrides for actionable errors and active streams. Idle
+    /// has no menu-bar item; only meaningful status is shown.
     var menuBarSystemImageName: String? {
         if nativeStreamError != nil { return "exclamationmark.triangle.fill" }
         if isStreaming { return "play.fill" }

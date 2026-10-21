@@ -20,14 +20,6 @@ struct OpenWindowPublisher: Commands {
 /// we control both sides of the launch.
 private let launchedAtLogin = ProcessInfo.processInfo.arguments.contains("--launched-at-login")
 
-/// With the menu-bar item enabled, paired installs start without a window or
-/// Dock icon. Hiding the item makes normal launches open the window instead;
-/// login launches stay quiet, with the Dock available. First runs show pairing.
-/// A lazy global, so the read lands after ContainerMigration has moved the
-/// defaults into place.
-private let startsInMenuBar = MenuBarPreferences.isVisible()
-    && (launchedAtLogin || UserDefaults.standard.integer(forKey: "hosts.size") > 0)
-
 @main
 struct GlimmerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -143,9 +135,9 @@ struct GlimmerApp: App {
         // launcher always re-spawns fresh next launch (the bug that made
         // first Dock click do nothing pre-restoration-fix).
         .restorationBehavior(.disabled)
-        // Login launches remain quiet. Normal launches show the window when
-        // the menu-bar item is hidden, and first runs open pairing.
-        .defaultLaunchBehavior(launchedAtLogin || startsInMenuBar ? .suppressed : .automatic)
+        // Finder/Spotlight launches always open a window: an idle app no longer
+        // has a menu-bar fallback. Login launches remain quiet in the Dock.
+        .defaultLaunchBehavior(launchedAtLogin ? .suppressed : .automatic)
         .commands {
             OpenWindowPublisher(open: { openWindow(id: "main") })
             CommandGroup(replacing: .newItem) {}
@@ -213,7 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mainOpen = app.windows.contains { $0.identifier?.rawValue == "main" && $0.isVisible }
         let streaming = boundManager?.isStreaming == true
         let wanted = activationPolicy(mainOpen: mainOpen, streaming: streaming,
-                                      menuBarVisible: boundManager?.showMenuBarItem ?? true)
+                                      menuBarVisible: boundManager?.hasVisibleMenuBarItem ?? false)
         guard app.activationPolicy() != wanted else { return }
         app.setActivationPolicy(wanted)
         Diag.info("activation policy → \(wanted == .regular ? "regular" : "accessory") "
@@ -252,14 +244,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await mgr.bootstrap() }
         }
 
-        // Starting in the menu bar (every launch but a first run)? Begin as
-        // `.accessory` so the Dock icon never appears alongside an invisible
-        // window. didBecomeKey on a subsequent user-triggered window open
-        // flips us back to `.regular` via the recheck observer.
-        NSApp.setActivationPolicy(startsInMenuBar ? .accessory : .regular)
-        if startsInMenuBar {
-            Diag.info("menu-bar start (launchedAtLogin=\(launchedAtLogin)) → activation policy .accessory", "Launch")
-        }
+        // No idle status icon exists. Start with the Dock available; the menu
+        // observer can switch to accessory once useful status actually appears.
+        NSApp.setActivationPolicy(.regular)
 
         let nc = NotificationCenter.default
         // Re-evaluate activation policy on any becomeKey / willClose. We
