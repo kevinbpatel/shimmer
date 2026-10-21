@@ -153,6 +153,7 @@ test:
 
 app:
 	@echo "▶ Building Shimmer.app ($(CONFIG))..."
+	@scripts/export-shimmer-icon.sh
 	@scripts/generate-build-info.sh
 	xcodebuild -project Glimmer.xcodeproj -scheme Glimmer -configuration $(CONFIG) \
 		-xcconfig $(STREAM_XCCONFIG) \

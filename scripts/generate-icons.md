@@ -47,6 +47,11 @@ The same command refreshes the About pane's `AboutAppIcon` image set at 1× and
 2×, with Default and Dark appearances. SwiftUI selects the image for the
 window's current appearance; regenerate these exports after editing the source
 icon. The app's Dock and Finder icon still uses the layered Composer document.
+`make app` refreshes all exports before compiling. GitHub always uses the purple
+Default appearance: `docs/assets/icon-512.png` in the README and the larger
+`docs/assets/icon-social.png` for Settings → Social preview. Keep the default
+branch's README image current when publishing an approved logo change. The
+social preview is a separate GitHub upload and must also be replaced there.
 
 `generate-icons.swift` is the generator for the previous moon-and-sparkles
 design. It still runs, and the rationale below is worth keeping because the
