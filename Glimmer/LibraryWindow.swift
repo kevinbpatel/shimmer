@@ -1,8 +1,10 @@
 //
 //  LibraryWindow.swift
 //
-//  The Servers tab: PCs down the left and a launcher on the right. App buttons
-//  use the whole detail column, with the server address under its heading.
+//  The Computers tab: PCs down the left, the selected PC's apps as a grid of
+//  cover art on the right, and the actions along the bottom edge - the shape of
+//  Tailscale's Accounts tab, inside the same tabbed window as Settings and
+//  About rather than a page of its own.
 //
 //  Everything underneath is unchanged - `selectHost`, `requestStream`,
 //  `PairSheet`, the host context menu and the artwork store are the same calls
@@ -32,16 +34,9 @@ struct ComputersTab: View {
 
     private var apps: [LibraryApp] {
         guard let host = model.selectedHost else { return [] }
-        var visible = host.apps.filter { !$0.hidden }
-        let current = model.isStreaming && model.activeStreamHostID == host.id
-            ? model.heroTargetApp : nil
-        // Keep Cancel / Show stream reachable even if the active app is hidden
-        // from the saved library or does not match a subsequent search.
-        if let current, !visible.contains(where: { $0.id == current.id }) {
-            visible.insert(current, at: 0)
-        }
+        let visible = host.apps.filter { !$0.hidden }
         guard !search.isEmpty else { return visible }
-        return visible.filter { $0.id == current?.id || $0.name.localizedCaseInsensitiveContains(search) }
+        return visible.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
@@ -108,17 +103,47 @@ struct ComputersTab: View {
         if let host = model.selectedHost {
             VStack(spacing: 0) {
                 ScrollView {
-                    ServerAppLauncher(host: host, apps: apps, search: $search,
-                                      actionForApp: { appAction(for: $0, on: host) }) { app in
-                        switch appAction(for: app, on: host) {
-                        case .stream: model.requestStream(app: app, on: host)
-                        case .cancelConnection: model.cancelConnect()
-                        case .showStream: model.resumeStreamWindow()
-                        case .unavailable: break
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Apps lead: they are what the page is FOR. The PC's
+                        // name is not repeated here - the row selected in the
+                        // sidebar already says which machine this is.
+                        field("Apps") {
+                            if host.apps.count > 8 { searchField.padding(.bottom, 2) }
+                            ForEach(apps) { app in
+                                Button {
+                                    model.requestStream(app: app, on: host)
+                                } label: {
+                                    Label {
+                                        Text(app.name)
+                                    } icon: {
+                                        AppGlyphIcon(app: app)
+                                    }
+                                    .frame(minWidth: 150, alignment: .leading)
+                                }
+                                .disabled(model.isStreaming)
+                                .help(model.isStreaming
+                                      ? "Finish the current stream first" : "Stream \(app.name)")
+                            }
+                            if apps.isEmpty {
+                                Text("No apps to show.").foregroundStyle(.secondary)
+                            }
+                            if model.isStreaming, model.activeStreamHostID == host.id,
+                               case .connecting(let stage) = model.streamPhase {
+                                Text(stage).foregroundStyle(.secondary)
+                            }
+                            if model.isStreaming, model.activeStreamHostID == host.id,
+                               model.activeStreamHasVideo {
+                                Button("Show the stream") { model.resumeStreamWindow() }
+                            }
+                        }
+
+                        field("Address") {
+                            Text(host.localAddress ?? host.manualAddress ?? host.name)
+                                .textSelection(.enabled)
                         }
                     }
-                    .padding(.top, 24)
-                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -141,68 +166,17 @@ struct ComputersTab: View {
         }
     }
 
-    private func appAction(for app: LibraryApp, on host: Host) -> ServerAppAction {
-        let stage: String?
-        if case .connecting(let value) = model.streamPhase { stage = value } else { stage = nil }
-        return ServerAppAction(isStreaming: model.isStreaming,
-                               isCurrentApp: model.activeStreamHostID == host.id
-                                   && model.heroTargetApp?.id == app.id,
-                               connectingStage: stage,
-                               hasVideo: model.activeStreamHasVideo && model.streamPhase == .streaming)
-    }
-}
-
-// MARK: - App launcher
-
-/// Keep the live action on its app, as upstream does. In particular a pending
-/// handshake must offer Cancel, never another launch or a premature Show stream.
-enum ServerAppAction: Equatable {
-    case stream, cancelConnection(String), showStream, unavailable
-
-    init(isStreaming: Bool, isCurrentApp: Bool, connectingStage: String?, hasVideo: Bool) {
-        if !isStreaming { self = .stream }
-        else if !isCurrentApp { self = .unavailable }
-        else if let connectingStage { self = .cancelConnection(connectingStage) }
-        else if hasVideo { self = .showStream }
-        else { self = .unavailable }
-    }
-}
-
-/// Native controls with enough room for the app's name and its current action.
-/// No artwork is invented for Sunshine's desktop entries.
-struct ServerAppLauncher: View {
-    let host: Host
-    let apps: [LibraryApp]
-    @Binding var search: String
-    let actionForApp: (LibraryApp) -> ServerAppAction
-    let launch: (LibraryApp) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(host.displayName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .textSelection(.enabled)
-                Text(host.localAddress ?? host.manualAddress ?? host.name)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Stream an app")
-                    .font(.headline)
-                if host.apps.filter({ !$0.hidden }).count > 8 { searchField }
-                ForEach(apps) { app in
-                    ServerAppLaunchButton(app: app, action: actionForApp(app)) { launch(app) }
-                }
-                if apps.isEmpty {
-                    Text(search.isEmpty ? "No apps available." : "No apps match your search.")
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                }
-            }
+    /// One detail row. The reference app right-aligns its labels ~109pt into
+    /// the detail column with the values ~20pt beyond - narrower than the
+    /// Settings gutter because this column is only 400pt wide.
+    private func field<Content: View>(
+        _ label: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 18) {
+            Text(label)
+                .frame(width: 92, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 6) { content() }
+            Spacer(minLength: 0)
         }
     }
 
@@ -212,7 +186,7 @@ struct ServerAppLauncher: View {
                 .foregroundStyle(.secondary).font(.system(size: 12))
             TextField("Search apps", text: $search)
                 .textFieldStyle(.plain)
-                .frame(maxWidth: .infinity)
+                .frame(width: 170)
             if !search.isEmpty {
                 Button { search = "" } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -223,73 +197,6 @@ struct ServerAppLauncher: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(Color.primary.opacity(0.07), in: Capsule())
-    }
-}
-
-struct ServerAppLaunchButton: View {
-    let app: LibraryApp
-    let action: ServerAppAction
-    let perform: () -> Void
-
-    private var subtitle: String? {
-        switch action {
-        case .cancelConnection(let stage): stage
-        case .showStream: "Show stream"
-        case .stream, .unavailable: nil
-        }
-    }
-
-    var body: some View {
-        Button(action: perform) {
-            HStack(spacing: 12) {
-                AppGlyphIcon(app: app, size: 24)
-                    .font(.system(size: 23))
-                    .frame(width: 30, height: 30)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(app.name)
-                        .font(.system(size: 13, weight: .medium))
-                        .lineLimit(2)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                Spacer(minLength: 8)
-                switch action {
-                case .cancelConnection:
-                    ProgressView().controlSize(.small)
-                    Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
-                case .showStream:
-                    Image(systemName: "arrow.up.forward")
-                        .font(.system(size: 12, weight: .semibold))
-                case .stream, .unavailable:
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
-        .disabled(action == .unavailable)
-        .help(help)
-        .accessibilityLabel(app.name)
-        .accessibilityValue(subtitle ?? "")
-        .accessibilityHint(help)
-    }
-
-    private var help: String {
-        switch action {
-        case .stream: "Stream \(app.name)"
-        case .cancelConnection: "Cancel the connection"
-        case .showStream: "Show the current stream"
-        case .unavailable: "Finish the current stream first"
-        }
     }
 }
 
