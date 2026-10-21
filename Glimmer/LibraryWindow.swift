@@ -162,7 +162,12 @@ struct ComputersTab: View {
 
                         field("Connection") {
                             HStack(spacing: 6) {
-                                if let symbol = model.macConnectionSymbol {
+                                if model.macConnectionIsEthernet {
+                                    EthernetPortGlyph()
+                                        .stroke(.secondary, style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                                        .frame(width: 16, height: 14)
+                                        .accessibilityHidden(true)
+                                } else if let symbol = model.macConnectionSymbol {
                                     Image(systemName: symbol).foregroundStyle(.secondary)
                                         .accessibilityHidden(true)
                                 }
@@ -171,17 +176,15 @@ struct ComputersTab: View {
                                 .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
                         }
 
+                        NetworkHistoryGraph(history: latencyHistory, streaming: model.isStreaming,
+                                            currentValue: { model.latencyDescription(liveReading: liveLatency, at: $0) })
+                            .padding(.top, 18)
                     }
                     .padding(.top, 22)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                NetworkHistoryPanel(history: latencyHistory, streaming: model.isStreaming,
-                                    currentValue: { model.latencyDescription(liveReading: liveLatency, at: $0) })
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
 
                 Divider()
                 HStack {
@@ -257,116 +260,108 @@ struct ComputersTab: View {
     }
 }
 
-/// Activity Monitor's compact summary treatment: ruled values beside a cyan
-/// history plot, in one quiet bordered strip. The single series is latency;
-/// upload/download colours would imply measurements this panel doesn't have.
-private struct NetworkHistoryPanel: View {
+/// One plot, with Activity Monitor's cyan trace and pale fill. It belongs to
+/// the detail content, sharing its margins, rather than a separate footer.
+private struct NetworkHistoryGraph: View {
     let history: HostLatencyHistory
     let streaming: Bool
     let currentValue: (Date) -> String
 
-    private let cyan = Color(red: 0, green: 0.68, blue: 0.84)
+    private let cyan = Color(red: 0, green: 0.73, blue: 0.90)
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let stats = history.statistics(at: timeline.date)
             let ceiling = max(10, ceil((stats?.maximum ?? 0) * 1.15 / 5) * 5)
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    valueRow("Current:", value: currentValue(timeline.date), highlighted: true)
-                    Divider()
-                    valueRow("Average:", value: format(stats?.average))
-                    Divider()
-                    valueRow("Minimum:", value: format(stats?.minimum))
-                    Divider()
-                    valueRow("Maximum:", value: format(stats?.maximum))
-                }
-                .padding(.horizontal, 9)
-                .frame(width: 164)
-
-                Divider()
-
-                VStack(spacing: 5) {
+            VStack(spacing: 7) {
+                ZStack {
                     Text(streaming ? "ROUND-TRIP" : "RESPONSE TIME")
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                    Divider()
-                    Chart {
-                        RuleMark(y: .value("Baseline", 0))
-                            .foregroundStyle(cyan.opacity(0.35))
-                            .lineStyle(StrokeStyle(lineWidth: 0.5))
-                        ForEach(Array(history.segments(maxGap: streaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2).enumerated()), id: \.offset) { index, segment in
-                            ForEach(Array(segment.enumerated()), id: \.offset) { _, reading in
-                                AreaMark(x: .value("Time", reading.capturedAt),
-                                         yStart: .value("Milliseconds", 0),
-                                         yEnd: .value("Milliseconds", reading.milliseconds),
-                                         series: .value("Segment", index))
-                                    .foregroundStyle(cyan.opacity(0.18))
-                                    .interpolationMethod(.linear)
-                                LineMark(x: .value("Time", reading.capturedAt),
-                                         y: .value("Milliseconds", reading.milliseconds),
-                                         series: .value("Segment", index))
-                                    .foregroundStyle(cyan)
-                                    .lineStyle(StrokeStyle(lineWidth: 1.2))
-                                    .interpolationMethod(.linear)
-                                if segment.count == 1 {
-                                    PointMark(x: .value("Time", reading.capturedAt),
-                                              y: .value("Milliseconds", reading.milliseconds))
-                                        .foregroundStyle(cyan).symbolSize(7)
-                                }
+                        .font(.system(size: 11, weight: .semibold))
+                    HStack {
+                        Spacer()
+                        Text(currentValue(timeline.date))
+                            .font(.system(size: 11)).monospacedDigit()
+                            .foregroundStyle(cyan)
+                    }
+                }
+                Divider()
+                Chart {
+                    RuleMark(y: .value("Baseline", 0))
+                        .foregroundStyle(cyan.opacity(0.35))
+                        .lineStyle(StrokeStyle(lineWidth: 0.5))
+                    ForEach(Array(history.segments(maxGap: streaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2).enumerated()), id: \.offset) { index, segment in
+                        ForEach(Array(segment.enumerated()), id: \.offset) { _, reading in
+                            AreaMark(x: .value("Time", reading.capturedAt),
+                                     yStart: .value("Milliseconds", 0),
+                                     yEnd: .value("Milliseconds", reading.milliseconds),
+                                     series: .value("Segment", index))
+                                .foregroundStyle(cyan.opacity(0.20))
+                                .interpolationMethod(.linear)
+                            LineMark(x: .value("Time", reading.capturedAt),
+                                     y: .value("Milliseconds", reading.milliseconds),
+                                     series: .value("Segment", index))
+                                .foregroundStyle(cyan)
+                                .lineStyle(StrokeStyle(lineWidth: 1.2))
+                                .interpolationMethod(.linear)
+                            if segment.count == 1 {
+                                PointMark(x: .value("Time", reading.capturedAt),
+                                          y: .value("Milliseconds", reading.milliseconds))
+                                    .foregroundStyle(cyan).symbolSize(7)
                             }
                         }
                     }
-                    .chartXScale(domain: timeline.date.addingTimeInterval(-HostLatencyHistory.duration)...timeline.date)
-                    .chartYScale(domain: 0...ceiling)
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
-                    .chartLegend(.hidden)
-                    .chartPlotStyle { plot in plot.clipped() }
-                    .overlay(alignment: .topLeading) {
-                        if stats == nil {
-                            Text("Waiting for measurements")
-                                .font(.system(size: 10)).foregroundStyle(.secondary)
-                                .padding(.top, 5)
-                        }
-                    }
-                    .accessibilityLabel("Last minute of network timing")
-                    HStack {
-                        Text("60 sec")
-                        Spacer()
-                        Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
-                    }
-                    .font(.system(size: 9)).foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 8)
+                .chartXScale(domain: timeline.date.addingTimeInterval(-HostLatencyHistory.duration)...timeline.date)
+                .chartYScale(domain: 0...ceiling)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .chartLegend(.hidden)
+                .chartPlotStyle { plot in plot.clipped() }
+                .overlay(alignment: .topLeading) {
+                    if stats == nil {
+                        Text("Waiting for measurements")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                            .padding(.top, 5)
+                    }
+                }
+                .accessibilityLabel("Last minute of network timing")
+                HStack {
+                    Text("60 sec")
+                    Spacer()
+                    Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
+                }
+                .font(.system(size: 9)).foregroundStyle(.secondary)
             }
-            .frame(height: 118)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .frame(height: 132)
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
         }
         .help(streaming
-              ? "Network round-trip time from the stream transport, with statistics for this view’s last minute. Missing readings leave gaps. Excludes game, capture, encoding, decoding, and display delay."
-              : "TCP connection setup time to the server, including DNS if needed. Statistics cover this view’s last minute of actual checks, about 10 seconds apart. Missing readings leave gaps. History resets when the host, path, or measurement type changes.")
+              ? "Network round-trip time from the stream transport over this view’s last minute. Missing readings leave gaps. Excludes game, capture, encoding, decoding, and display delay."
+              : "TCP connection setup time to the server, including DNS if needed. Shows this view’s last minute of actual checks, about 10 seconds apart. Missing readings leave gaps. History resets when the host, path, or measurement type changes.")
     }
+}
 
-    private func valueRow(_ title: String, value: String, highlighted: Bool = false) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-            Spacer(minLength: 2)
-            Text(value).monospacedDigit()
-                .foregroundStyle(highlighted ? cyan : Color.primary)
+/// A small RJ45 socket: the stepped opening and six contacts read as Ethernet
+/// at text size, without depending on a plug-shaped SF Symbol.
+private struct EthernetPortGlyph: Shape {
+    nonisolated func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let outline: [CGPoint] = [CGPoint(x: 2, y: 2), CGPoint(x: 14, y: 2),
+                                  CGPoint(x: 14, y: 10), CGPoint(x: 11, y: 10),
+                                  CGPoint(x: 11, y: 12), CGPoint(x: 5, y: 12),
+                                  CGPoint(x: 5, y: 10), CGPoint(x: 2, y: 10)]
+        path.addLines(outline)
+        path.closeSubpath()
+        for x in stride(from: 4.0, through: 12.0, by: 1.6) {
+            path.move(to: CGPoint(x: x, y: 3.5))
+            path.addLine(to: CGPoint(x: x, y: 6.5))
         }
-        .font(.system(size: 11))
-        .frame(maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func format(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        if value < 1 { return "<1 ms" }
-        return "\(value.formatted(.number.precision(.fractionLength(0)))) ms"
+        return path.applying(CGAffineTransform(scaleX: rect.width / 16, y: rect.height / 14)
+            .concatenating(CGAffineTransform(translationX: rect.minX, y: rect.minY)))
     }
 }
 

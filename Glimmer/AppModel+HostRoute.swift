@@ -54,7 +54,8 @@ final class HostRouteMonitor {
 
         var symbol: String? {
             switch self {
-            case .wired: "cable.connector.horizontal"
+            // The view draws an Ethernet socket instead of a USB-like cable.
+            case .wired: nil
             case .wifi: "wifi"
             case .cellular: "antenna.radiowaves.left.and.right"
             case .multiple, .unknown: nil
@@ -325,6 +326,11 @@ struct HostLatencyHistory {
 }
 
 extension AppModel {
+
+    var macConnectionIsEthernet: Bool {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return false }
+        return hostRoute.physicalLink == .wired
+    }
 
     var macConnectionSymbol: String? {
         guard let address = selectedHostRouteAddress, hostRoute.address == address else { return nil }

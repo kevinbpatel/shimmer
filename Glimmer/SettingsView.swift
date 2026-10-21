@@ -20,13 +20,6 @@ import SwiftUI
 struct AppShell: View {
     @Environment(AppModel.self) private var model
 
-    private var windowHeight: CGFloat {
-        // Keep the paired-server form compact, with room for the connection
-        // details and a small timing history. Pairing keeps its original room.
-        if model.settingsTab == .computers, model.selectedHost != nil { return 480 - 32 }
-        return model.settingsTab.windowHeight
-    }
-
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 0) {
@@ -54,7 +47,7 @@ struct AppShell: View {
         .ignoresSafeArea(.container, edges: .top)
         // Fixed, not resizable - the window follows the tab.
         .frame(width: SettingsMetrics.windowWidth,
-               height: windowHeight,
+               height: model.settingsTab.windowHeight,
                alignment: .top)
     }
 }
