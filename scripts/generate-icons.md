@@ -7,20 +7,23 @@ the spectrum continuous, with stronger colour through the faces. A brighter
 violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
 the background in Default/Light. Dark uses a neutral charcoal fill
 (Display P3 `#1C1C1E`), with a pearl entry beam and vivid yellow-gold, cyan
-and violet gradients. Dark has stronger transmitted colour through the faces,
-quieter rear-face colours and brighter glass (translucency 0.40 with full shell
-opacity). Its material settings remain independently editable.
-The pyramid geometry is shared. The porcelain variant was retired.
+and violet gradients, with quieter rear-face colours. Both appearances use
+firmer glass (translucency 0.26 with full shell opacity) and a stronger interior
+spectrum so the three colours remain distinct at Dock size. Their material
+settings remain independently editable. The pyramid geometry is shared.
+The porcelain variant was retired.
 
 The Composer document has four groups: restrained spectrum colour retention,
 the glass shell, rear faces and base seam, and the aligned light artwork.
 The shell is a raster asset with native inside specular lighting and
-translucency (0.40 in Default, with the shell layer at full opacity). The beam
+translucency (0.26, with the shell layer at full opacity). The beam
 boundaries, gradients, rear facets and base seam are editable SVG. Material blur and
 screen-space refraction are disabled to keep
-the selected ray geometry crisp. The colour-retention overlay uses restrained
-transmission gradients across the faces and is inset from the bevels so it
-preserves their highlights. The rays have no facet offsets or bends.
+the selected ray geometry crisp. The colour-retention overlay uses stronger
+amber, turquoise and orchid inside the glass to compensate for the blue tint.
+Its front-face alpha ranges from 0.76 to 0.86; the side ranges from 0.67 to 0.78
+to preserve the difference between the facets. It is inset from the bevels so
+it preserves their highlights. The rays have no facet offsets or bends.
 
 Xcode compiles this document into appearance-aware icon stacks using
 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. No flattened replacement icon
@@ -29,17 +32,18 @@ or Finder custom icon is needed.
 The shipping Composer document is the editable source consumed directly by
 the app build. Open `Glimmer/AppIcon.icon` in Icon Composer to adjust the
 material. Beam gradients live in `Assets/light.svg`; their colour-retention
-counterparts live in `Assets/retained-spectrum.svg`. Keep those palettes in
-sync when tuning the light. The icon does not depend on the exploratory
-studies under `output/`.
+counterparts live in `Assets/retained-spectrum.svg`. Their ray paths must
+remain aligned, but the interior palette is deliberately stronger than the
+exterior palette to keep colour visible through the native glass. The icon
+does not depend on the exploratory studies under `output/`.
 
 Dark artwork is supplied through native `image-name-specializations` on the
 same layers. The matching `*-dark.svg` assets tune the beams, transmitted
 colour, rear faces and base seam. Native material overrides use
 `translucency-specializations` and `opacity-specializations`. Keep the default
 and Dark paths and transforms aligned when editing: this is an appearance
-palette, not a different pyramid construction. The Default export is unchanged
-by these Dark overrides.
+palette, not a different pyramid construction. Dark-only palette edits do not
+affect Default; the stronger interior and firmer glass are applied to both.
 
 Export the README icon with `./scripts/export-shimmer-icon.sh`. The export
 uses Icon Composer's macOS 27 design generation, matching the approved icon.
