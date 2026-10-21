@@ -74,14 +74,14 @@
         {
           "value": {
             "enabled": true,
-            "value": 0.26
+            "value": 0.4
           }
         },
         {
           "appearance": "dark",
           "value": {
             "enabled": true,
-            "value": 0.26
+            "value": 0.4
           }
         }
       ]
