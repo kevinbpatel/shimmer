@@ -201,18 +201,8 @@ extension AppModel {
         }
     }
 
-    /// Menu-bar icon - three states the user can read at a glance:
-    ///   * `moon.stars`                 - idle (default)
-    ///   * `play.fill`                  - streaming
-    ///   * `exclamationmark.triangle.fill` - error
-    /// Reading `streamPhase` / `isStreaming` / `nativeStreamError`
-    /// means `@Observable` automatically tracks the icon and SwiftUI
-    /// rebuilds the MenuBarExtra label when any of them flip.
-    /// SF Symbol for the menu-bar charm's STATE overrides (error/streaming);
-    /// nil means idle, where the charm shows the custom Eclipse template mark
-    /// (Assets.xcassets/MenuBarIcon - original art) instead of
-    /// the old `moon.stars` stand-in. The alternate mark ships alongside as
-    /// MenuBarIconAlt; swapping is a one-string change in GlimmerApp.
+    /// SF Symbol overrides for actionable errors and active streams. The
+    /// controller supplies the native pyramid symbol for Shimmer's idle state.
     var menuBarSystemImageName: String? {
         if nativeStreamError != nil { return "exclamationmark.triangle.fill" }
         if isStreaming { return "play.fill" }

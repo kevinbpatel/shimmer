@@ -92,3 +92,37 @@ struct MenuBarBatteryGlyphTests {
         #expect(shown == shown.sorted())
     }
 }
+
+struct MenuBarVisibilityTests {
+    @Test func hidingTheMenuBarAlwaysKeepsTheAppInTheDock() {
+        for mainOpen in [false, true] {
+            for streaming in [false, true] {
+                #expect(AppDelegate.activationPolicy(mainOpen: mainOpen, streaming: streaming,
+                                                     menuBarVisible: false) == .regular)
+            }
+        }
+    }
+
+    @Test func menuBarOnlyModeStillKeepsLiveStreamsAndWindowsInTheDock() {
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
+                                             menuBarVisible: true) == .accessory)
+        #expect(AppDelegate.activationPolicy(mainOpen: true, streaming: false,
+                                             menuBarVisible: true) == .regular)
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: true,
+                                             menuBarVisible: true) == .regular)
+    }
+
+    @Test func hidingTheMenuBarSurvivesRelaunch() throws {
+        let name = "shimmer-menu-bar-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(MenuBarPreferences.isVisible(in: defaults))
+        defaults.set(false, forKey: MenuBarPreferences.visibilityKey)
+        let reloaded = try #require(UserDefaults(suiteName: name))
+        #expect(!MenuBarPreferences.isVisible(in: reloaded))
+    }
+
+    @Test func idleSymbolExists() {
+        #expect(NSImage(systemSymbolName: "pyramid", accessibilityDescription: nil) != nil)
+    }
+}

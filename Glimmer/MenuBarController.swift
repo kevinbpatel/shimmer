@@ -21,6 +21,14 @@
 import AppKit
 import SwiftUI
 
+enum MenuBarPreferences {
+    static let visibilityKey = "showMenuBarItem"
+
+    static func isVisible(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: visibilityKey) as? Bool ?? true
+    }
+}
+
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     /// Width the hosted rows lay out at; the standard items pad out to match.
@@ -63,7 +71,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     ///                    resume - `runningAppName`, the host-truth the "X
     ///                    running" header and the tile badge use, so the menu
     ///                    bar and dropdown never disagree)
-    ///   idle          -> the Eclipse mark (Assets.xcassets/MenuBarIcon)
+    ///   idle          -> a native pyramid symbol matching Shimmer's logo
     ///
     /// The pad outranks the app glyph: you're all but always holding the
     /// controller while a session is up, so its battery - the one thing the
@@ -71,9 +79,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// pad gets the bundled DualSense mark with a STEAM-style battery baked in
     /// (MenuBarBatteryGlyph); anything else gets Apple's generic controller
     /// symbol and the number. The app glyph (streaming or host-running) shows
-    /// only when NO pad is connected; otherwise it's the Eclipse mark.
+    /// only when NO pad is connected; otherwise idle uses the pyramid.
     private func applyLabel() {
-        guard let button = item.button else { return }
+        let visible = model.showMenuBarItem
+        if item.isVisible != visible { item.isVisible = visible }
+        guard visible, let button = item.button else { return }
+        button.setAccessibilityLabel("Shimmer")
+        button.toolTip = "Shimmer"
         button.imagePosition = .imageLeading
         button.title = ""
         if model.nativeStreamError != nil, let symbol = model.menuBarSystemImageName {
@@ -91,7 +103,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         } else if model.runningAppName != nil, let glyph = statusGlyph(model.heroTargetApp) {
             button.image = glyph
         } else {
-            button.image = Self.asset("MenuBarIcon")
+            button.image = Self.symbol("pyramid")
         }
     }
 

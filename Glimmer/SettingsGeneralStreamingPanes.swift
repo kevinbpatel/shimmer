@@ -41,6 +41,8 @@ struct AppPane: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
             SettingsField("General") {
+                Toggle("Show in menu bar", isOn: $model.showMenuBarItem)
+                    .help("When hidden, Shimmer stays available in the Dock.")
                 // Login launches come up in the menu bar like every other
                 // launch (the helper relaunches the app suppressed).
                 Toggle("Be ready at login", isOn: $launchAtLogin)
