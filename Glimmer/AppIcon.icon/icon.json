@@ -53,7 +53,7 @@
             },
             {
               "appearance": "dark",
-              "value": 0.98
+              "value": 1.0
             }
           ]
         }
@@ -81,7 +81,7 @@
           "appearance": "dark",
           "value": {
             "enabled": true,
-            "value": 0.46
+            "value": 0.4
           }
         }
       ]

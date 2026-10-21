@@ -6,9 +6,10 @@ gold, cyan and violet gradients. The selected shading-only treatment keeps
 the spectrum continuous, with stronger colour through the faces. A brighter
 violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
 the background in Default/Light. Dark uses a neutral charcoal fill
-(Display P3 `#1C1C1E`), with a coordinated pearl entry beam and warmer amber,
-softer aqua and cooler violet rays. Dark also has quieter rear-face colours
-and its own native glass translucency (0.46) and shell opacity (0.98).
+(Display P3 `#1C1C1E`), with a pearl entry beam and vivid yellow-gold, cyan
+and violet gradients. Dark has stronger transmitted colour through the faces,
+quieter rear-face colours and brighter glass (translucency 0.40 with full shell
+opacity). Its material settings remain independently editable.
 The pyramid geometry is shared. The porcelain variant was retired.
 
 The Composer document has four groups: restrained spectrum colour retention,
