@@ -181,16 +181,18 @@ struct ComputersTab: View {
                                 Text("Latency").font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                Button(latencyTest.isRunning ? "Stop" : "Test latency") {
-                                    if latencyTest.isRunning { latencyTest.stop() }
-                                    else { startLatencyTest() }
+                                if latencyTest.hasRun {
+                                    Button(latencyTest.isRunning ? "Stop" : "Test latency") {
+                                        if latencyTest.isRunning { latencyTest.stop() }
+                                        else { startLatencyTest() }
+                                    }
+                                    .buttonStyle(.link)
+                                    .disabled(model.isStreaming && model.activeStreamHostID != host.id)
                                 }
-                                .buttonStyle(.link)
-                                .disabled(model.isStreaming && model.activeStreamHostID != host.id)
                             }
-                            if latencyTest.hasRun {
-                                NetworkHistoryGraph(test: latencyTest, streaming: model.isStreaming)
-                            }
+                            NetworkHistoryGraph(test: latencyTest, streaming: model.isStreaming,
+                                                canStart: !model.isStreaming || model.activeStreamHostID == host.id,
+                                                startTest: startLatencyTest)
                         }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 18)
@@ -276,6 +278,8 @@ struct ComputersTab: View {
 private struct NetworkHistoryGraph: View {
     let test: HostLatencyTest
     let streaming: Bool
+    let canStart: Bool
+    let startTest: () -> Void
     private let blue = Color(red: 0.27, green: 0.47, blue: 0.91)
 
     var body: some View {
@@ -286,18 +290,31 @@ private struct NetworkHistoryGraph: View {
                         min(now.addingTimeInterval(-10), test.history.readings.first?.capturedAt ?? now))
         VStack(alignment: .leading, spacing: 7) {
             VStack(spacing: 0) {
-                HStack {
-                    Text(streaming ? "Stream round-trip" : "TCP response time")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(test.latestDescription)
-                        .fontWeight(.semibold).monospacedDigit()
+                Group {
+                    if test.hasRun {
+                        HStack {
+                            Text(streaming ? "Stream round-trip" : "TCP response time")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(test.latestDescription)
+                                .fontWeight(.semibold).monospacedDigit()
+                        }
+                    } else {
+                        Text("Test connection latency")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .font(.system(size: 12))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 Divider()
                 Chart {
+                    if !test.hasRun {
+                        RuleMark(y: .value("Baseline", 0))
+                            .foregroundStyle(Color.secondary.opacity(0.25))
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                    }
                     ForEach(Array(test.history.segments(maxGap: 3.5).enumerated()), id: \.offset) { index, segment in
                         ForEach(Array(segment.enumerated()), id: \.offset) { _, reading in
                             LineMark(x: .value("Time", reading.capturedAt),
@@ -331,8 +348,14 @@ private struct NetworkHistoryGraph: View {
                 .chartLegend(.hidden)
                 .chartPlotStyle { plot in plot.clipped() }
                 .frame(height: 100)
+                .opacity(test.hasRun ? 1 : 0.4)
                 .overlay(alignment: .center) {
-                    if test.history.readings.isEmpty {
+                    if !test.hasRun {
+                        Button("Test latency", action: startTest)
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .disabled(!canStart)
+                    } else if test.history.readings.isEmpty {
                         Text(test.isRunning ? "Waiting for a response…" : "No measurements available")
                             .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
@@ -346,6 +369,8 @@ private struct NetworkHistoryGraph: View {
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
             Text(test.isRunning ? "Testing up to 30 readings…" : test.completed ? "Test complete" : "Stopped")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
+                .opacity(test.hasRun ? 1 : 0)
+                .accessibilityHidden(!test.hasRun)
         }
         .help(streaming
               ? "Network round-trip time from the current stream. Reads the existing transport estimator without extra probes. Excludes game, capture, encoding, decoding, and display delay."
