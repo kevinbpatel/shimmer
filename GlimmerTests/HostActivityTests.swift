@@ -28,7 +28,7 @@ struct HostActivityTests {
         model.hostLiveStatus = HostLiveStatus(hostID: host.id,
                                              state: .streamingApp(name: "Steam Big Picture"),
                                              capturedAt: Self.now)
-        #expect(model.hostStatusLine(for: host.id, at: Self.now) == "Host session: Steam Big Picture")
+        #expect(model.hostStatusLine(for: host.id, at: Self.now) == "Online")
         #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .online)
         let expired = Self.now.addingTimeInterval(HostLiveStatus.stale + 1)
         #expect(model.hostStatusLine(for: host.id, at: expired) == "Checking…")
@@ -43,7 +43,7 @@ struct HostActivityTests {
         let host = Self.host("host-activity-a")
         model.selectedHost = host
         model.hostLiveStatus = HostLiveStatus(hostID: host.id, state: .reachable, capturedAt: Self.now)
-        #expect(model.hostStatusLine(for: host.id, at: Self.now) == "Online · session status unavailable")
+        #expect(model.hostStatusLine(for: host.id, at: Self.now) == "Online · status unavailable")
         #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .neutral)
         #expect(model.runningAppName == nil)
         #expect(!HostLiveStatus.State.reachable.hasSessionInformation)

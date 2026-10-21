@@ -127,13 +127,20 @@ struct ComputersTab: View {
                             if apps.isEmpty {
                                 Text("No apps to show.").foregroundStyle(.secondary)
                             }
+                            if model.isStreaming, model.activeStreamHostID == host.id,
+                               case .connecting(let stage) = model.streamPhase {
+                                Text(stage).foregroundStyle(.secondary)
+                            }
+                            if model.isStreaming, model.activeStreamHostID == host.id,
+                               model.activeStreamHasVideo {
+                                Button("Show the stream") { model.resumeStreamWindow() }
+                            }
                         }
 
                         field("Address") {
                             Text(host.localAddress ?? host.manualAddress ?? host.name)
                                 .textSelection(.enabled)
                         }
-                        activityRows(for: host)
                     }
                     .padding(.top, 22)
                     .padding(.horizontal, 16)
@@ -173,35 +180,6 @@ struct ComputersTab: View {
         }
     }
 
-    private func activityRows(for host: Host) -> some View {
-        // Relative dates and expired host snapshots must update even when
-        // no other observable property changes (for example after sleep).
-        TimelineView(.periodic(from: .now, by: 10)) { context in
-            VStack(alignment: .leading, spacing: 12) {
-                field("Status") {
-                    HStack(spacing: 7) {
-                        Circle()
-                            .fill(model.hostStatusIndicator(for: host.id, at: context.date).color)
-                            .frame(width: 9, height: 9)
-                        Text(model.hostStatusLine(for: host.id, at: context.date))
-                        if model.isStreaming, model.activeStreamHostID == host.id,
-                           model.activeStreamHasVideo {
-                            Button("Show the stream") { model.resumeStreamWindow() }
-                                .controlSize(.small)
-                                .padding(.leading, 3)
-                        }
-                    }
-                    .help("The host session identifies the streaming app, not the game currently being played.")
-                }
-                field("Last streamed") {
-                    Text(model.lastStreamedDescription(for: host, at: context.date))
-                        .foregroundStyle(.secondary)
-                        .help("Most recent stream from this Mac. Play on other devices is not included.")
-                }
-            }
-        }
-    }
-
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -224,31 +202,21 @@ struct ComputersTab: View {
 
 // MARK: - Sidebar row
 
-/// One PC: a round glyph with a status dot, the name, and the address beneath -
+/// One PC: a round glyph, the name, and the address beneath -
 /// the shape of the reference app's account rows (41.5pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
     let selected: Bool
-    @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.22))
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Image(systemName: "display")
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(Color.accentColor))
-                TimelineView(.periodic(from: .now, by: 10)) { context in
-                    Circle()
-                        .fill(model.hostStatusIndicator(for: host.id, at: context.date).color)
-                        .frame(width: 9, height: 9)
-                        .overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
-                        .offset(x: 1, y: 1)
-                }
-            }
+            Circle()
+                .fill(Color.accentColor.opacity(0.22))
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Image(systemName: "display")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(Color.accentColor))
             VStack(alignment: .leading, spacing: 0) {
                 Text(host.displayName)
                     .font(.system(size: 13))
@@ -297,17 +265,6 @@ struct AppGlyphIcon: View {
                 // Matched to the cap height of the symbols beside it, so a
                 // bundled mark and an SF Symbol sit on the same line.
                 .frame(width: size, height: size)
-        }
-    }
-}
-
-private extension HostStatusIndicator {
-    var color: Color {
-        switch self {
-        case .neutral: return .secondary.opacity(0.55)
-        case .online: return .green
-        case .attention: return .orange
-        case .offline: return .red
         }
     }
 }

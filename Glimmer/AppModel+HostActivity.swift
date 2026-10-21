@@ -5,7 +5,7 @@ enum HostStatusIndicator {
 }
 
 extension AppModel {
-    /// One freshness/identity check for the status text, dots and launch target.
+    /// One freshness/identity check for the status text and launch target.
     func liveStatus(for hostID: String, at now: Date = .now) -> HostLiveStatus? {
         guard let live = hostLiveStatus, live.hostID == hostID,
               now.timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale else { return nil }
@@ -30,9 +30,9 @@ extension AppModel {
         guard let live = liveStatus(for: hostID, at: now) else { return "Checking…" }
         switch live.state {
         case .idle: return "Online"
-        case .reachable: return "Online · session status unavailable"
-        case .streamingApp(let name): return "Host session: \(name)"
-        case .streamingUnknownApp: return "Host session active"
+        case .reachable: return "Online · status unavailable"
+        case .streamingApp: return "Online"
+        case .streamingUnknownApp: return "Online"
         case .asleep: return "Asleep or offline"
         case .certMismatch: return "Trust needed - pair again"
         case .unknown: return "Checking…"
