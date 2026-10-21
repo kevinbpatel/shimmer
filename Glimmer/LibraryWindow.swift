@@ -367,10 +367,6 @@ private struct NetworkHistoryGraph: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
-            Text(test.isRunning ? "Testing up to 30 readings…" : test.completed ? "Test complete" : "Stopped")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
-                .opacity(test.hasRun ? 1 : 0)
-                .accessibilityHidden(!test.hasRun)
         }
         .help(streaming
               ? "Network round-trip time from the current stream. Reads the existing transport estimator without extra probes. Excludes game, capture, encoding, decoding, and display delay."
