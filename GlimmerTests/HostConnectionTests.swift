@@ -3,6 +3,18 @@ import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func physicalConnectionIsIndependentOfTheTunnelLabel() {
+        #expect(HostRouteMonitor.physicalLink(ethernet: true, wifi: false, cellular: false).label == "Ethernet")
+        #expect(HostRouteMonitor.physicalLink(ethernet: false, wifi: true, cellular: false).label == "Wi-Fi")
+        #expect(HostRouteMonitor.physicalLink(ethernet: false, wifi: false, cellular: true).label == "Cellular")
+    }
+
+    @Test func ambiguousOrUnavailablePhysicalLinksAreNotGuessed() {
+        #expect(HostRouteMonitor.physicalLink(ethernet: true, wifi: true, cellular: false).label == "Multiple links")
+        #expect(HostRouteMonitor.physicalLink(ethernet: true, wifi: false, cellular: true).label == "Multiple links")
+        #expect(HostRouteMonitor.physicalLink(ethernet: false, wifi: false, cellular: false).label == "Unavailable")
+    }
+
     private let interfaces = [
         HostRouteMonitor.InterfaceAddress(name: "utun2", address: "100.94.140.12"),
         HostRouteMonitor.InterfaceAddress(name: "utun2", address: "fd7a:115c:a1e0::f635:8c0d"),

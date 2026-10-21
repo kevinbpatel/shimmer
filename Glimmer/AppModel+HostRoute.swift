@@ -35,12 +35,13 @@ final class HostRouteMonitor {
     /// not yet resolved) both render as NO glyph: absent knowledge stays
     /// unlabelled, never guessed.
     enum RouteClass {
-        case wired, wifi, tailscale, tunnel, unknown
+        case wired, wifi, cellular, tailscale, tunnel, unknown
 
         var label: String {
             switch self {
             case .wired: "Ethernet"
             case .wifi: "Wi-Fi"
+            case .cellular: "Cellular"
             case .tailscale: "Tailscale"
             case .tunnel: "VPN"
             case .unknown: "Unknown network"
@@ -48,7 +49,22 @@ final class HostRouteMonitor {
         }
     }
 
+    enum PhysicalLink {
+        case wired, wifi, cellular, multiple, unknown
+
+        var label: String {
+            switch self {
+            case .wired: "Ethernet"
+            case .wifi: "Wi-Fi"
+            case .cellular: "Cellular"
+            case .multiple: "Multiple links"
+            case .unknown: "Unavailable"
+            }
+        }
+    }
+
     private(set) var routeClass: RouteClass = .unknown
+    private(set) var physicalLink: PhysicalLink = .unknown
     private(set) var address: String?
     private(set) var changedAt = Date.distantPast
     private var routeIdentity = ""
@@ -59,7 +75,7 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "bolt.fill"
         case .wifi: return "wifi"
-        case .tailscale, .tunnel, .unknown: return nil
+        case .cellular, .tailscale, .tunnel, .unknown: return nil
         }
     }
 
@@ -68,6 +84,7 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "over Ethernet"
         case .wifi: return "over Wi-Fi"
+        case .cellular: return "over cellular"
         case .tailscale: return "over Tailscale"
         case .tunnel: return "over a VPN"
         case .unknown: return nil
@@ -91,6 +108,7 @@ final class HostRouteMonitor {
         generation += 1
         self.address = address
         routeClass = .unknown
+        physicalLink = .unknown
         routeIdentity = ""
         changedAt = .now
         guard let address, !address.isEmpty else { return }
@@ -103,40 +121,63 @@ final class HostRouteMonitor {
             // Classify on the monitor queue (cheap enum derivation), publish
             // on the main actor where SwiftUI observes `routeClass`.
             let fresh = Self.classify(path)
+            let physical = Self.physicalLink(path)
             let identity = Self.identity(path)
             Task { @MainActor [weak self] in
                 guard let self, self.generation == gen else { return }
-                self.publish(fresh, identity: identity)
+                self.publish(fresh, physical: physical, identity: identity)
             }
         }
         // The local endpoint can be absent in the first path callback. Once
         // ready it identifies the exact interface this connection selected.
         conn.stateUpdateHandler = { [weak self, weak conn] state in
             let fresh: RouteClass
+            let physical: PhysicalLink
             let identity: String
             switch state {
             case .ready:
                 guard let path = conn?.currentPath else { return }
                 fresh = Self.classify(path)
+                physical = Self.physicalLink(path)
                 identity = Self.identity(path)
             case .failed, .waiting, .cancelled:
                 fresh = .unknown
+                physical = .unknown
                 identity = ""
             default: return
             }
             Task { @MainActor [weak self] in
                 guard let self, self.generation == gen else { return }
-                self.publish(fresh, identity: identity)
+                self.publish(fresh, physical: physical, identity: identity)
             }
         }
         conn.start(queue: queue)
         connection = conn
     }
 
-    private func publish(_ fresh: RouteClass, identity: String) {
-        if routeClass != fresh || routeIdentity != identity { changedAt = .now }
+    private func publish(_ fresh: RouteClass, physical: PhysicalLink, identity: String) {
+        if routeClass != fresh || physicalLink != physical || routeIdentity != identity { changedAt = .now }
         routeClass = fresh
+        physicalLink = physical
         routeIdentity = identity
+    }
+
+    private nonisolated static func physicalLink(_ path: NWPath) -> PhysicalLink {
+        guard path.status == .satisfied else { return .unknown }
+        return physicalLink(ethernet: path.usesInterfaceType(.wiredEthernet),
+                            wifi: path.usesInterfaceType(.wifi),
+                            cellular: path.usesInterfaceType(.cellular))
+    }
+
+    /// NWPath can report the physical interface underneath a tunnel as well
+    /// as `.other`. If several physical types are eligible, don't guess one.
+    nonisolated static func physicalLink(ethernet: Bool, wifi: Bool, cellular: Bool) -> PhysicalLink {
+        let count = [ethernet, wifi, cellular].filter { $0 }.count
+        if count > 1 { return .multiple }
+        if ethernet { return .wired }
+        if wifi { return .wifi }
+        if cellular { return .cellular }
+        return .unknown
     }
 
     private nonisolated static func identity(_ path: NWPath) -> String {
@@ -165,6 +206,7 @@ final class HostRouteMonitor {
         }
         if path.usesInterfaceType(.wiredEthernet) { return .wired }
         if path.usesInterfaceType(.wifi) { return .wifi }
+        if path.usesInterfaceType(.cellular) { return .cellular }
         return .unknown
     }
 
@@ -230,9 +272,23 @@ struct HostLatencyReading {
 
 extension AppModel {
 
-    func connectionDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
-        guard let host = selectedHost, let address = selectedHostRouteAddress else { return "Checking…" }
-        let route = hostRoute.address == address ? hostRoute.routeClass : .unknown
+    var macConnectionDescription: String {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return "Checking…" }
+        return hostRoute.physicalLink.label
+    }
+
+    var hostRouteDescription: String {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return "Checking…" }
+        switch hostRoute.routeClass {
+        case .wired, .wifi, .cellular: return "Direct"
+        case .tailscale: return "Tailscale"
+        case .tunnel: return "VPN"
+        case .unknown: return "Checking…"
+        }
+    }
+
+    func latencyDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
+        guard let host = selectedHost, let address = selectedHostRouteAddress else { return "Unavailable" }
         let reading: HostLatencyReading?
         let maxAge: TimeInterval
         if isStreaming {
@@ -249,8 +305,7 @@ extension AppModel {
         }
         let latency = reading?.text(forHost: host.id, address: address, at: now,
                                     notBefore: hostRoute.changedAt, maxAge: maxAge)
-        if route == .unknown && latency == nil { return "Checking…" }
-        return [route.label, latency].compactMap { $0 }.joined(separator: " · ")
+        return latency ?? "Unavailable"
     }
 
     /// The destination `refreshHostRoute()` monitors for the current

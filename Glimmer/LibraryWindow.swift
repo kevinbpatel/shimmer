@@ -148,11 +148,22 @@ struct ComputersTab: View {
                         }
 
                         field("Connection") {
+                            Text(model.macConnectionDescription)
+                                .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
+                        }
+
+                        field("Route") {
+                            Text(model.hostRouteDescription)
+                        }
+
+                        field(model.isStreaming ? "Round-trip" : "Response time") {
                             TimelineView(.periodic(from: .now, by: 1)) { _ in
-                                Text(model.connectionDescription(liveReading: liveLatency, at: .now))
+                                Text(model.latencyDescription(liveReading: liveLatency, at: .now))
                                     .monospacedDigit()
                             }
-                            .help("This Mac’s route to the server. Latency is measured TCP connection time while idle and network round-trip time while streaming; it is not total input-to-display latency.")
+                            .help(model.isStreaming
+                                  ? "Network round-trip time measured by the live stream transport. Excludes game, capture, encoding, decoding, and display delay; this is not end-to-end input latency."
+                                  : "Measured time to establish a TCP connection to the server, including any DNS and connection setup. This is not streaming or end-to-end input latency.")
                         }
                     }
                     .padding(.top, 22)
