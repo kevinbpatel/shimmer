@@ -30,17 +30,12 @@ struct AboutPane: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                if let icon = NSImage(named: "AppIcon") {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                } else {
-                    Image(systemName: "moon.stars.fill")
-                        .font(.system(size: 72))
-                        .foregroundStyle(.tint)
-                }
+                // Appearance-aware exports of AppIcon.icon. Loading the app's
+                // legacy AppIcon NSImage fixes this view to the default artwork.
+                Image("AboutAppIcon")
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
                 VStack(spacing: 4) {
                     Text("Shimmer for macOS")

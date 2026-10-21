@@ -1,68 +1,202 @@
 {
+  "groups": [
+    {
+      "name": "Restrained colour through the glass",
+      "layers": [
+        {
+          "name": "Continuous spectrum with restrained face transmission",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "retained-spectrum.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "retained-spectrum-dark.svg"
+            }
+          ]
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    },
+    {
+      "name": "Polished blue glass \u2014 inside edge lighting",
+      "layers": [
+        {
+          "name": "Clean glass shell \u2014 one continuous bevel",
+          "image-name": "glass-shell.png",
+          "glass": true,
+          "position": {
+            "scale": 0.75125277486911,
+            "translation-in-points": [
+              -19.638509738219895,
+              -9.729652774869109
+            ]
+          },
+          "opacity-specializations": [
+            {
+              "value": 1.0
+            },
+            {
+              "appearance": "dark",
+              "value": 1.0
+            }
+          ]
+        }
+      ],
+      "lighting": "combined",
+      "specular": "inside",
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.018
+      },
+      "blur-material": 0,
+      "translucency-specializations": [
+        {
+          "value": {
+            "enabled": true,
+            "value": 0.4
+          }
+        },
+        {
+          "appearance": "dark",
+          "value": {
+            "enabled": true,
+            "value": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rear faces \u2014 apex to far base corner",
+      "layers": [
+        {
+          "name": "Rear seam \u2014 3.2 pt, tapered ends",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "anatomy.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "anatomy-dark.svg"
+            }
+          ]
+        },
+        {
+          "name": "Rear left face \u2014 tonal depth",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "rear-left-face.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "rear-left-face-dark.svg"
+            }
+          ]
+        },
+        {
+          "name": "Rear right face \u2014 tonal depth",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "rear-right-face.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "rear-right-face-dark.svg"
+            }
+          ]
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    },
+    {
+      "name": "Shared white-to-spectrum geometry",
+      "layers": [
+        {
+          "name": "Continuous optical path",
+          "glass": false,
+          "image-name-specializations": [
+            {
+              "value": "light.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "light-dark.svg"
+            }
+          ]
+        }
+      ],
+      "lighting": "combined",
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "refractivity": {
+        "enabled": false,
+        "strength": 0,
+        "depth": 0
+      },
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      }
+    }
+  ],
   "fill-specializations": [
     {
       "value": {
-        "linear-gradient": [
-          "display-p3:0.39502,0.05441,0.58496,1.00000",
-          "display-p3:0.00000,0.00000,0.00000,1.00000"
-        ],
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
-          }
-        }
+        "solid": "display-p3:0.313725,0.141176,0.741176,1"
       }
     },
     {
       "appearance": "dark",
       "value": {
-        "linear-gradient": [
-          "display-p3:0.41415,0.05891,0.61035,1.00000",
-          "display-p3:0.00000,0.00000,0.00000,1.00000"
-        ],
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 0.7
-          }
-        }
-      }
-    }
-  ],
-  "groups": [
-    {
-      "layers": [
-        {
-          "image-name": "eclipse-mark.png",
-          "name": "eclipse mark",
-          "opacity": 1,
-          "position": {
-            "scale": 1,
-            "translation-in-points": [0, -39]
-          }
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0
-      },
-      "translucency": {
-        "enabled": false,
-        "value": 0
+        "solid": "display-p3:0.109804,0.109804,0.117647,1"
       }
     }
   ],
   "supported-platforms": {
-    "circles": ["watchOS"],
     "squares": "shared"
-  }
+  },
+  "features": [
+    "refractivity",
+    "specular-location"
+  ]
 }

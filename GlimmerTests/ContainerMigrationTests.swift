@@ -14,6 +14,22 @@ import Testing
 
 struct ContainerMigrationTests {
 
+    // Assert the no-Keychain identity policy without executing a dangerous
+    // legacy cleanup against the developer's real credential store.
+    @Test func identityStorageNeverCallsKeychainServices() throws {
+        let stream = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Glimmer/Stream")
+        let sources = try FileManager.default.contentsOfDirectory(at: stream, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("Identity") && $0.pathExtension == "swift" }
+        #expect(!sources.isEmpty)
+        let keychainCall = #"\b(?:SecItem\w+|SecKeychain\w+|SecIdentityCreateWithCertificate|SecPKCS12Import)\s*\("#
+        for source in sources {
+            let contents = try String(contentsOf: source, encoding: .utf8)
+            #expect(contents.range(of: keychainCall, options: .regularExpression) == nil,
+                    "Identity storage must leave the Keychain alone: \(source.lastPathComponent)")
+        }
+    }
+
     private func tmpDir() -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmtest-\(UUID().uuidString)", isDirectory: true)

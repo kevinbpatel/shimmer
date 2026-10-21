@@ -1,11 +1,56 @@
-# `generate-icons.swift` - design notes
+# App icon and legacy generator notes
 
-**What actually ships is not this.** The app icon is `Glimmer/AppIcon.icon`, a
-hand-authored Icon Composer bundle: one `eclipse-mark.png` layer over a
-violet-to-black vertical gradient declared in `icon.json`, with a slightly
-brighter dark specialization. There is no `AppIcon.appiconset` in
-`Assets.xcassets` any more. `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` plus
-`CFBundleIconName` in `Info.plist` is what resolves it.
+**The shipping icon is `Glimmer/AppIcon.icon`.** It is the selected aligned
+square-based glass pyramid on purple, with warmer incoming light and richer
+gold, cyan and violet gradients. The selected shading-only treatment keeps
+the spectrum continuous, with stronger colour through the faces. A brighter
+violet fill (Display P3 `#5024BD`) and lighter glass improve separation from
+the background in Default/Light. Dark uses a neutral charcoal fill
+(Display P3 `#1C1C1E`), with a pearl entry beam and vivid yellow-gold, cyan
+and violet gradients. Dark has stronger transmitted colour through the faces,
+quieter rear-face colours and brighter glass (translucency 0.40 with full shell
+opacity). Its material settings remain independently editable.
+The pyramid geometry is shared. The porcelain variant was retired.
+
+The Composer document has four groups: restrained spectrum colour retention,
+the glass shell, rear faces and base seam, and the aligned light artwork.
+The shell is a raster asset with native inside specular lighting and
+translucency (0.40 in Default, with the shell layer at full opacity). The beam
+boundaries, gradients, rear facets and base seam are editable SVG. Material blur and
+screen-space refraction are disabled to keep
+the selected ray geometry crisp. The colour-retention overlay uses restrained
+transmission gradients across the faces and is inset from the bevels so it
+preserves their highlights. The rays have no facet offsets or bends.
+
+Xcode compiles this document into appearance-aware icon stacks using
+`ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. No flattened replacement icon
+or Finder custom icon is needed.
+
+The shipping Composer document is the editable source consumed directly by
+the app build. Open `Glimmer/AppIcon.icon` in Icon Composer to adjust the
+material. Beam gradients live in `Assets/light.svg`; their colour-retention
+counterparts live in `Assets/retained-spectrum.svg`. Keep those palettes in
+sync when tuning the light. The icon does not depend on the exploratory
+studies under `output/`.
+
+Dark artwork is supplied through native `image-name-specializations` on the
+same layers. The matching `*-dark.svg` assets tune the beams, transmitted
+colour, rear faces and base seam. Native material overrides use
+`translucency-specializations` and `opacity-specializations`. Keep the default
+and Dark paths and transforms aligned when editing: this is an appearance
+palette, not a different pyramid construction. The Default export is unchanged
+by these Dark overrides.
+
+Export the README icon with `./scripts/export-shimmer-icon.sh`. The export
+uses Icon Composer's macOS 27 design generation, matching the approved icon.
+The same command refreshes the About pane's `AboutAppIcon` image set at 1× and
+2×, with Default and Dark appearances. SwiftUI selects the image for the
+window's current appearance; regenerate these exports after editing the source
+icon. The app's Dock and Finder icon still uses the layered Composer document.
+`make app` refreshes all exports before compiling. The GitHub README and T3 Code
+project icon both use the purple Default export, `docs/assets/icon-512.png`.
+Keep the default branch's README image current when publishing an approved logo
+change. T3's project favicon points to that same stable file path.
 
 `generate-icons.swift` is the generator for the previous moon-and-sparkles
 design. It still runs, and the rationale below is worth keeping because the

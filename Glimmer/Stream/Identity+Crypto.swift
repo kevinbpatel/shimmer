@@ -164,26 +164,4 @@ extension IdentityManager {
         }
         return pem
     }
-
-    // MARK: - Legacy login-keychain cleanup
-    //
-    // Pre-OpenSSL builds laundered the client cert/key through a SecIdentity in
-    // the login keychain. The control channel now runs on OpenSSL straight from
-    // the PEMs, so that item is dead weight - preflight() deletes it on launch.
-
-    private static let dpLabel = "Glimmer Client Identity"
-
-    /// Delete the orphaned "Glimmer Client Identity" item (+ its cert/key) that
-    /// older builds imported into the login keychain. Idempotent; SecItemDelete
-    /// on absent items is a harmless no-op.
-    func deleteLabelledIdentity() {
-        for cls in [kSecClassIdentity, kSecClassKey, kSecClassCertificate] {
-            let query: [String: Any] = [
-                kSecClass as String: cls,
-                kSecAttrLabel as String: Self.dpLabel,
-                kSecMatchLimit as String: kSecMatchLimitAll
-            ]
-            _ = SecItemDelete(query as CFDictionary)
-        }
-    }
 }

@@ -35,9 +35,6 @@ extension AppModel {
         // the new daemon without the user re-toggling anything.
         AWDLHelperManager.shared.reconcileAfterUpdate()
         log.info("Shimmer stream engine: Swift-native")
-        // Install step: build the client SecIdentity once, into Glimmer's own
-        // keychain, so streams don't prompt the user for keychain access.
-        await IdentityManager.shared.preflight()
         migrateFromMoonlightQtIfNeeded()
         loadHosts()
         // Seed the Custom fields from the display when Custom is ALREADY the
