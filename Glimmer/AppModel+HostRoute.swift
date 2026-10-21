@@ -285,6 +285,22 @@ struct HostLatencyHistory {
     static let duration: TimeInterval = 60
     private(set) var readings: [HostLatencyReading] = []
 
+    struct Statistics {
+        let minimum: Double
+        let maximum: Double
+        let average: Double
+        let count: Int
+    }
+
+    func statistics(at now: Date) -> Statistics? {
+        let values = readings.filter {
+            $0.capturedAt >= now.addingTimeInterval(-Self.duration) && $0.capturedAt <= now
+        }.map(\.milliseconds)
+        guard let minimum = values.min(), let maximum = values.max() else { return nil }
+        return Statistics(minimum: minimum, maximum: maximum,
+                          average: values.reduce(0, +) / Double(values.count), count: values.count)
+    }
+
     mutating func record(_ reading: HostLatencyReading?, at now: Date) {
         readings.removeAll { $0.capturedAt < now.addingTimeInterval(-Self.duration) || $0.capturedAt > now }
         guard let reading,

@@ -3,6 +3,33 @@ import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func historySummaryUsesOnlyActualMeasurementsInTheVisibleMinute() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        for (offset, value) in [(-59.0, 100.0), (-30, 2), (-10, 4), (0, 9)] {
+            history.record(.init(hostID: "pc", address: "host", milliseconds: value,
+                                 capturedAt: now.addingTimeInterval(offset)), at: now)
+        }
+        let stats = history.statistics(at: now.addingTimeInterval(2))
+        #expect(stats?.minimum == 2)
+        #expect(stats?.maximum == 9)
+        #expect(stats?.average == 5)
+        #expect(stats?.count == 3)
+        #expect(history.statistics(at: now.addingTimeInterval(61)) == nil)
+    }
+
+    @Test func emptyHistoryDoesNotClaimZeroTimingAndSingleSampleIsValid() {
+        let now = Date(timeIntervalSince1970: 1000)
+        var history = HostLatencyHistory()
+        #expect(history.statistics(at: now) == nil)
+        history.record(.init(hostID: "pc", address: "host", milliseconds: 0.4, capturedAt: now), at: now)
+        let stats = history.statistics(at: now)
+        #expect(stats?.minimum == 0.4)
+        #expect(stats?.maximum == 0.4)
+        #expect(stats?.average == 0.4)
+        #expect(stats?.count == 1)
+    }
+
     @Test func historyRecordsEachMeasurementOnceAndExpiresOldSamples() {
         let now = Date(timeIntervalSince1970: 1000)
         let reading = HostLatencyReading(hostID: "pc", address: "host", milliseconds: 2, capturedAt: now)

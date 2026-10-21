@@ -23,7 +23,7 @@ struct AppShell: View {
     private var windowHeight: CGFloat {
         // Keep the paired-server form compact, with room for the connection
         // details and a small timing history. Pairing keeps its original room.
-        if model.settingsTab == .computers, model.selectedHost != nil { return 460 - 32 }
+        if model.settingsTab == .computers, model.selectedHost != nil { return 480 - 32 }
         return model.settingsTab.windowHeight
     }
 

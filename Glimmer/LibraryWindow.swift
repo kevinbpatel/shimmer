@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import Charts
 
 struct ComputersTab: View {
     @Environment(AppModel.self) private var model
@@ -170,24 +171,17 @@ struct ComputersTab: View {
                                 .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
                         }
 
-                        field(model.isStreaming ? "Round-trip" : "Response time") {
-                            TimelineView(.periodic(from: .now, by: 1)) { _ in
-                                Text(model.latencyDescription(liveReading: liveLatency, at: .now))
-                                    .monospacedDigit()
-                            }
-                            .help(model.isStreaming
-                                  ? "Network round-trip time measured by the live stream transport. Excludes game, capture, encoding, decoding, and display delay; this is not end-to-end input latency."
-                                  : "Measured time to establish a TCP connection to the server, including any DNS and connection setup. This is not streaming or end-to-end input latency.")
-                            LatencyHistoryGraph(history: latencyHistory,
-                                                maxGap: model.isStreaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2)
-                                .frame(width: 210)
-                        }
                     }
                     .padding(.top, 22)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                NetworkHistoryPanel(history: latencyHistory, streaming: model.isStreaming,
+                                    currentValue: { model.latencyDescription(liveReading: liveLatency, at: $0) })
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
 
                 Divider()
                 HStack {
@@ -263,56 +257,116 @@ struct ComputersTab: View {
     }
 }
 
-/// Fixed time and zero-based axes: a quiet connection stays quiet, while a
-/// spike keeps its actual height. Straight segments avoid invented smoothing.
-private struct LatencyHistoryGraph: View {
+/// Activity Monitor's compact summary treatment: ruled values beside a cyan
+/// history plot, in one quiet bordered strip. The single series is latency;
+/// upload/download colours would imply measurements this panel doesn't have.
+private struct NetworkHistoryPanel: View {
     let history: HostLatencyHistory
-    let maxGap: TimeInterval
+    let streaming: Bool
+    let currentValue: (Date) -> String
+
+    private let cyan = Color(red: 0, green: 0.68, blue: 0.84)
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
-            let ceiling = max(10, ceil((history.readings.map(\.milliseconds).max() ?? 0) * 1.15 / 5) * 5)
-            VStack(spacing: 3) {
-                HStack {
-                    Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
-                    Spacer()
-                    if history.readings.isEmpty { Text("Collecting measurements…") }
+            let stats = history.statistics(at: timeline.date)
+            let ceiling = max(10, ceil((stats?.maximum ?? 0) * 1.15 / 5) * 5)
+            HStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    valueRow("Current:", value: currentValue(timeline.date), highlighted: true)
+                    Divider()
+                    valueRow("Average:", value: format(stats?.average))
+                    Divider()
+                    valueRow("Minimum:", value: format(stats?.minimum))
+                    Divider()
+                    valueRow("Maximum:", value: format(stats?.maximum))
                 }
-                .font(.system(size: 10)).foregroundStyle(.secondary)
-                Canvas { context, size in
-                    let start = timeline.date.addingTimeInterval(-HostLatencyHistory.duration)
-                    var grid = Path()
-                    for fraction in [0.0, 0.5, 1.0] {
-                        let y = size.height * fraction
-                        grid.move(to: CGPoint(x: 0, y: y))
-                        grid.addLine(to: CGPoint(x: size.width, y: y))
-                    }
-                    context.stroke(grid, with: .color(.secondary.opacity(0.18)), lineWidth: 0.5)
-                    for segment in history.segments(maxGap: maxGap) {
-                        let points = segment.filter { $0.capturedAt >= start && $0.capturedAt <= timeline.date }.map {
-                            CGPoint(x: $0.capturedAt.timeIntervalSince(start) / HostLatencyHistory.duration * size.width,
-                                    y: size.height * (1 - $0.milliseconds / ceiling))
+                .padding(.horizontal, 9)
+                .frame(width: 164)
+
+                Divider()
+
+                VStack(spacing: 5) {
+                    Text(streaming ? "ROUND-TRIP" : "RESPONSE TIME")
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                    Divider()
+                    Chart {
+                        RuleMark(y: .value("Baseline", 0))
+                            .foregroundStyle(cyan.opacity(0.35))
+                            .lineStyle(StrokeStyle(lineWidth: 0.5))
+                        ForEach(Array(history.segments(maxGap: streaming ? 3 : AppModel.hostStatusPollSeconds * 2 + 2).enumerated()), id: \.offset) { index, segment in
+                            ForEach(Array(segment.enumerated()), id: \.offset) { _, reading in
+                                AreaMark(x: .value("Time", reading.capturedAt),
+                                         yStart: .value("Milliseconds", 0),
+                                         yEnd: .value("Milliseconds", reading.milliseconds),
+                                         series: .value("Segment", index))
+                                    .foregroundStyle(cyan.opacity(0.18))
+                                    .interpolationMethod(.linear)
+                                LineMark(x: .value("Time", reading.capturedAt),
+                                         y: .value("Milliseconds", reading.milliseconds),
+                                         series: .value("Segment", index))
+                                    .foregroundStyle(cyan)
+                                    .lineStyle(StrokeStyle(lineWidth: 1.2))
+                                    .interpolationMethod(.linear)
+                                if segment.count == 1 {
+                                    PointMark(x: .value("Time", reading.capturedAt),
+                                              y: .value("Milliseconds", reading.milliseconds))
+                                        .foregroundStyle(cyan).symbolSize(7)
+                                }
+                            }
                         }
-                        guard let first = points.first else { continue }
-                        if points.count == 1 {
-                            context.fill(Path(ellipseIn: CGRect(x: first.x - 1.5, y: first.y - 1.5, width: 3, height: 3)),
-                                         with: .color(.accentColor))
-                        } else {
-                            var line = Path(); line.addLines(points)
-                            context.stroke(line, with: .color(.accentColor),
-                                           style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                    }
+                    .chartXScale(domain: timeline.date.addingTimeInterval(-HostLatencyHistory.duration)...timeline.date)
+                    .chartYScale(domain: 0...ceiling)
+                    .chartXAxis(.hidden)
+                    .chartYAxis(.hidden)
+                    .chartLegend(.hidden)
+                    .chartPlotStyle { plot in plot.clipped() }
+                    .overlay(alignment: .topLeading) {
+                        if stats == nil {
+                            Text("Waiting for measurements")
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                                .padding(.top, 5)
                         }
                     }
+                    .accessibilityLabel("Last minute of network timing")
+                    HStack {
+                        Text("60 sec")
+                        Spacer()
+                        Text("0–\(ceiling.formatted(.number.precision(.fractionLength(0)))) ms")
+                    }
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
                 }
-                .frame(height: 40)
-                HStack { Text("60s ago"); Spacer(); Text("Now") }
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 8)
             }
+            .frame(height: 118)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.22), lineWidth: 1))
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Last minute of network measurements")
-        .accessibilityValue(history.readings.isEmpty ? "No measurements yet" : "\(history.readings.count) measurements; gaps indicate missing data")
-        .help("Actual measurements from this view’s last minute, on a zero-based scale. Idle checks run about every 10 seconds; stream round-trip readings update every second. No extra probes are sent. History resets when the host, network path, or measurement type changes.")
+        .help(streaming
+              ? "Network round-trip time from the stream transport, with statistics for this view’s last minute. Missing readings leave gaps. Excludes game, capture, encoding, decoding, and display delay."
+              : "TCP connection setup time to the server, including DNS if needed. Statistics cover this view’s last minute of actual checks, about 10 seconds apart. Missing readings leave gaps. History resets when the host, path, or measurement type changes.")
+    }
+
+    private func valueRow(_ title: String, value: String, highlighted: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+            Spacer(minLength: 2)
+            Text(value).monospacedDigit()
+                .foregroundStyle(highlighted ? cyan : Color.primary)
+        }
+        .font(.system(size: 11))
+        .frame(maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func format(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        if value < 1 { return "<1 ms" }
+        return "\(value.formatted(.number.precision(.fractionLength(0)))) ms"
     }
 }
 
