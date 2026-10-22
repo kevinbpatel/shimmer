@@ -190,6 +190,7 @@ extension AppModel {
             return
 
         case .reachable(let rttMs):
+            let probedAt = Date()
             // Host answered → clear the unreachable streak so a later transient
             // miss starts counting from zero again.
             await MainActor.run { [weak self] in self?.hostUnreachableStreak = 0 }
@@ -214,20 +215,17 @@ extension AppModel {
                     return Dictionary(uniqueKeysWithValues: host.apps.map { ($0.id, $0.name) })
                 }
 
-                let state: HostLiveStatus.State
-                if info.currentGameID == 0 {
-                    state = .idle
-                } else if let name = appNamesByID[info.currentGameID] {
-                    state = .streamingApp(name: name)
-                } else {
-                    state = .streamingUnknownApp(id: info.currentGameID)
-                }
+                let state = HostLiveStatus.reportedState(
+                    currentGameID: info.reportsCurrentGame ? info.currentGameID : nil,
+                    appNamesByID: appNamesByID)
                 await publishLiveStatus(HostLiveStatus(
                     hostID: snap.id,
                     state: state,
                     rttMs: rttMs,
                     sunshineVersion: info.appVersion,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             } catch let err as StreamError {
                 await client.shutdown()
@@ -240,30 +238,30 @@ extension AppModel {
                    detail.lowercased().contains("cert") || detail.lowercased().contains("mitm") {
                     state = .certMismatch
                 } else {
-                    // /serverinfo failed for some other reason (timeout, 5xx)
-                    // but TCP succeeded - fall back to "idle with RTT"
-                    // rather than penalise a working host for a transient
-                    // HTTP hiccup. Spec calls this "treat as Ready".
-                    state = .idle
+                    // TCP proves reachability, not an idle host session.
+                    state = .reachable
                 }
                 await publishLiveStatus(HostLiveStatus(
                     hostID: snap.id,
                     state: state,
                     rttMs: rttMs,
                     sunshineVersion: nil,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             } catch {
                 await client.shutdown()
                 if Task.isCancelled { return }
-                // Same forgiving stance as above for non-StreamError throws
-                // (URL session timeouts, DNS races, etc.).
+                // The host answered TCP, but its session state is unknown.
                 await publishLiveStatus(HostLiveStatus(
                     hostID: snap.id,
-                    state: .idle,
+                    state: .reachable,
                     rttMs: rttMs,
                     sunshineVersion: nil,
-                    capturedAt: Date()
+                    capturedAt: Date(),
+                    probedAddress: snap.info.address,
+                    probedAt: probedAt
                 ), expectedHostID: expectedHostID)
             }
         }

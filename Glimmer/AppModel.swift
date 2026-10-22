@@ -57,6 +57,15 @@ final class AppModel {
     var hosts: [Host] = []
     var selectedHost: Host?
 
+    var showMenuBarItem = true {
+        didSet {
+            guard !isRestoringDefaults else { return }
+            UserDefaults.standard.set(showMenuBarItem, forKey: MenuBarPreferences.visibilityKey)
+            // Keep the Dock available before the menu-bar entry disappears.
+            AppDelegate.refreshActivationPolicy()
+        }
+    }
+
     /// Box art for the launcher's app tiles, fetched from the host and cached
     /// on disk. Owned here so one store serves every view.
     let artwork = AppArtworkStore()
@@ -188,6 +197,10 @@ final class AppModel {
     /// connect-banner, the StreamButton role, and the ReadinessChip's
     /// transitional state. See `StreamPhase` for the case set.
     var streamPhase: StreamPhase = .idle
+
+    var activeStreamHostID: String?
+    /// A handshake or failed launch is not streaming history.
+    var activeStreamHasVideo = false
 
     /// True when a stream is running but its window has been orderOut'd
     /// because the user Cmd-Tabbed away. The launcher UI shows a "Back to
@@ -610,6 +623,7 @@ final class AppModel {
         // stays under the complexity bar). The persisted-key set is unchanged.
         isRestoringDefaults = true
         defer { isRestoringDefaults = false }
+        showMenuBarItem = MenuBarPreferences.isVisible()
         // The artwork store builds its own paired clients; hand it the same
         // Host → ServerInfo bridge the stream path uses (authoritative cert
         // pin included), rather than letting it reach into AppModel.

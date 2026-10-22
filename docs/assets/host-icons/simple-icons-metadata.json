@@ -1,0 +1,128 @@
+[
+  {
+    "asset": "HostLogo-steamOS",
+    "title": "Steam",
+    "hex": "000000",
+    "source": "https://partner.steamgames.com/doc/marketing/branding",
+    "guidelines": "https://partner.steamgames.com/doc/marketing/branding"
+  },
+  {
+    "asset": "HostLogo-nobara",
+    "title": "Nobara Linux",
+    "hex": "000000",
+    "source": "https://wiki.nobaraproject.org"
+  },
+  {
+    "asset": "HostLogo-cachyOS",
+    "title": "CachyOS",
+    "hex": "00AA88",
+    "source": "https://commons.wikimedia.org/wiki/File:CachyOS_Logo.svg"
+  },
+  {
+    "asset": "HostLogo-garuda",
+    "title": "Garuda Linux",
+    "hex": "8839EF",
+    "source": "https://gitlab.com/garuda-linux/themes-and-settings/artwork/garuda-icons/-/blob/aab26625fe01479ebc3a252103fca723baca9e88/usr/share/icons/garuda/distributor-logo-garuda-outline.svg",
+    "license": {
+      "type": "GPL-3.0-only"
+    }
+  },
+  {
+    "asset": "HostLogo-arch",
+    "title": "Arch Linux",
+    "hex": "1793D1",
+    "source": "https://www.archlinux.org/art",
+    "guidelines": "https://wiki.archlinux.org/index.php/DeveloperWiki:TrademarkPolicy#Logo_Usage_Guidelines"
+  },
+  {
+    "asset": "HostLogo-fedora",
+    "title": "Fedora",
+    "hex": "51A2DA",
+    "source": "https://docs.fedoraproject.org/en-US/project/brand/",
+    "guidelines": "https://fedoraproject.org/wiki/Legal:Trademark_guidelines",
+    "license": {
+      "type": "custom",
+      "url": "https://docs.fedoraproject.org/en-US/project/brand/"
+    }
+  },
+  {
+    "asset": "HostLogo-ubuntu",
+    "title": "Ubuntu",
+    "hex": "E95420",
+    "source": "https://design.ubuntu.com/resources",
+    "guidelines": "https://design.ubuntu.com/brand"
+  },
+  {
+    "asset": "HostLogo-kubuntu",
+    "title": "Kubuntu",
+    "hex": "0079C1",
+    "source": "https://kubuntu.org"
+  },
+  {
+    "asset": "HostLogo-mint",
+    "title": "Linux Mint",
+    "hex": "86BE43",
+    "source": "https://github.com/linuxmint/brand-logo/blob/540ac3b08e987866d77a340f557f994c988ac2ae/ring-mono-green.svg"
+  },
+  {
+    "asset": "HostLogo-popOS",
+    "title": "Pop!_OS",
+    "hex": "48B9C7",
+    "source": "https://github.com/system76/brand/blob/7a31740b54f929b62a165baa61dfb0b5164261e8/Pop_OS%20branding/Pop_icon.svg"
+  },
+  {
+    "asset": "HostLogo-debian",
+    "title": "Debian",
+    "hex": "A81D33",
+    "source": "https://www.debian.org/logos",
+    "guidelines": "https://www.debian.org/logos/",
+    "license": {
+      "type": "CC-BY-SA-3.0"
+    }
+  },
+  {
+    "asset": "HostLogo-openSUSE",
+    "title": "openSUSE",
+    "hex": "73BA25",
+    "source": "https://github.com/openSUSE/artwork/blob/33e94aa76837c09f03d1712705949b71a246a53b/logos/buttons/button-colour.svg",
+    "guidelines": "https://en.opensuse.org/Portal:Artwork"
+  },
+  {
+    "asset": "HostLogo-manjaro",
+    "title": "Manjaro",
+    "hex": "35BFA4",
+    "source": "https://manjaro.org"
+  },
+  {
+    "asset": "HostLogo-endeavourOS",
+    "title": "EndeavourOS",
+    "hex": "7F7FFF",
+    "source": "https://github.com/endeavouros-team/endeavouros-theming/blob/135f642c980ed8d8fc212783eb478f96226f6c72/endeavouros-logo-text.svg"
+  },
+  {
+    "asset": "HostLogo-nixOS",
+    "title": "NixOS",
+    "hex": "5277C3",
+    "source": "https://brand.nixos.org/logos/nixos-logomark-black-flat-minimal.svg",
+    "guidelines": "https://brand.nixos.org/documents/nixos-branding-guide.pdf",
+    "license": {
+      "type": "CC-BY-4.0"
+    }
+  },
+  {
+    "asset": "HostLogo-gentoo",
+    "title": "Gentoo",
+    "hex": "54487A",
+    "source": "https://wiki.gentoo.org/wiki/Project:Artwork/Artwork#Variations_of_the_.22g.22_logo",
+    "guidelines": "https://www.gentoo.org/inside-gentoo/foundation/name-logo-guidelines.html",
+    "license": {
+      "type": "CC-BY-SA-2.5"
+    }
+  },
+  {
+    "asset": "HostLogo-linux",
+    "title": "Linux",
+    "hex": "FCC624",
+    "source": "https://www.linuxfoundation.org/the-linux-mark/"
+  }
+]

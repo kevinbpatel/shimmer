@@ -21,6 +21,7 @@ import Foundation
 import Network
 import SwiftUI
 import Observation
+import Darwin
 
 /// Live wired/Wi-Fi classification of the kernel route toward one host.
 /// Owned by `AppModel` (see `hostRoute`), re-pointed by the launcher
@@ -34,10 +35,49 @@ final class HostRouteMonitor {
     /// not yet resolved) both render as NO glyph: absent knowledge stays
     /// unlabelled, never guessed.
     enum RouteClass {
-        case wired, wifi, tunnel, unknown
+        case wired, wifi, cellular, tailscale, tunnel, unknown
+
+        var label: String {
+            switch self {
+            case .wired: "Ethernet"
+            case .wifi: "Wi-Fi"
+            case .cellular: "Cellular"
+            case .tailscale: "Tailscale"
+            case .tunnel: "VPN"
+            case .unknown: "Unknown network"
+            }
+        }
+    }
+
+    enum PhysicalLink {
+        case wired, wifi, cellular, multiple, unknown
+
+        var symbol: String? {
+            switch self {
+            // The view draws an Ethernet socket instead of a USB-like cable.
+            case .wired: nil
+            case .wifi: "wifi"
+            case .cellular: "antenna.radiowaves.left.and.right"
+            case .multiple, .unknown: nil
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .wired: "Ethernet"
+            case .wifi: "Wi-Fi"
+            case .cellular: "Cellular"
+            case .multiple: "Multiple links"
+            case .unknown: "Unavailable"
+            }
+        }
     }
 
     private(set) var routeClass: RouteClass = .unknown
+    private(set) var physicalLink: PhysicalLink = .unknown
+    private(set) var address: String?
+    private(set) var changedAt = Date.distantPast
+    private var routeIdentity = ""
 
     /// Chip glyph for the current route - bolt for wired, arcs for Wi-Fi,
     /// nothing when the route is a tunnel or unknown.
@@ -45,7 +85,7 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "bolt.fill"
         case .wifi: return "wifi"
-        case .tunnel, .unknown: return nil
+        case .cellular, .tailscale, .tunnel, .unknown: return nil
         }
     }
 
@@ -54,7 +94,10 @@ final class HostRouteMonitor {
         switch routeClass {
         case .wired: return "over Ethernet"
         case .wifi: return "over Wi-Fi"
-        case .tunnel, .unknown: return nil
+        case .cellular: return "over cellular"
+        case .tailscale: return "over Tailscale"
+        case .tunnel: return "over a VPN"
+        case .unknown: return nil
         }
     }
 
@@ -73,7 +116,11 @@ final class HostRouteMonitor {
         connection?.cancel()
         connection = nil
         generation += 1
+        self.address = address
         routeClass = .unknown
+        physicalLink = .unknown
+        routeIdentity = ""
+        changedAt = .now
         guard let address, !address.isEmpty else { return }
 
         // The port is irrelevant to route selection (only the destination
@@ -84,13 +131,78 @@ final class HostRouteMonitor {
             // Classify on the monitor queue (cheap enum derivation), publish
             // on the main actor where SwiftUI observes `routeClass`.
             let fresh = Self.classify(path)
+            let physical = Self.physicalLink(path)
+            let identity = Self.identity(path)
             Task { @MainActor [weak self] in
                 guard let self, self.generation == gen else { return }
-                self.routeClass = fresh
+                self.publish(fresh, physical: physical, identity: identity)
+            }
+        }
+        // The local endpoint can be absent in the first path callback. Once
+        // ready it identifies the exact interface this connection selected.
+        conn.stateUpdateHandler = { [weak self, weak conn] state in
+            let fresh: RouteClass
+            let physical: PhysicalLink
+            let identity: String
+            switch state {
+            case .ready:
+                guard let path = conn?.currentPath else { return }
+                fresh = Self.classify(path)
+                physical = Self.physicalLink(path)
+                identity = Self.identity(path)
+            case .failed, .waiting, .cancelled:
+                fresh = .unknown
+                physical = .unknown
+                identity = ""
+            default: return
+            }
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == gen else { return }
+                self.publish(fresh, physical: physical, identity: identity)
             }
         }
         conn.start(queue: queue)
         connection = conn
+    }
+
+    private func publish(_ fresh: RouteClass, physical: PhysicalLink, identity: String) {
+        if routeClass != fresh || physicalLink != physical || routeIdentity != identity { changedAt = .now }
+        routeClass = fresh
+        physicalLink = physical
+        routeIdentity = identity
+    }
+
+    private nonisolated static func physicalLink(_ path: NWPath) -> PhysicalLink {
+        guard path.status == .satisfied else { return .unknown }
+        return physicalLink(ethernet: path.usesInterfaceType(.wiredEthernet),
+                            wifi: path.usesInterfaceType(.wifi),
+                            cellular: path.usesInterfaceType(.cellular))
+    }
+
+    /// NWPath can report the physical interface underneath a tunnel as well
+    /// as `.other`. If several physical types are eligible, don't guess one.
+    nonisolated static func physicalLink(ethernet: Bool, wifi: Bool, cellular: Bool) -> PhysicalLink {
+        let count = [ethernet, wifi, cellular].filter { $0 }.count
+        if count > 1 { return .multiple }
+        if ethernet { return .wired }
+        if wifi { return .wifi }
+        if cellular { return .cellular }
+        return .unknown
+    }
+
+    private nonisolated static func identity(_ path: NWPath) -> String {
+        path.availableInterfaces.map(\.name).joined(separator: ",")
+            + ":" + (localAddress(path) ?? "")
+    }
+
+    private nonisolated static func localAddress(_ path: NWPath) -> String? {
+        guard case .hostPort(let host, _) = path.localEndpoint else { return nil }
+        switch host {
+        case .ipv4(let ip): return ip.debugDescription
+        case .ipv6(let ip): return ip.debugDescription
+        case .name: return nil
+        @unknown default: return nil
+        }
     }
 
     /// NWPath → route class. Tunnel is checked FIRST: a host reached through
@@ -98,14 +210,251 @@ final class HostRouteMonitor {
     /// routed to (the same honesty rule the engine's exporter probe follows).
     private nonisolated static func classify(_ path: NWPath) -> RouteClass {
         guard path.status == .satisfied else { return .unknown }
-        if path.usesInterfaceType(.other) { return .tunnel }
+        if path.usesInterfaceType(.other) {
+            return isTailscale(localAddress: localAddress(path), interfaces: interfaceAddresses())
+                ? .tailscale : .tunnel
+        }
         if path.usesInterfaceType(.wiredEthernet) { return .wired }
         if path.usesInterfaceType(.wifi) { return .wifi }
+        if path.usesInterfaceType(.cellular) { return .cellular }
         return .unknown
+    }
+
+    struct InterfaceAddress: Sendable {
+        let name: String
+        let address: String
+    }
+
+    /// Positive evidence on the SELECTED interface, not a CGNAT destination or
+    /// an unrelated active VPN. Tailscale assigns fd7a:115c:a1e0::/48 locally.
+    nonisolated static func isTailscale(localAddress: String?, interfaces: [InterfaceAddress]) -> Bool {
+        guard let localAddress, let local = ipBytes(localAddress) else { return false }
+        let names = Set(interfaces.filter { ipBytes($0.address) == local }.map(\.name))
+        guard names.count == 1, let name = names.first else { return false }
+        let prefix: [UInt8] = [0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0]
+        return interfaces.contains {
+            $0.name == name && ipBytes($0.address)?.starts(with: prefix) == true
+        }
+    }
+
+    private nonisolated static func ipBytes(_ value: String) -> Data? {
+        let value = value.split(separator: "%", maxSplits: 1).first.map(String.init) ?? ""
+        if let ip = IPv4Address(value) { return ip.rawValue }
+        return IPv6Address(value)?.rawValue
+    }
+
+    private nonisolated static func interfaceAddresses() -> [InterfaceAddress] {
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return [] }
+        defer { freeifaddrs(first) }
+        var result: [InterfaceAddress] = []
+        var next: UnsafeMutablePointer<ifaddrs>? = first
+        while let item = next {
+            next = item.pointee.ifa_next
+            guard let address = item.pointee.ifa_addr,
+                  [AF_INET, AF_INET6].contains(Int32(address.pointee.sa_family)) else { continue }
+            var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(address, socklen_t(address.pointee.sa_len), &buffer,
+                              socklen_t(buffer.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+            result.append(InterfaceAddress(name: String(cString: item.pointee.ifa_name),
+                                           address: String(cString: buffer)))
+        }
+        return result
+    }
+}
+
+struct HostLatencyReading {
+    let hostID: String
+    let address: String
+    let milliseconds: Double
+    let capturedAt: Date
+
+    func text(forHost hostID: String, address: String, at now: Date,
+              notBefore: Date, maxAge: TimeInterval) -> String? {
+        guard self.hostID == hostID, self.address == address,
+              capturedAt >= notBefore, capturedAt <= now,
+              now.timeIntervalSince(capturedAt) <= maxAge,
+              milliseconds.isFinite, milliseconds >= 0,
+              milliseconds < Double(Int.max) else { return nil }
+        return milliseconds < 1 ? "<1 ms" : "\(Int(milliseconds.rounded())) ms"
+    }
+}
+
+/// A short, in-memory history of actual measurements. UI refreshes must not
+/// duplicate a probe, stretch old data to "now", or connect across outages.
+struct HostLatencyHistory {
+    static let duration: TimeInterval = 60
+    private(set) var readings: [HostLatencyReading] = []
+    private var missingReadings: [Date] = []
+
+    struct Statistics {
+        let minimum: Double
+        let maximum: Double
+        let average: Double
+        let count: Int
+    }
+
+    func statistics(at now: Date) -> Statistics? {
+        let values = readings.filter {
+            $0.capturedAt >= now.addingTimeInterval(-Self.duration) && $0.capturedAt <= now
+        }.map(\.milliseconds)
+        guard let minimum = values.min(), let maximum = values.max() else { return nil }
+        return Statistics(minimum: minimum, maximum: maximum,
+                          average: values.reduce(0, +) / Double(values.count), count: values.count)
+    }
+
+    mutating func record(_ reading: HostLatencyReading?, at now: Date) {
+        readings.removeAll { $0.capturedAt < now.addingTimeInterval(-Self.duration) || $0.capturedAt > now }
+        missingReadings.removeAll { $0 < now.addingTimeInterval(-Self.duration) || $0 > now }
+        if reading == nil, let previous = readings.last,
+           now > previous.capturedAt,
+           !(missingReadings.last.map { $0 > previous.capturedAt } ?? false) {
+            missingReadings.append(now)
+            if missingReadings.count > 120 { missingReadings.removeFirst(missingReadings.count - 120) }
+        }
+        guard let reading,
+              reading.text(forHost: reading.hostID, address: reading.address, at: now,
+                           notBefore: now.addingTimeInterval(-Self.duration), maxAge: Self.duration) != nil,
+              readings.last.map({ reading.capturedAt > $0.capturedAt }) ?? true else { return }
+        readings.append(reading)
+        // Bound storage even if an upstream source publishes unusually fast.
+        if readings.count > 120 { readings.removeFirst(readings.count - 120) }
+    }
+
+    func segments(maxGap: TimeInterval) -> [[HostLatencyReading]] {
+        readings.reduce(into: []) { segments, reading in
+            if let previous = segments.last?.last,
+               reading.capturedAt.timeIntervalSince(previous.capturedAt) <= maxGap,
+               !missingReadings.contains(where: { $0 > previous.capturedAt && $0 <= reading.capturedAt }) {
+                segments[segments.count - 1].append(reading)
+            } else {
+                segments.append([reading])
+            }
+        }
+    }
+}
+
+/// Owns only the user-requested diagnostic. Stopping or replacing a test
+/// cancels its sampler and prevents any late result from entering a new test.
+@MainActor
+@Observable
+final class HostLatencyTest {
+    private(set) var isRunning = false
+    private(set) var hasRun = false
+    private(set) var completed = false
+    private(set) var attempts = 0
+    private(set) var history = HostLatencyHistory()
+    private(set) var latestReading: HostLatencyReading?
+    private(set) var sampledAt = Date.now
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var generation = 0
+    private let limit: Int
+    private let interval: Duration
+
+    init(limit: Int = 30, interval: Duration = .seconds(1)) {
+        self.limit = max(1, limit)
+        self.interval = interval
+    }
+
+    var latestDescription: String {
+        guard let reading = latestReading else { return isRunning && attempts == 0 ? "Testing…" : "Unavailable" }
+        return reading.text(forHost: reading.hostID, address: reading.address, at: sampledAt,
+                            notBefore: .distantPast, maxAge: HostLatencyHistory.duration) ?? "Unavailable"
+    }
+
+    func start(hostID: String, address: String, sample: @escaping @MainActor () async -> Double?) {
+        reset()
+        hasRun = true
+        isRunning = true
+        let run = generation
+        task = Task { [weak self] in
+            guard let self else { return }
+            for index in 0..<self.limit {
+                guard !Task.isCancelled, self.generation == run else { return }
+                let value = await sample()
+                guard !Task.isCancelled, self.generation == run else { return }
+                self.sampledAt = .now
+                self.attempts += 1
+                let reading = value.map {
+                    HostLatencyReading(hostID: hostID, address: address, milliseconds: $0, capturedAt: self.sampledAt)
+                }
+                self.latestReading = reading.flatMap {
+                    $0.text(forHost: hostID, address: address, at: self.sampledAt,
+                            notBefore: .distantPast, maxAge: HostLatencyHistory.duration) == nil ? nil : $0
+                }
+                self.history.record(self.latestReading, at: self.sampledAt)
+                if index + 1 < self.limit {
+                    do { try await Task.sleep(for: self.interval) } catch { return }
+                }
+            }
+            guard self.generation == run else { return }
+            self.isRunning = false
+            self.completed = true
+            self.task = nil
+        }
+    }
+
+    func stop() {
+        generation += 1
+        task?.cancel()
+        task = nil
+        isRunning = false
+        sampledAt = .now
+    }
+
+    func reset() {
+        stop()
+        hasRun = false
+        completed = false
+        attempts = 0
+        history = HostLatencyHistory()
+        latestReading = nil
     }
 }
 
 extension AppModel {
+
+    var macConnectionIsEthernet: Bool {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return false }
+        return hostRoute.physicalLink == .wired
+    }
+
+    var macConnectionSymbol: String? {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return nil }
+        return hostRoute.physicalLink.symbol
+    }
+
+    var macConnectionDescription: String {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address else { return "Checking…" }
+        return hostRoute.physicalLink.label
+    }
+
+    func currentLatencyReading(liveReading: HostLatencyReading?, at now: Date) -> HostLatencyReading? {
+        guard let host = selectedHost, let address = selectedHostRouteAddress else { return nil }
+        let reading: HostLatencyReading?
+        let maxAge: TimeInterval
+        if isStreaming {
+            reading = activeStreamHostID == host.id && streamPhase == .streaming ? liveReading : nil
+            maxAge = 3
+        } else if let status = hostLiveStatus, let ms = status.rttMs,
+                  let address = status.probedAddress, let probedAt = status.probedAt {
+            reading = HostLatencyReading(hostID: status.hostID, address: address,
+                                         milliseconds: Double(ms), capturedAt: probedAt)
+            maxAge = HostLiveStatus.stale
+        } else {
+            reading = nil
+            maxAge = 0
+        }
+        guard reading?.text(forHost: host.id, address: address, at: now,
+                            notBefore: hostRoute.changedAt, maxAge: maxAge) != nil else { return nil }
+        return reading
+    }
+
+    func latencyDescription(liveReading: HostLatencyReading?, at now: Date) -> String {
+        guard let reading = currentLatencyReading(liveReading: liveReading, at: now) else { return "Unavailable" }
+        return reading.text(forHost: reading.hostID, address: reading.address, at: now,
+                            notBefore: hostRoute.changedAt, maxAge: HostLiveStatus.stale) ?? "Unavailable"
+    }
 
     /// The destination `refreshHostRoute()` monitors for the current
     /// selection - the same fallback chain `nativeServerInfo(for:)` dials, so

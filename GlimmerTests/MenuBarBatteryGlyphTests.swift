@@ -92,3 +92,73 @@ struct MenuBarBatteryGlyphTests {
         #expect(shown == shown.sorted())
     }
 }
+
+struct MenuBarVisibilityTests {
+    @Test func hidingTheMenuBarAlwaysKeepsTheAppInTheDock() {
+        for mainOpen in [false, true] {
+            for streaming in [false, true] {
+                #expect(AppDelegate.activationPolicy(mainOpen: mainOpen, streaming: streaming,
+                                                     menuBarVisible: false) == .regular)
+            }
+        }
+    }
+
+    @Test func menuBarOnlyModeStillKeepsLiveStreamsAndWindowsInTheDock() {
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
+                                             menuBarVisible: true) == .accessory)
+        #expect(AppDelegate.activationPolicy(mainOpen: true, streaming: false,
+                                             menuBarVisible: true) == .regular)
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: true,
+                                             menuBarVisible: true) == .regular)
+    }
+
+    @Test func hidingTheMenuBarSurvivesRelaunch() throws {
+        let name = "shimmer-menu-bar-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(MenuBarPreferences.isVisible(in: defaults))
+        defaults.set(false, forKey: MenuBarPreferences.visibilityKey)
+        let reloaded = try #require(UserDefaults(suiteName: name))
+        #expect(!MenuBarPreferences.isVisible(in: reloaded))
+    }
+
+    @Test func idleHasNoStatusItemAndKeepsDockAccess() {
+        let idle = MenuBarPresentation(warning: false, battery: nil,
+                                       playStation: false, appGlyph: nil)
+        #expect(idle == nil)
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
+                                             menuBarVisible: idle != nil) == .regular)
+    }
+
+    @Test func steamStatusReturnsAndDisappearsWithoutAFallback() {
+        let steam = MenuBarPresentation(warning: false, battery: nil,
+                                        playStation: false, appGlyph: .asset("SteamGlyph"))
+        #expect(steam?.glyph == .asset("SteamGlyph"))
+        #expect(steam?.title == "")
+        #expect(steam?.assetHeight == 15)
+        #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
+                                             menuBarVisible: steam != nil) == .accessory)
+        let ended = MenuBarPresentation(warning: false, battery: nil,
+                                        playStation: false, appGlyph: nil)
+        #expect(ended == nil)
+    }
+
+    @Test func warningsStillTakePrecedenceOverControllerAndAppStatus() {
+        let warning = MenuBarPresentation(warning: true, battery: (75, false),
+                                          playStation: false, appGlyph: .asset("SteamGlyph"))
+        #expect(warning?.glyph == .symbol("exclamationmark.triangle.fill"))
+        #expect(warning?.title == "")
+    }
+
+    @Test func controllerStatusPreservesTheBatteryGlyphAndPercentage() {
+        let generic = MenuBarPresentation(warning: false, battery: (75, false),
+                                          playStation: false, appGlyph: .asset("SteamGlyph"))
+        #expect(generic?.glyph == .symbol("gamecontroller.fill"))
+        #expect(generic?.title == "75%")
+        let playStation = MenuBarPresentation(warning: false, battery: (75, true),
+                                              playStation: true, appGlyph: .asset("SteamGlyph"))
+        #expect(playStation?.glyph == .asset(MenuBarBatteryGlyph.assetName(forPercent: 75,
+                                                                          charging: true)))
+        #expect(playStation?.title == "")
+    }
+}

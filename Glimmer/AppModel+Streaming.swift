@@ -39,6 +39,7 @@ extension AppModel {
     func requestStream(app: LibraryApp, on host: Host) {
         guard !isStreaming else { stream(app: app, on: host); return }  // stream() logs + ignores
         if let live = hostLiveStatus, live.hostID == host.id,
+           live.state.hasSessionInformation,
            Date().timeIntervalSince(live.capturedAt) <= HostLiveStatus.stale {
             let occupant: String?
             switch live.state {
@@ -147,12 +148,8 @@ extension AppModel {
         ConnectTimingTelemetry.shared.anchorClick()
         Self.connectCapsuleShown = false
         Self.connectCancelRequested = false
-        // NB: the "last played" timestamp is intentionally NOT written here.
-        // It records when the stream ENDED, not when it started - writing it
-        // on start made the launcher's "last played N ago" label tick from
-        // the moment a (possibly still-live) session began. The write now
-        // lives in the single teardown cleanup site below, gated on
-        // `wasStreaming` so it only stamps real sessions.
+        activeStreamHostID = host.id
+        activeStreamHasVideo = false
         isStreaming = true
         // Park awdl0 for the life of the stream - but ONLY off a confirmed-wired
         // route. AWDL contention is a single-radio Wi-Fi problem; on Ethernet,
@@ -168,6 +165,7 @@ extension AppModel {
         // Sunshine's logs and our own latency story.
         hostStatusTask?.cancel()
         hostStatusTask = nil
+        hostLiveStatus = nil
 
         var cfg = nativeStreamConfig(for: host)
         cfg.windowTitle = Self.streamWindowTitle(hostName: host.displayName, appName: app.name)
@@ -328,6 +326,9 @@ extension AppModel {
         // banner in place lets it survive; a clean quit set it to nil up above
         // (line 273 at stream start) so nothing stale leaks through.
         let wasStreaming = self.isStreaming
+        self.recordStreamActivity(for: host.id)
+        self.activeStreamHostID = nil
+        self.activeStreamHasVideo = false
         self.streamPhase = .idle
         self.isStreaming = false
         // Restore awdl0 (AirDrop/Continuity) now the stream is down - covers the
@@ -363,19 +364,6 @@ extension AppModel {
                     + "5-minute stash threshold", "Stream")
             }
             self.streamEndedToastVisible = true
-            // Stamp "last played" with the stream-END time (now),
-            // not the start time. This is the value HostsStore reads
-            // back into `Host.lastConnected` for both the
-            // launcher's "last played N ago" label and most-recent-host
-            // ordering - writing it at end keeps this host most-recent
-            // while making the relative-time label read time-since-end.
-            // Always a past instant, so the relative-time label can
-            // never go stale/negative while the next stream is live.
-            // Shares the `wasStreaming` gate with the toast above: the
-            // connection-failure path stamps the attempt's end time too
-            // (matching the previous start-time write, which also fired
-            // on failures), and the label still reads correctly.
-            UserDefaults.standard.set(Date(), forKey: "glimmer.lastConnected.\(host.id)")
         }
         // Re-arm the readiness-chip poller so it goes back to
         // "Ready · 12 ms" instead of holding its last value from
@@ -473,6 +461,7 @@ extension AppModel {
             // Latched once inside the store - repeat edges are no-ops.
             SessionReceiptStore.markSessionLive()
         case .firstFrame:
+            markStreamVideo(for: host.id)
             promoteToStreamingOnFirstFrame()
         case .connectionTerminated(let code):
             streamPhase = .idle

@@ -79,6 +79,14 @@ shimmer is Swift/SwiftUI over a different model layer, so both were
 reimplemented — but the design is theirs, and the `/appasset` box-art request
 follows the same convention every Moonlight client uses. Thank you.
 
+## Server operating-system icons
+
+The sidebar uses Bazzite's official press-kit mark, ChimeraOS's official artwork,
+Apple's `apple.logo` SF Symbol, and Linux/Windows marks from Simple Icons.
+See [host icon sources and licenses](docs/assets/host-icons/README.md) for the
+individual artwork sources, attribution, and license notices. These marks
+identify the selected platform; their owners do not endorse Shimmer.
+
 ## MIT-licensed upstreams ported via moonlight-common-c
 
 Two of the components ported into the Swift engine originate from separately

@@ -437,6 +437,7 @@ public struct ServerInfo: Sendable {
     /// needs on the wire.
     public var serverCodecModeRaw: Int = 0
     public var currentGameID: Int = 0           // 0 = host is idle; otherwise the app ID that's streaming
+    public var reportsCurrentGame: Bool = false // Missing is unknown, not proof that the host is idle.
     /// Host's primary-NIC MAC from /serverinfo's `<mac>` (stock Moonlight uses
     /// the same field for WoL). Only learnable while the host is ONLINE; some
     /// Sunshine NIC configs report a zeroed MAC - consumers must treat

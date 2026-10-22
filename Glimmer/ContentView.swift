@@ -129,13 +129,10 @@ struct MainWindow: View {
             // beat toolbar-menu shortcuts or app-level .commands here.
             HostSwitchShortcuts()
         }
-        // Unpairing the LAST PC swaps ConnectSurface out for the empty state,
-        // which merely CANCELS its route-monitor task - cancellation never
-        // runs monitor(nil), leaving the parked UDP socket watching the
-        // forgotten host's route until quit. Key on emptiness; release it
-        // (selectedHost is nil here → monitor(address: nil), the teardown).
-        .task(id: model.hosts.isEmpty) {
-            if model.hosts.isEmpty { model.refreshHostRoute() }
+        // Follow selection and address fallback changes on every tab. Removing
+        // the last PC also passes nil here and releases the route monitor.
+        .task(id: model.selectedHostRouteAddress) {
+            model.refreshHostRoute()
         }
     }
 }
