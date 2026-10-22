@@ -4,7 +4,7 @@
 //  The "Pair a new PC" flow. Extracted from SettingsView (which was at its
 //  file-length limit) and given a discover-first UX: the sheet opens to a live
 //  mDNS list of PCs on the network (the Discovery actor, previously unwired),
-//  the user picks one (or falls back to a manual address), and pairing then
+//  the user picks one, and pairing then
 //  auto-starts so the displayed PIN is immediately enterable on the host.
 //
 //  Also hosts PINTiles + FloatingWindowLevel, both used only here.
@@ -207,17 +207,12 @@ struct PairSheet: View {
 
 // MARK: - Discover-first host chooser
 
-/// Live mDNS list of PCs on the network + a manual-address fallback. Picking a
-/// row (or submitting the manual field) hands the resolved address back via
-/// `selected`, which advances the sheet to the PIN step.
+/// Live mDNS list of PCs. Manual addresses are entered from the separate
+/// dropdown beside Add PC in the Servers sidebar.
 private struct HostChooser: View {
     let selected: (String) -> Void
     @State private var found: [HostDiscovery.Discovered] = []
-    @State private var manual: String = ""
-    @State private var showManual = false
-    /// Flips ~7s into an empty discovery (Bonjour can be blocked on locked-down
-    /// or guest networks). Swaps the spinner copy and auto-reveals the manual
-    /// field so the user isn't stranded on a permanent "Looking for PCs...".
+    /// Stop showing an indefinite spinner on Bonjour-hostile networks.
     @State private var discoveryStalled = false
 
     var body: some View {
@@ -234,9 +229,7 @@ private struct HostChooser: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Spinner only while still actively looking. The stalled nudge is
-            // hoisted out so it survives the auto-reveal of the manual field.
-            if found.isEmpty && !showManual && !discoveryStalled {
+            if found.isEmpty && !discoveryStalled {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
                     Text("Looking for PCs on your network…")
@@ -251,7 +244,7 @@ private struct HostChooser: View {
                     Image(systemName: "wifi.exclamationmark")
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.orange)
-                    Text("No PCs found yet - enter the address below.")
+                    Text("No PCs found yet. To enter an address, cancel and use the arrow beside Add PC.")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -284,32 +277,6 @@ private struct HostChooser: View {
                     }
                 }
             }
-
-            if showManual {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Hostname or IP")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        TextField("e.g. tower.local or 192.168.1.10", text: $manual)
-                            .textFieldStyle(.roundedBorder)
-                            .disableAutocorrection(true)
-                            .onSubmit { submitManual() }
-                        Button("Continue") { submitManual() }
-                            .buttonStyle(StreamButtonStyle())
-                            .disabled(manual.trimmingCharacters(in: .whitespaces).isEmpty)
-                    }
-                }
-            } else {
-                Button {
-                    showManual = true
-                } label: {
-                    Label("Enter an address manually", systemImage: "keyboard")
-                        .font(.callout)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-            }
         }
         .task {
             // Stream discovered hosts until the view goes away. HostDiscovery
@@ -321,21 +288,69 @@ private struct HostChooser: View {
             }
             await HostDiscovery.shared.stop()
         }
-        // Bonjour-hostile-network nudge: after ~7s with nothing found and the
-        // user not already in the manual field, surface the fallback path.
+        // Explain how to use the separate address entry if discovery stalls.
         .task {
             try? await Task.sleep(nanoseconds: 7_000_000_000)
-            if !Task.isCancelled, found.isEmpty, !showManual {
+            if !Task.isCancelled, found.isEmpty {
                 discoveryStalled = true
-                showManual = true
             }
         }
     }
+}
 
-    private func submitManual() {
-        let addr = manual.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !addr.isEmpty else { return }
-        selected(addr)
+// MARK: - Manual address popover
+
+struct ManualAddressPopover: View {
+    let cancel: () -> Void
+    let add: (String) -> Void
+    @State private var address = ""
+    @FocusState private var addressFocused: Bool
+
+    init(initialAddress: String = "", cancel: @escaping () -> Void,
+         add: @escaping (String) -> Void) {
+        self.cancel = cancel
+        self.add = add
+        _address = State(initialValue: initialAddress)
+    }
+
+    private var trimmedAddress: String {
+        address.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add PC Using an Address")
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+            Text("Enter the IP address or hostname of the PC you want to stream from.")
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("192.168.1.10 or pc.local", text: $address)
+                .textFieldStyle(.roundedBorder)
+                .disableAutocorrection(true)
+                .focused($addressFocused)
+                .onSubmit(submit)
+                .accessibilityLabel("PC IP address or hostname")
+            HStack {
+                Button("Cancel", action: cancel)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button(action: submit) {
+                    Text("Add PC…").frame(minWidth: 88)
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(trimmedAddress.isEmpty)
+            }
+        }
+        .font(.system(size: 13))
+        .padding(20)
+        .frame(width: 360)
+        .onAppear { addressFocused = true }
+    }
+
+    private func submit() {
+        guard !trimmedAddress.isEmpty else { return }
+        add(trimmedAddress)
     }
 }
 

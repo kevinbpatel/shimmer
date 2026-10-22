@@ -14,6 +14,7 @@ struct HostIconTests {
         #expect(HostIcon.suggested(for: "Linux Mint") == .mint)
         #expect(HostIcon.suggested(for: "windows-gaming") == .windows)
         #expect(HostIcon.suggested(for: "macos-studio") == .macOS)
+        #expect(HostIcon.suggested(for: "Mac") == .macOS)
         #expect(HostIcon.suggested(for: "archer") == .computer)
         #expect(HostIcon.suggested(for: "my-mint-green-pc") == .computer)
         #expect(HostIcon.suggested(for: "desktop.ubuntu.example") == .computer)

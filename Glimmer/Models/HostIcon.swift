@@ -101,7 +101,7 @@ enum HostIcon: String, CaseIterable, Identifiable {
         switch self {
         case .automatic, .computer: []
         case .windows: ["windows", "win10", "win11"]
-        case .macOS: ["macos", "osx"]
+        case .macOS: ["macos", "osx", "mac"]
         case .bazzite: ["bazzite"]
         case .steamOS: ["steamos", "steamdeck"]
         case .nobara: ["nobara"]

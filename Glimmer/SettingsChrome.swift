@@ -57,8 +57,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     /// asks for, even with `.fullSizeContentView`, so subtract it here.
     var windowHeight: CGFloat {
         switch self {
-        // Leave room for the optional latency test without clipping its chart.
-        case .computers: return 580 - 32
+        // Match Tailscale's Accounts window. The apps scroll independently
+        // while the latency panel stays anchored above the bottom bar.
+        case .computers: return 528 - 32
         // Stream carries eleven fields (two of them two rows tall); General
         // seven. Sized so neither page scrolls.
         case .stream: return 660 - 32
@@ -78,6 +79,7 @@ struct SettingsTabBar: View {
     /// stayed vivid blue on an inactive window, which is what made the two
     /// headers look so different side by side.
     @Environment(\.controlActiveState) private var activeState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 2) {
@@ -123,12 +125,14 @@ struct SettingsTabBar: View {
     private var isActive: Bool { activeState != .inactive }
 
     private func tint(for tab: SettingsTab) -> Color {
-        guard selection == tab else { return isActive ? .primary : .secondary }
+        guard selection == tab else { return .secondary }
         return isActive ? Color.accentColor : .secondary
     }
 
     private var plateFill: Color {
-        Color.primary.opacity(isActive ? 0.12 : 0.08)
+        colorScheme == .dark
+            ? Color.white.opacity(isActive ? 0.13 : 0.08)
+            : Color.white.opacity(isActive ? 0.94 : 0.65)
     }
 }
 

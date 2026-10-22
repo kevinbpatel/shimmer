@@ -19,6 +19,7 @@ import SwiftUI
 
 struct AppShell: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.controlActiveState) private var activeState
 
     var body: some View {
         @Bindable var model = model
@@ -29,12 +30,12 @@ struct AppShell: View {
             VStack(spacing: 0) {
                 Text("Shimmer")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(activeState == .inactive ? .secondary : .primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 30)
                 SettingsTabBar(selection: $model.settingsTab)
             }
-            .background(Color(nsColor: .underPageBackgroundColor))
+            .background(WindowHeaderMaterial())
             Divider()
             switch model.settingsTab {
             case .computers: ComputersTab()
@@ -53,6 +54,20 @@ struct AppShell: View {
                height: model.settingsTab.windowHeight,
                alignment: .top)
     }
+}
+
+/// Let AppKit choose the header's material for the current appearance and
+/// window focus, including the system's accessibility transparency settings.
+private struct WindowHeaderMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .titlebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 /// Every setting, on one scrolling page. Tailscale keeps one Settings tab

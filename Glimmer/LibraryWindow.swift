@@ -18,6 +18,9 @@ struct ComputersTab: View {
     @Environment(AppModel.self) private var model
 
     @State private var showPairSheet = false
+    @State private var pairingAddress = ""
+    @State private var showManualAddress = false
+    @State private var pendingManualAddress: String?
     @State private var showUnpairConfirm = false
     @State private var search = ""
     @State private var latencyTest = HostLatencyTest()
@@ -65,7 +68,7 @@ struct ComputersTab: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .sheet(isPresented: $showPairSheet) {
-            PairSheet(initialAddress: "")
+            PairSheet(initialAddress: pairingAddress)
                 .presentationBackground(.thinMaterial)
         }
         .onChange(of: latencyScope) { latencyTest.reset() }
@@ -103,11 +106,34 @@ struct ComputersTab: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
-            // A full-width button on a 39pt bar, like "Add Account…".
-            Button {
-                showPairSheet = true
-            } label: {
-                Text("Add PC…").frame(maxWidth: .infinity)
+            HStack(spacing: 6) {
+                Button {
+                    pairingAddress = ""
+                    showPairSheet = true
+                } label: {
+                    Text("Add PC…").frame(maxWidth: .infinity)
+                }
+                Button {
+                    showManualAddress.toggle()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .frame(width: 12)
+                }
+                .help("Add a PC using an IP address or hostname")
+                .accessibilityLabel("Add PC using an address")
+                .popover(isPresented: $showManualAddress, arrowEdge: .bottom) {
+                    ManualAddressPopover(cancel: { showManualAddress = false }) { address in
+                        pendingManualAddress = address
+                        showManualAddress = false
+                    }
+                    .onDisappear {
+                        // Present pairing only after the popover has closed.
+                        guard let address = pendingManualAddress else { return }
+                        pendingManualAddress = nil
+                        pairingAddress = address
+                        showPairSheet = true
+                    }
+                }
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 8)
@@ -121,7 +147,7 @@ struct ComputersTab: View {
         if let host = model.selectedHost {
             VStack(spacing: 0) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         // Apps lead: they are what the page is FOR. The PC's
                         // name is not repeated here - the row selected in the
                         // sidebar already says which machine this is.
@@ -196,9 +222,8 @@ struct ComputersTab: View {
                         }
 
                     }
-                    .padding(.top, 22)
+                    .padding(.top, 12)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: .infinity)
@@ -372,7 +397,7 @@ private struct NetworkHistoryGraph: View {
                 }
                 .chartLegend(.hidden)
                 .chartPlotStyle { plot in plot.clipped() }
-                .frame(height: 100)
+                .frame(height: 80)
                 .opacity(test.hasRun ? 1 : 0.4)
                 .overlay(alignment: .center) {
                     if !test.hasRun {
