@@ -69,7 +69,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 /// The centred icon-over-label tab strip. Tailscale draws the selected tab as
-/// a rounded tinted plate with an accent-coloured glyph and label, and the
+/// a rounded neutral plate with an accent-coloured glyph and label, and the
 /// rest monochrome - no underline, no segmented control.
 struct SettingsTabBar: View {
     @Binding var selection: SettingsTab
@@ -88,22 +88,21 @@ struct SettingsTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.symbol)
-                            .font(.system(size: 18, weight: .regular))
-                            .frame(height: 20)
+                            .font(.system(size: 20, weight: .regular))
+                            .frame(height: 22)
                         Text(tab.title)
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                     }
                     .foregroundStyle(tint(for: tab))
-                    // No minimum width: each tab is as wide as its own label
-                    // plus 7pt, which is what puts them 56-63pt apart like the
-                    // reference app instead of a uniform 78.
-                    .padding(.vertical, 4)
+                    // Keep content-sized tabs, using the reference's 20pt
+                    // symbols and 12pt labels rather than scaling the window.
+                    .padding(.vertical, 5)
                     .padding(.horizontal, 7)
                     .background {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(selection == tab ? plateFill : .clear)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
                                     .strokeBorder(selection == tab
                                                   ? Color.primary.opacity(0.13) : .clear,
                                                   lineWidth: 1))
@@ -129,7 +128,7 @@ struct SettingsTabBar: View {
     }
 
     private var plateFill: Color {
-        isActive ? Color.accentColor.opacity(0.10) : Color.primary.opacity(0.08)
+        Color.primary.opacity(isActive ? 0.12 : 0.08)
     }
 }
 
@@ -139,6 +138,10 @@ struct SettingsTabBar: View {
 /// lines up with the others as the user flips tabs - a per-pane width makes
 /// the labels visibly jump.
 enum SettingsMetrics {
+    /// At the reference screenshot's 2× scale, a 72px avatar sits in a
+    /// 96px account row. Keep server rows on that same 36 / 48pt rhythm.
+    static let sidebarIconSize: CGFloat = 36
+    static let sidebarRowHeight: CGFloat = 48
     /// Measured off Tailscale's own Settings window (600x588 points, captured
     /// and sampled pixel by pixel):
     ///   * gutter labels right-align at x=168, controls start at x=180 (gap 12)

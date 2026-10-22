@@ -89,7 +89,7 @@ struct ComputersTab: View {
             // row is a neutral grey plate. No section header either - its
             // account list has none and the tab is already called Computers.
             ScrollView {
-                VStack(spacing: 2) {
+                VStack(spacing: 0) {
                     ForEach(model.hosts) { host in
                         HostRow(host: host, selected: host.id == model.selectedHost?.id)
                             .contentShape(Rectangle())
@@ -98,7 +98,7 @@ struct ComputersTab: View {
                     }
                 }
                 .padding(.horizontal, 6)
-                .padding(.top, 6)
+                .padding(.top, 10)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -109,7 +109,7 @@ struct ComputersTab: View {
             } label: {
                 Text("Add PC…").frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .padding(.vertical, 8)
         }
     }
@@ -417,36 +417,35 @@ private struct EthernetPortGlyph: Shape {
 // MARK: - Sidebar row
 
 /// One PC: a round glyph, the name, and the address beneath -
-/// the shape of the reference app's account rows (41.5pt plate, 6pt inset).
+/// the shape of the reference app's account rows (48pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
     let selected: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(Color.accentColor.opacity(0.22))
-                .frame(width: 28, height: 28)
+                .frame(width: SettingsMetrics.sidebarIconSize,
+                       height: SettingsMetrics.sidebarIconSize)
                 .overlay(
                     Image(systemName: "display")
-                        .font(.system(size: 13, weight: .regular))
+                        .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(Color.accentColor))
             VStack(alignment: .leading, spacing: 0) {
                 Text(host.displayName)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                 Text(host.localAddress ?? host.manualAddress ?? host.name)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        // 41.5pt plate, 6pt inset, neutral grey when selected - measured off
-        // the reference app.
-        .frame(minHeight: 41.5)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .frame(minHeight: SettingsMetrics.sidebarRowHeight)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(selected ? Color.primary.opacity(0.13) : Color.clear))
