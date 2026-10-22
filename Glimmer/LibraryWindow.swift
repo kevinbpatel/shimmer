@@ -330,6 +330,25 @@ struct ComputersTab: View {
     }
 }
 
+/// A readable zero-based scale for the measurements currently in view. Keep
+/// clean tick values without imposing a 10 ms floor on fast connections.
+struct LatencyGraphScale {
+    let upperBound: Double
+    var ticks: [Double] { [0, upperBound / 2, upperBound] }
+
+    init(maximum: Double?) {
+        guard let maximum, maximum.isFinite, maximum >= 0,
+              maximum < Double(Int.max) else {
+            upperBound = 10
+            return
+        }
+        let value = max(1, maximum)
+        let magnitude = pow(10, floor(log10(value)))
+        let step = [1.0, 2, 5, 10].first { $0 * magnitude >= value } ?? 10
+        upperBound = max(value, step * magnitude)
+    }
+}
+
 /// An opt-in Tailscale-style diagnostic: a quiet result header, blue trace,
 /// and readable millisecond labels on the right. Completed results are frozen.
 private struct NetworkHistoryGraph: View {
@@ -341,8 +360,7 @@ private struct NetworkHistoryGraph: View {
 
     var body: some View {
         let now = test.sampledAt
-        let maximum = test.history.statistics(at: now)?.maximum ?? 0
-        let ceiling = max(10, ceil(maximum * 1.15 / 10) * 10)
+        let scale = LatencyGraphScale(maximum: test.history.statistics(at: now)?.maximum)
         let start = max(now.addingTimeInterval(-HostLatencyHistory.duration),
                         min(now.addingTimeInterval(-10), test.history.readings.first?.capturedAt ?? now))
         VStack(alignment: .leading, spacing: 7) {
@@ -389,15 +407,18 @@ private struct NetworkHistoryGraph: View {
                     }
                 }
                 .chartXScale(domain: start...now)
-                .chartYScale(domain: 0...ceiling)
+                .chartYScale(domain: 0...scale.upperBound,
+                             range: .plotDimension(startPadding: 8, endPadding: 8))
                 .chartXAxis(.hidden)
                 .chartYAxis {
-                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
-                        AxisValueLabel {
+                    AxisMarks(position: .trailing, values: scale.ticks) { value in
+                        AxisValueLabel(collisionResolution: .disabled, horizontalSpacing: 8) {
                             if let ms = value.as(Double.self) {
-                                Text("\(ms.formatted(.number.precision(.fractionLength(0))))ms")
+                                Text("\(ms.formatted(.number.precision(.fractionLength(0...1))))ms")
                                     .font(.system(size: 11))
+                                    .monospacedDigit()
                                     .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                                    .frame(minWidth: 36, alignment: .trailing)
                             }
                         }
                     }

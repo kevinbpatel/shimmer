@@ -3,6 +3,27 @@ import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func graphScaleAdaptsFromFastLANToSlowerConnections() {
+        for (maximum, upper) in [(0.4, 1.0), (1, 1), (1.2, 2), (4, 5),
+                                 (9, 10), (26, 50), (99, 100), (101, 200)] {
+            let scale = LatencyGraphScale(maximum: maximum)
+            #expect(scale.upperBound == upper)
+            #expect(scale.ticks == [0, upper / 2, upper])
+        }
+        #expect(LatencyGraphScale(maximum: 0.4).ticks == [0, 0.5, 1])
+    }
+
+    @Test func graphScaleHasAFinitePositiveRangeAndNeverClipsValidMeasurements() {
+        for maximum in [0.0, 0.001, 0.999, 1, 2.001, 5, 10.001, 9999, Double(Int.max).nextDown] {
+            let scale = LatencyGraphScale(maximum: maximum)
+            #expect(scale.upperBound.isFinite && scale.upperBound > 0)
+            #expect(scale.upperBound >= maximum)
+        }
+        for maximum in [nil, .nan, .infinity, -.infinity, -1, Double(Int.max)] as [Double?] {
+            #expect(LatencyGraphScale(maximum: maximum).upperBound == 10)
+        }
+    }
+
     @Test func failedReadingBreaksTheTraceEvenBetweenCloselySpacedSamples() {
         let now = Date(timeIntervalSince1970: 1000)
         var history = HostLatencyHistory()
