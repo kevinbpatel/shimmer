@@ -128,18 +128,31 @@ struct ComputersTab: View {
                         field("Apps") {
                             if host.apps.count > 8 { searchField.padding(.bottom, 2) }
                             ForEach(apps) { app in
+                                let canShowStream = model.isStreaming
+                                    && model.activeStreamHostID == host.id
+                                    && model.activeStreamApp?.id == app.id
+                                    && model.activeStreamHasVideo
                                 Button {
-                                    model.requestStream(app: app, on: host)
+                                    if canShowStream { model.resumeStreamWindow() }
+                                    else { model.requestStream(app: app, on: host) }
                                 } label: {
-                                    Label {
-                                        Text(app.name)
-                                    } icon: {
-                                        AppGlyphIcon(app: app)
+                                    HStack(spacing: 8) {
+                                        Label {
+                                            Text(app.name)
+                                        } icon: {
+                                            AppGlyphIcon(app: app)
+                                        }
+                                        Spacer(minLength: 0)
+                                        if canShowStream {
+                                            Image(systemName: "arrow.up.forward.app")
+                                                .accessibilityHidden(true)
+                                        }
                                     }
                                     .frame(minWidth: 150, alignment: .leading)
                                 }
-                                .disabled(model.isStreaming)
-                                .help(model.isStreaming
+                                .disabled(model.isStreaming && !canShowStream)
+                                .accessibilityLabel(canShowStream ? "Show \(app.name) stream" : "Stream \(app.name)")
+                                .help(canShowStream ? "Show \(app.name) stream" : model.isStreaming
                                       ? "Finish the current stream first" : "Stream \(app.name)")
                             }
                             if apps.isEmpty {
@@ -148,10 +161,6 @@ struct ComputersTab: View {
                             if model.isStreaming, model.activeStreamHostID == host.id,
                                case .connecting(let stage) = model.streamPhase {
                                 Text(stage).foregroundStyle(.secondary)
-                            }
-                            if model.isStreaming, model.activeStreamHostID == host.id,
-                               model.activeStreamHasVideo {
-                                Button("Show the stream") { model.resumeStreamWindow() }
                             }
                         }
 
