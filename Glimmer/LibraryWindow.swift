@@ -41,7 +41,7 @@ struct ComputersTab: View {
     }
 
     private var nearby: [HostDiscovery.Discovered] {
-        NearbyPCList.available(discovered)
+        NearbyPCList.available(discovered, saved: model.hosts)
     }
 
     private var apps: [LibraryApp] {
@@ -111,17 +111,16 @@ struct ComputersTab: View {
                         sidebarHeading("Nearby PCs")
                             .padding(.top, model.hosts.isEmpty ? 0 : 10)
                         ForEach(nearby) { pc in
-                            let saved = NearbyPCList.savedPC(for: pc, in: model.hosts)
                             Button {
                                 latencyTest.reset()
-                                pairingTarget = PCPairingTarget(name: pc.displayName, address: pc.host, isSaved: saved != nil)
+                                pairingTarget = PCPairingTarget(name: pc.displayName, address: pc.host)
                             } label: {
-                                NearbyPCRow(pc: pc, isSaved: saved != nil, selected: pairingTarget?.address == pc.host)
+                                NearbyPCRow(pc: pc, selected: pairingTarget?.address == pc.host)
                             }
                             .buttonStyle(.plain)
                             .disabled(model.pairingInFlight)
-                            .help(saved == nil ? "Pair with \(pc.displayName)" : "Pair again using \(pc.host)")
-                            .accessibilityLabel("\(pc.displayName), nearby PC, \(pc.host), \(saved == nil ? "pair PC" : "pair again")")
+                            .help("Pair with \(pc.displayName) to add this PC")
+                            .accessibilityLabel("\(pc.displayName), nearby PC, not added, \(pc.host)")
                         }
                     }
                 }
@@ -507,8 +506,8 @@ private struct EthernetPortGlyph: Shape {
     }
 }
 
-/// Discovery stays visible even for a saved PC, so the local pairing flow is
-/// always accessible. UUID/address matches only choose UI wording, never trust.
+/// Discovery is transient and untrusted. Match stable server IDs or exact
+/// saved addresses; a friendly name alone must never hide another user's PC.
 struct NearbyPCList {
     static func savedPC(at address: String, in saved: [Host]) -> Host? {
         let key = addressKey(address)
@@ -517,15 +516,9 @@ struct NearbyPCList {
         }
     }
 
-    static func savedPC(for pc: HostDiscovery.Discovered, in saved: [Host]) -> Host? {
-        if let id = pc.serverID,
-           let host = saved.first(where: { $0.id.caseInsensitiveCompare(id) == .orderedSame }) {
-            return host
-        }
-        return savedPC(at: pc.host, in: saved)
-    }
-
-    static func available(_ found: [HostDiscovery.Discovered]) -> [HostDiscovery.Discovered] {
+    static func available(_ found: [HostDiscovery.Discovered], saved: [Host]) -> [HostDiscovery.Discovered] {
+        let ids = Set(saved.map { $0.id.lowercased() })
+        let addresses = Set(saved.flatMap { [$0.localAddress, $0.manualAddress].compactMap { $0 }.map(addressKey) })
         var seenIDs = Set<String>()
         var seenAddresses = Set<String>()
         return found.sorted {
@@ -535,6 +528,8 @@ struct NearbyPCList {
             return $0.id < $1.id
         }.filter { pc in
             let address = addressKey(pc.host)
+            if let id = pc.serverID, ids.contains(id.lowercased()) { return false }
+            guard !addresses.contains(address) else { return false }
             let endpoint = "\(address):\(pc.port)"
             let duplicateAddress = !seenAddresses.insert(endpoint).inserted
             let duplicateID = pc.serverID.map { !seenIDs.insert($0.lowercased()).inserted } ?? false
@@ -559,7 +554,6 @@ struct NearbyPCList {
 
 private struct NearbyPCRow: View {
     let pc: HostDiscovery.Discovered
-    let isSaved: Bool
     let selected: Bool
     var body: some View {
         HStack(spacing: 8) {
@@ -572,8 +566,7 @@ private struct NearbyPCRow: View {
                 Text(pc.host).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Image(systemName: isSaved ? "arrow.clockwise" : "plus")
-                .font(.system(size: 10)).foregroundStyle(.secondary)
+            Image(systemName: "plus").font(.system(size: 10)).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)

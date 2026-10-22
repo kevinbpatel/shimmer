@@ -39,27 +39,26 @@ struct HostConnectionTests {
         #expect(AppModel.candidateAddresses(for: host) == ["192.168.1.9", "100.64.0.10"])
     }
 
-    @Test func savedPCsRemainDiscoverableAtTheirLocalAddress() {
+    @Test func nearbyPCsExcludeSavedIDsEvenAfterAnAddressChange() {
         let saved = savedPC(id: "KNOWN", address: "192.0.2.1")
         let moved = HostDiscovery.Discovered(id: "bonjour", displayName: "Renamed PC", host: "192.0.2.2", port: 47989, serverID: "known")
-        #expect(NearbyPCList.available([moved]) == [moved])
-        #expect(NearbyPCList.savedPC(for: moved, in: [saved]) == saved)
+        #expect(NearbyPCList.available([moved], saved: [saved]).isEmpty)
     }
 
     @Test func nearbyPCsMatchCanonicalAddressesAndDeduplicateAliases() {
+        let saved = savedPC(id: "saved", address: "2001:db8::1")
         let same = HostDiscovery.Discovered(id: "v6", displayName: "PC", host: "[2001:0DB8:0:0:0:0:0:1]", port: 47989)
         let one = HostDiscovery.Discovered(id: "one", displayName: "Gaming PC", host: "192.0.2.2", port: 47989, serverID: "new")
         let alias = HostDiscovery.Discovered(id: "alias", displayName: "Other service name", host: "192.0.2.3", port: 47989, serverID: "new")
-        #expect(NearbyPCList.available([same, one, alias]).count == 2)
+        #expect(NearbyPCList.available([same, one, alias], saved: [saved]).count == 1)
         let duplicates = [one, .init(id: "other-alias", displayName: "Another name", host: one.host, port: one.port)]
-        #expect(NearbyPCList.available(duplicates).count == 1)
+        #expect(NearbyPCList.available(duplicates, saved: []).count == 1)
     }
 
     @Test func aMatchingFriendlyNameDoesNotHideAnUnrelatedNearbyPC() {
         let saved = savedPC(id: "saved", address: "192.0.2.1")
         let other = HostDiscovery.Discovered(id: "new", displayName: saved.name, host: "192.0.2.2", port: 47989, serverID: "different")
-        #expect(NearbyPCList.available([other]) == [other])
-        #expect(NearbyPCList.savedPC(for: other, in: [saved]) == nil)
+        #expect(NearbyPCList.available([other], saved: [saved]) == [other])
     }
 
     private func savedPC(id: String, address: String) -> Glimmer.Host {
