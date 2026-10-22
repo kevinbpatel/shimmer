@@ -59,14 +59,8 @@ extension NetworkClient {
 
         try await ensureIdentityLoaded()
 
-        // IMPORTANT: GFE keys its per-session state on `uniqueid`. moonlight-qt
-        // intentionally hard-codes "0123456789ABCDEF" so any moonlight client
-        // can quit a game started by any other one (otherwise GFE wedges and
-        // requires manual intervention to recover). The host's own UUID lives
-        // on ServerInfo.uniqueId; that is NOT what goes on the wire here. We
-        // still load the IdentityManager-generated client uniqueid in
-        // ensureIdentityLoaded() because it's persisted for debugging /
-        // forward-compat, but it must not be sent.
+        // Sunshine keys its pending pairing session by uniqueid. A stable ID
+        // per install prevents two Macs from sharing and overwriting that state.
         let port = usePaired ? server.httpsPort : server.httpPort
 
         // Build the request-URI (path + query). URLComponents does the percent-
@@ -74,7 +68,7 @@ extension NetworkClient {
         var components = URLComponents()
         components.path = "/" + path
         var items: [URLQueryItem] = [
-            URLQueryItem(name: "uniqueid", value: Self.wireUniqueID),
+            URLQueryItem(name: "uniqueid", value: clientUniqueID ?? Self.wireUniqueID),
             URLQueryItem(name: "uuid", value: Self.requestNonce())
         ]
         for (key, value) in query.sorted(by: { $0.key < $1.key }) {
@@ -100,15 +94,16 @@ extension NetworkClient {
         // by DER; usePaired=false is the plain-HTTP unpaired probe. The UA matches
         // moonlight-qt so Sunshine's per-client feature gating (HDR etc.) doesn't
         // refuse us as an unknown client.
-        let resp = try await ControlTransport.get(
-            host: server.address, port: port, target: target,
-            userAgent: "Mozilla/5.0 (compatible; Moonlight/Shimmer)",
-            tls: usePaired,
-            credential: ControlTransport.TLSCredential(
+        let resp = try await transport(
+            server.address, port, target,
+            "Mozilla/5.0 (compatible; Moonlight/Shimmer)",
+            usePaired,
+            ControlTransport.TLSCredential(
                 clientCertPEM: usePaired ? clientCertPEM : nil,
                 clientKeyPEM: usePaired ? clientKeyPEM : nil,
                 pinnedCertPEM: usePaired ? server.serverCertPEM : nil),
-            timeout: timeout)
+            timeout)
+        try Task.checkCancellation()
 
         // GameStream puts protocol errors in the body XML with HTTP 200, so a
         // non-2xx is transport-level breakage (e.g. a 401 from a reverse proxy).
@@ -170,16 +165,17 @@ extension NetworkClient {
     public static let controlTimeout: TimeInterval = 5
     static let launchTimeout: TimeInterval = 20
     static let resumeTimeout: TimeInterval = 20
-    /// Pairing requests block on host-side state that's gated on a HUMAN typing
-    /// the PIN into the host's pairing page - so the snappy 5s control timeout
-    /// is far too short (the request fires the moment the code is shown, then
-    /// waits for the user to read + type it). Moonlight uses a similarly long
-    /// pairing window. 60s is comfortably human-scale.
+    /// Protocol rounds after code entry. PIN entry itself gets a human-scale window.
     static let pairTimeout: TimeInterval = 60
+    static let pinEntryTimeout: TimeInterval = 300
 
-    /// The literal `uniqueid` value sent on every request to the host. Must
-    /// match moonlight-qt exactly - see comment in `rawRequest`.
+    /// Anonymous discovery only; authenticated requests use the install identity.
     static let wireUniqueID = "0123456789ABCDEF"
+
+    static var pairingDeviceName: String {
+        let name = Foundation.Host.current().localizedName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Shimmer" : name
+    }
 
     /// Per-request nonce. GFE uses a Qt UUID's raw 16 bytes hex-encoded; we
     /// match that exactly so packet captures look the same. Backed by

@@ -105,11 +105,11 @@ extension NetworkClient {
 
     /// Authenticate a discovered route without HTTP fallback or changing the pin.
     /// The UUID must come from the authenticated response, never the input hint.
-    func verifiedServerID() async throws -> String? {
+    func verifiedServerID(timeout: TimeInterval = 3) async throws -> String? {
         guard server.serverCertPEM != nil else { return nil }
         try await ensureIdentityLoaded()
         let xml = try await rawRequest(path: "serverinfo", query: [:], extraQuery: nil,
-                                       usePaired: true, timeout: 3)
+                                       usePaired: true, timeout: timeout)
         try Self.verifyStatus(xml)
         return xml.string(forChild: "uniqueid")?.trimmingCharacters(in: .whitespacesAndNewlines)
     }

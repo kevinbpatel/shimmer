@@ -123,6 +123,7 @@ struct HostConnectionTests {
         let flow = PCPairingFlow()
         flow.start(pin: "1234", pair: { _ in .failed("Couldn't reach PC") }, completed: { _ in Issue.record("Unexpected success") })
         #expect(await eventually { flow.error != nil })
+        #expect(flow.pin == nil, "A failed attempt must not leave an expired PIN on screen")
         let gate = LatencySampleGate()
         flow.start(pin: "5678", pair: { pin in
             #expect(pin == "5678")

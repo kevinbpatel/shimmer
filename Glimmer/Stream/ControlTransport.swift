@@ -39,6 +39,8 @@ enum ControlTransport {
         let pinnedCertPEM: String?
     }
 
+    typealias Get = @Sendable (String, Int, String, String, Bool, TLSCredential, TimeInterval) async throws -> Response
+
     private static let log = Logger(subsystem: "io.ugfugl.Glimmer", category: "Stream.Network.TLS")
     private static let ioQueue = DispatchQueue(label: "io.ugfugl.Glimmer.control", attributes: .concurrent)
 

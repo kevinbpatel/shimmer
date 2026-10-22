@@ -100,8 +100,8 @@ enum HostIcon: String, CaseIterable, Identifiable {
     private var aliases: [String] {
         switch self {
         case .automatic, .computer: []
-        case .windows: ["windows", "win10", "win11"]
-        case .macOS: ["macos", "osx", "mac"]
+        case .windows: ["windows", "windows10", "windows11", "win10", "win11"]
+        case .macOS: ["macos", "osx", "mac", "macmini", "macbook", "macbookpro", "macbookair", "imac", "macstudio", "macpro"]
         case .bazzite: ["bazzite"]
         case .steamOS: ["steamos", "steamdeck"]
         case .nobara: ["nobara"]

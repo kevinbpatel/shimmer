@@ -4,7 +4,7 @@
 //  PIN-based pairing handshake with a GameStream host (GFE or Sunshine).
 //
 //  Ported from moonlight-qt's app/backend/nvpairingmanager.{cpp,h} (GPLv3; see
-//  CREDITS.md). The protocol is a five-round-trip dance over plain HTTP plus a
+//  CREDITS.md). The protocol uses four rounds over plain HTTP plus a
 //  final HTTPS liveness check; each round mixes AES-128-ECB symmetric crypto
 //  (keyed off the PIN the user types into the host UI) with RSA signatures over our
 //  long-lived client cert. If any step deviates by a single byte the host
@@ -38,31 +38,18 @@ public actor PairingClient {
 
     // MARK: Public API
 
-    /// Walk the full PIN handshake. On success the returned `ServerInfo` has
-    /// `pairStatus = .paired` and `serverCertPEM` populated with the host's
-    /// pinned certificate. On failure we always send `/unpair` to the host
-    /// before throwing - leaving a half-paired state on the host side trips
-    /// "Already pairing" errors on retry.
+    /// Complete the PIN/signature handshake. Sunshine has no /unpair endpoint;
+    /// cancelling closes the request and never sends an unsupported cleanup operation.
     public func pair(pin: String) async throws -> ServerInfo {
         try Task.checkCancellation()
         do {
             return try await runPairingFlow(pin: pin)
-        } catch {
-            // Best-effort cleanup. Swallow any error from unpair - we're
-            // already in the failure path and the original error is what
-            // the caller cares about.
-            // Cleanup must still run after the caller cancels the PIN wait.
-            await Task { await self.sendUnpair() }.value
-            throw error
+        } catch StreamError.hostUnreachable {
+            throw PairingAttemptFailure.disconnected
         }
     }
 
-    // MARK: - Pairing flow
-    //
-    // The flow has five HTTP rounds plus a final HTTPS challenge. Each round
-    // is a one-shot GET with all parameters in the query string; there's no
-    // session state on the host side beyond what we tell it on each call.
-
+    // Four plain-HTTP rounds followed by the pinned HTTPS challenge.
     private func runPairingFlow(pin: String) async throws -> ServerInfo {
 
         // Wrap the whole flow in an Instruments interval so a stuck pair
@@ -110,7 +97,8 @@ public actor PairingClient {
         // subsequent TLS verification until pairing finishes (or fails).
         // ---------------------------------------------------------------
         let salt = try Self.randomBytes(16)
-        let clientCertPEM = try await IdentityManager.shared.clientCertPEM()
+        let identity = try await network.identityMaterial()
+        let clientCertPEM = identity.certPEM
         let clientCertBytes = Data(clientCertPEM.utf8)
 
         let serverCertPEM = try await fetchServerCert(
@@ -241,8 +229,15 @@ public actor PairingClient {
 
         try await completeClientPairing(
             clientSecret: clientSecret,
+            clientKeyPEM: identity.keyPEM,
             signpostID: pairingSignpostID
         )
+
+        guard let verifiedID = try await network.verifiedServerID(timeout: NetworkClient.controlTimeout),
+              verifiedID.caseInsensitiveCompare(server.uniqueId) == .orderedSame else {
+            throw StreamError.pairingRejected
+        }
+        try Task.checkCancellation()
 
         // Success - persist into the ServerInfo we hand back.
         server.serverCertPEM = serverCertPEM
@@ -296,24 +291,30 @@ public actor PairingClient {
         clientCertBytes: Data,
         signpostID: OSSignpostID
     ) async throws -> String {
-        let getCertResp = try await pairRound(
-            stepLabel: "getservercert",
-            signpostID: signpostID,
-            query: [
-                "phrase": "getservercert",
-                "salt": salt.hex(),
-                "clientcert": clientCertBytes.hex()
-            ],
-            usePaired: false,
-            failureMessage: "getservercert: host did not return paired=1"
-        )
+        let deadline = Date().addingTimeInterval(NetworkClient.pinEntryTimeout)
+        let getCertResp: XMLNode
+        do {
+            getCertResp = try await pairRound(
+                stepLabel: "getservercert",
+                signpostID: signpostID,
+                query: [
+                    "phrase": "getservercert",
+                    "salt": salt.hex(),
+                    "clientcert": clientCertBytes.hex()
+                ],
+                usePaired: false,
+                timeout: NetworkClient.pinEntryTimeout,
+                failureMessage: "getservercert: host did not return paired=1"
+            )
+        } catch {
+            throw Self.pinEntryError(error, deadline: deadline)
+        }
         guard let plainCertHex = Self.xmlString(getCertResp, tag: "plaincert"),
               !plainCertHex.isEmpty,
               let serverCertBytes = Data(hex: plainCertHex) else {
             // Empty plaincert means the host is mid-pair with someone else.
-            // Mirror moonlight's behaviour - kick its state machine and bail.
-            throw StreamError.pairingFailed(
-                "getservercert: plaincert missing (host is likely already pairing with another client)")
+            // Keep this distinct from a wrong PIN or failed signature.
+            throw PairingAttemptFailure.busy
         }
 
         // The host's cert is PEM-encoded ASCII inside the hex blob.
@@ -321,6 +322,13 @@ public actor PairingClient {
             throw StreamError.pairingFailed("plaincert was not valid UTF-8 PEM")
         }
         return serverCertPEM
+    }
+
+    static func pinEntryError(_ error: Error, deadline: Date, now: Date = .now) -> Error {
+        guard !(error is CancellationError) else { return error }
+        if now.timeIntervalSince(deadline) > -1 { return PairingAttemptFailure.timedOut }
+        if case StreamError.hostUnreachable = error { return PairingAttemptFailure.disconnected }
+        return error
     }
 
     /// Decode + decrypt the host's step-3 challenge response, split out of
@@ -360,19 +368,20 @@ public actor PairingClient {
         signpostID: OSSignpostID,
         query: [String: String],
         usePaired: Bool,
+        timeout: TimeInterval = NetworkClient.pairTimeout,
         failureMessage: String
     ) async throws -> XMLNode {
         OSSignposter.pairing.emitEvent(
             "PairingStep",
             id: signpostID,
             "step=\(stepLabel)")
-        var fullQuery = ["devicename": "roth", "updateState": "1"]
+        var fullQuery = ["devicename": NetworkClient.pairingDeviceName, "updateState": "1"]
         for (key, value) in query { fullQuery[key] = value }
         let response = try await network.request(
             path: "pair",
             query: fullQuery,
             usePaired: usePaired,
-            timeout: NetworkClient.pairTimeout
+            timeout: timeout
         )
         try Self.verifyResponseStatus(response)
         guard Self.xmlString(response, tag: "paired") == "1" else {
@@ -391,9 +400,9 @@ public actor PairingClient {
     /// fully added on the host side. Both rounds throw on a non-`paired=1` reply.
     private func completeClientPairing(
         clientSecret: Data,
+        clientKeyPEM: String,
         signpostID: OSSignpostID
     ) async throws {
-        let clientKeyPEM = try await IdentityManager.shared.clientKeyPEM()
         let signedClientSecret = try Self.signMessage(
             Data(clientSecret),
             privateKeyPEM: clientKeyPEM
@@ -552,20 +561,6 @@ public actor PairingClient {
                 \(String(describing: error), privacy: .public)
                 """
             )
-        }
-    }
-
-    // MARK: - Unpair (failure cleanup)
-
-    private func sendUnpair() async {
-        do {
-            _ = try await network.request(
-                path: "unpair",
-                query: [:],
-                usePaired: false
-            )
-        } catch {
-            log.warning("unpair call failed: \(String(describing: error), privacy: .public)")
         }
     }
 

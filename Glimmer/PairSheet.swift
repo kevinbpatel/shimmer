@@ -44,7 +44,9 @@ final class PCPairingFlow {
             }
             switch result {
             case .paired(let id): completed(id)
-            case .failed(let message): error = message
+            case .failed(let message):
+                self.pin = nil
+                error = message
             }
         }
     }
@@ -81,7 +83,19 @@ struct PCPairingPane: View {
                     Text(target.address).font(.system(size: 12)).foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                if let pin = flow.pin {
+                if let error = flow.error {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("Cancel") { flow.reset() }
+                            .keyboardShortcut(.cancelAction)
+                        Spacer()
+                        Button("Try Again", action: begin)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.pairingInFlight)
+                    }
+                } else if let pin = flow.pin {
                     Text("Enter this code in the pairing prompt on your PC.")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -92,11 +106,7 @@ struct PCPairingPane: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-                    if let error = flow.error {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else if flow.isRunning {
+                    if flow.isRunning {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
                             Text(flow.isCancelling ? "Cancelling…" : "Waiting for your PC…")
@@ -108,11 +118,6 @@ struct PCPairingPane: View {
                             .keyboardShortcut(.cancelAction)
                             .disabled(flow.isCancelling)
                         Spacer()
-                        if flow.error != nil {
-                            Button("Try Again", action: begin)
-                                .buttonStyle(.borderedProminent)
-                                .disabled(model.pairingInFlight)
-                        }
                     }
                 } else {
                     Text("Pair this PC to add it to your saved PCs and stream its apps.")

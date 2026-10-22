@@ -172,6 +172,10 @@ extension AppModel {
             pairingPhase = .success("Paired with \(hostnameOrIP) ✓")
             Diag.notice("Pairing succeeded", "Pairing")
             return paired.uniqueId
+        } catch let failure as PairingAttemptFailure {
+            if Task.isCancelled { pairingPhase = .idle; return nil }
+            pairingPhase = .failure(failure.message)
+            Diag.error("Pairing did not complete", "Pairing")
         } catch let err as StreamError {
             if Task.isCancelled { pairingPhase = .idle; return nil }
             // SECURITY (#10): the externally-visible message is uniform -

@@ -25,6 +25,16 @@ struct HostIconTests {
         #expect(HostIcon.suggested(for: "pop-osx-pc") == .macOS)
     }
 
+    @Test func advertisedAppleAndWindowsNamesSuggestTheirSystemIcons() {
+        for name in ["Kevin’s Mac mini", "Kevins-MacBook-Pro", "MacBookAir", "iMac", "MacStudio"] {
+            #expect(HostIcon.suggested(for: name) == .macOS)
+        }
+        #expect(HostIcon.suggested(for: "Windows11-Gaming") == .windows)
+        #expect(HostIcon.suggested(for: "Windows10") == .windows)
+        #expect(HostIcon.suggested(for: "macaroni") == .computer)
+        #expect(HostIcon.suggested(for: "windowseat") == .computer)
+    }
+
     @Test func explicitChoiceOverridesNamesAndAutomaticUsesTheOriginalServerName() {
         #expect(HostIcon.windows.resolved(serverName: "bazzite") == .windows)
         #expect(HostIcon.computer.resolved(serverName: "bazzite") == .computer)

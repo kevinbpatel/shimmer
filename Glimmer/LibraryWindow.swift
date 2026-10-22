@@ -557,16 +557,15 @@ private struct NearbyPCRow: View {
     let selected: Bool
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "desktopcomputer")
-                .font(.system(size: 20))
+            HostSystemGlyph(icon: HostIcon.suggested(for: pc.displayName))
                 .foregroundStyle(.secondary)
                 .frame(width: SettingsMetrics.sidebarIconSize, height: SettingsMetrics.sidebarIconSize)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(pc.displayName).font(.system(size: 13)).lineLimit(1)
                 Text(pc.host).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Image(systemName: "plus").font(.system(size: 10)).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
@@ -630,20 +629,30 @@ struct HostIdentityIcon: View {
             .fill(icon == .computer ? Color.accentColor.opacity(0.22) : colour)
             .frame(width: SettingsMetrics.sidebarIconSize, height: SettingsMetrics.sidebarIconSize)
             .overlay {
-                if let asset = icon.assetName {
-                    Image(asset)
-                        .renderingMode(icon == .chimeraOS ? .original : .template)
-                        .resizable().scaledToFit()
-                        .foregroundStyle(icon == .linux ? Color.black : .white)
-                        .frame(width: 25, height: 25)
-                } else {
-                    Image(systemName: icon == .macOS ? "apple.logo" : "display")
-                        .font(.system(size: icon == .macOS ? 23 : 18))
-                        .foregroundStyle(icon == .computer ? Color.accentColor : .white)
-                }
+                HostSystemGlyph(icon: icon)
+                    .foregroundStyle(icon == .computer ? Color.accentColor : icon == .linux ? .black : .white)
             }
             .help(icon == .computer ? "Server icon · Right-click to choose" : "\(icon.title) icon · Right-click to change")
             .accessibilityLabel(icon == .computer ? "Server" : "\(icon.title) server icon")
+    }
+}
+
+/// Shared OS/distro artwork for paired hosts and transient Bonjour rows.
+/// The caller supplies the foreground style and surrounding presentation.
+private struct HostSystemGlyph: View {
+    let icon: HostIcon
+
+    var body: some View {
+        if let asset = icon.assetName {
+            Image(asset)
+                .renderingMode(icon == .chimeraOS ? .original : .template)
+                .resizable().scaledToFit()
+                .frame(width: 25, height: 25)
+        } else {
+            Image(systemName: icon == .macOS ? "apple.logo" : "desktopcomputer")
+                .font(.system(size: icon == .macOS ? 23 : 18))
+                .frame(width: 25, height: 25)
+        }
     }
 }
 
