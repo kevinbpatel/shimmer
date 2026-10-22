@@ -132,28 +132,33 @@ struct ComputersTab: View {
                                     && model.activeStreamHostID == host.id
                                     && model.activeStreamApp?.id == app.id
                                     && model.activeStreamHasVideo
-                                Button {
-                                    if canShowStream { model.resumeStreamWindow() }
-                                    else { model.requestStream(app: app, on: host) }
-                                } label: {
-                                    HStack(spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Button {
+                                        model.requestStream(app: app, on: host)
+                                    } label: {
                                         Label {
                                             Text(app.name)
                                         } icon: {
                                             AppGlyphIcon(app: app)
                                         }
-                                        Spacer(minLength: 0)
-                                        if canShowStream {
-                                            Image(systemName: "arrow.up.forward.app")
-                                                .accessibilityHidden(true)
-                                        }
+                                        .frame(minWidth: 150, alignment: .leading)
                                     }
-                                    .frame(minWidth: 150, alignment: .leading)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .disabled(model.isStreaming)
+                                    .help(model.isStreaming
+                                          ? "Finish the current stream first" : "Stream \(app.name)")
+
+                                    if canShowStream {
+                                        Button {
+                                            model.resumeStreamWindow()
+                                        } label: {
+                                            Label("Show stream", systemImage: "arrow.up.forward.app.fill")
+                                                .labelStyle(.iconOnly)
+                                        }
+                                        .help("Show \(app.name) stream")
+                                        .accessibilityLabel("Show \(app.name) stream")
+                                    }
                                 }
-                                .disabled(model.isStreaming && !canShowStream)
-                                .accessibilityLabel(canShowStream ? "Show \(app.name) stream" : "Stream \(app.name)")
-                                .help(canShowStream ? "Show \(app.name) stream" : model.isStreaming
-                                      ? "Finish the current stream first" : "Stream \(app.name)")
                             }
                             if apps.isEmpty {
                                 Text("No apps to show.").foregroundStyle(.secondary)
@@ -185,32 +190,16 @@ struct ComputersTab: View {
                                 .help("The physical interface macOS reports for this Mac’s route to the server, including underneath a VPN. This does not describe the host PC’s interface. Multiple links means macOS reports more than one eligible physical interface.")
                         }
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Latency").font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                if latencyTest.hasRun {
-                                    Button(latencyTest.isRunning ? "Stop" : "Test latency") {
-                                        if latencyTest.isRunning { latencyTest.stop() }
-                                        else { startLatencyTest() }
-                                    }
-                                    .buttonStyle(.link)
-                                    .disabled(model.isStreaming && model.activeStreamHostID != host.id)
-                                }
-                            }
-                            NetworkHistoryGraph(test: latencyTest, streaming: model.isStreaming,
-                                                canStart: !model.isStreaming || model.activeStreamHostID == host.id,
-                                                startTest: startLatencyTest)
-                        }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 18)
                     }
                     .padding(.top, 22)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxHeight: .infinity)
+
+                latencySection(for: host)
+                    .padding(16)
 
                 Divider()
                 HStack {
@@ -228,6 +217,28 @@ struct ComputersTab: View {
                                    systemImage: "display",
                                    description: Text("Pick one on the left to see its apps."))
         }
+    }
+
+    private func latencySection(for host: Host) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Latency").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if latencyTest.hasRun {
+                    Button(latencyTest.isRunning ? "Stop" : "Test latency") {
+                        if latencyTest.isRunning { latencyTest.stop() }
+                        else { startLatencyTest() }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(model.isStreaming && model.activeStreamHostID != host.id)
+                }
+            }
+            NetworkHistoryGraph(test: latencyTest, streaming: model.isStreaming,
+                                canStart: !model.isStreaming || model.activeStreamHostID == host.id,
+                                startTest: startLatencyTest)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func startLatencyTest() {
