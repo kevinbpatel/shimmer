@@ -289,8 +289,7 @@ extension AppModel {
         let prefix = "hosts.\(saveSlot(for: uuid, defaults: defaults))"
         defaults.set(hostname, forKey: "\(prefix).hostname")
         defaults.set(uuid, forKey: "\(prefix).uuid")
-        defaults.set(address, forKey: "\(prefix).localaddress")
-        defaults.set(address, forKey: "\(prefix).manualaddress")
+        Self.persistPairedAddresses(address: address, prefix: prefix, defaults: defaults)
         if let pem = serverCertPEM { defaults.set(pem, forKey: "\(prefix).srvcert") }
         if let appVersion { defaults.set(appVersion, forKey: "\(prefix).appversion") }
         if let gfeVersion { defaults.set(gfeVersion, forKey: "\(prefix).gfeversion") }
@@ -311,6 +310,14 @@ extension AppModel {
         if let pem = serverCertPEM { try? PinnedCertStore.store(pem: pem, forHostID: uuid) }
 
         loadHosts()
+    }
+
+    /// Re-pairing the same UUID locally must retain its remote/manual fallback.
+    static func persistPairedAddresses(address: String, prefix: String, defaults: UserDefaults) {
+        defaults.set(address, forKey: "\(prefix).localaddress")
+        if defaults.string(forKey: "\(prefix).manualaddress")?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            defaults.set(address, forKey: "\(prefix).manualaddress")
+        }
     }
 
     /// Resolve the `hosts.N` slot `saveHost` should write into: the slot that

@@ -39,26 +39,27 @@ struct HostConnectionTests {
         #expect(AppModel.candidateAddresses(for: host) == ["192.168.1.9", "100.64.0.10"])
     }
 
-    @Test func nearbyPCsExcludeSavedIDsEvenAfterAnAddressChange() {
+    @Test func savedPCsRemainDiscoverableAtTheirLocalAddress() {
         let saved = savedPC(id: "KNOWN", address: "192.0.2.1")
         let moved = HostDiscovery.Discovered(id: "bonjour", displayName: "Renamed PC", host: "192.0.2.2", port: 47989, serverID: "known")
-        #expect(NearbyPCList.available([moved], saved: [saved]).isEmpty)
+        #expect(NearbyPCList.available([moved]) == [moved])
+        #expect(NearbyPCList.savedPC(for: moved, in: [saved]) == saved)
     }
 
     @Test func nearbyPCsMatchCanonicalAddressesAndDeduplicateAliases() {
-        let saved = savedPC(id: "saved", address: "2001:db8::1")
         let same = HostDiscovery.Discovered(id: "v6", displayName: "PC", host: "[2001:0DB8:0:0:0:0:0:1]", port: 47989)
         let one = HostDiscovery.Discovered(id: "one", displayName: "Gaming PC", host: "192.0.2.2", port: 47989, serverID: "new")
         let alias = HostDiscovery.Discovered(id: "alias", displayName: "Other service name", host: "192.0.2.3", port: 47989, serverID: "new")
-        #expect(NearbyPCList.available([same, one, alias], saved: [saved]).count == 1)
+        #expect(NearbyPCList.available([same, one, alias]).count == 2)
         let duplicates = [one, .init(id: "other-alias", displayName: "Another name", host: one.host, port: one.port)]
-        #expect(NearbyPCList.available(duplicates, saved: []).count == 1)
+        #expect(NearbyPCList.available(duplicates).count == 1)
     }
 
     @Test func aMatchingFriendlyNameDoesNotHideAnUnrelatedNearbyPC() {
         let saved = savedPC(id: "saved", address: "192.0.2.1")
         let other = HostDiscovery.Discovered(id: "new", displayName: saved.name, host: "192.0.2.2", port: 47989, serverID: "different")
-        #expect(NearbyPCList.available([other], saved: [saved]) == [other])
+        #expect(NearbyPCList.available([other]) == [other])
+        #expect(NearbyPCList.savedPC(for: other, in: [saved]) == nil)
     }
 
     private func savedPC(id: String, address: String) -> Glimmer.Host {
@@ -70,6 +71,20 @@ struct HostConnectionTests {
         let host = savedPC(id: "saved", address: "GAMING.local.")
         #expect(NearbyPCList.savedPC(at: "gaming.local", in: [host])?.id == "saved")
         #expect(NearbyPCList.savedPC(at: "other.local", in: [host]) == nil)
+    }
+
+    @Test @MainActor func localPairingRetainsRemoteFallbackAndUpdatesExistingAddress() throws {
+        let suite = "Shimmer.PairingAddressTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("100.64.0.10", forKey: "hosts.1.manualaddress")
+        defaults.set("192.168.1.2", forKey: "hosts.1.localaddress")
+        AppModel.persistPairedAddresses(address: "192.168.1.9", prefix: "hosts.1", defaults: defaults)
+        #expect(defaults.string(forKey: "hosts.1.localaddress") == "192.168.1.9")
+        #expect(defaults.string(forKey: "hosts.1.manualaddress") == "100.64.0.10")
+        AppModel.persistPairedAddresses(address: "192.168.1.3", prefix: "hosts.2", defaults: defaults)
+        #expect(defaults.string(forKey: "hosts.2.localaddress") == "192.168.1.3")
+        #expect(defaults.string(forKey: "hosts.2.manualaddress") == "192.168.1.3")
     }
 
     @Test @MainActor func cancellingInlinePairingRejectsALateSuccess() async {

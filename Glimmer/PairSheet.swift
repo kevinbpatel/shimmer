@@ -8,6 +8,7 @@ struct PCPairingTarget: Identifiable, Equatable {
     let name: String
     let address: String
     var startImmediately = false
+    var isSaved = false
 }
 
 /// Owns one attempt. A cancelled or replaced attempt cannot select a saved
@@ -115,10 +116,12 @@ struct PCPairingPane: View {
                         }
                     }
                 } else {
-                    Text("Pair this PC to add it to your saved PCs and stream its apps.")
+                    Text(target.isSaved
+                         ? "This PC is already saved. Pair again using its local address to get a new pairing code."
+                         : "Pair this PC to add it and stream its apps.")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button("Pair PC", action: begin)
+                    Button(target.isSaved ? "Pair Again…" : "Pair PC", action: begin)
                         .buttonStyle(.borderedProminent)
                         .disabled(model.pairingInFlight)
                 }
