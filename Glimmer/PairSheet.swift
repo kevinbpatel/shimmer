@@ -330,16 +330,17 @@ struct ManualAddressPopover: View {
                 .focused($addressFocused)
                 .onSubmit(submit)
                 .accessibilityLabel("PC IP address or hostname")
-            HStack {
+            HStack(spacing: 24) {
                 Button("Cancel", action: cancel)
                     .keyboardShortcut(.cancelAction)
-                Spacer()
+                    .frame(maxWidth: .infinity)
                 Button(action: submit) {
                     Text("Add PC…").frame(minWidth: 88)
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(trimmedAddress.isEmpty)
+                .frame(maxWidth: .infinity)
             }
         }
         .font(.system(size: 13))
