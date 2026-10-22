@@ -13,6 +13,7 @@
 
 import Foundation
 import os.log
+import Darwin
 
 enum ControlTransport {
 
@@ -49,37 +50,75 @@ enum ControlTransport {
                     tls: Bool,
                     credential: TLSCredential,
                     timeout: TimeInterval) async throws -> Response {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Response, Error>) in
-            ioQueue.async {
-                // OPENSSL PER-THREAD STATE RELEASE (the 2026-08-21 crash).
-                // `ioQueue` is a concurrent dispatch queue, so this block runs on
-                // POOLED GCD worker threads that the system retires when idle.
-                // libcrypto plants thread-local state (ERR stacks, the 3.x
-                // "master key" sparse array) on whatever thread runs a TLS
-                // handshake, and reclaims it in a pthread TSD DESTRUCTOR at
-                // thread exit. A 3-day process accumulated that state across
-                // dozens of workers; when GCD retired one ~15min after a wake,
-                // the destructor walked a days-old sparse array and crashed on
-                // freed memory (sa_doall → ossl_sa_free → clean_master_key,
-                // SIGSEGV at a 0x8080... poison address). OPENSSL_thread_stop is
-                // the API the OpenSSL docs REQUIRE of threads the library didn't
-                // create: it releases the per-thread state deterministically,
-                // HERE, microseconds after it was planted and while it is
-                // certainly valid - so thread retirement finds nothing to
-                // reclaim. Cost: per-call state re-creation, trivial next to the
-                // TLS handshake this block just performed. (The RTP/control
-                // paths run on OWNED long-lived threads and the audio decrypt
-                // path is plaintext for our hosts, so this transport is the one
-                // pooled-thread OpenSSL user; the Swift-concurrency cooperative
-                // pool's threads persist for the process lifetime.)
-                defer { OPENSSL_thread_stop() }
-                do {
-                    cont.resume(returning: try performBlocking(
-                        host: host, port: port, target: target, userAgent: userAgent,
-                        tls: tls, credential: credential, timeout: timeout))
-                } catch {
-                    cont.resume(throwing: error)
+        let cancellation = SocketCancellation()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            let response = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Response, Error>) in
+                ioQueue.async {
+                    // OPENSSL PER-THREAD STATE RELEASE (the 2026-08-21 crash).
+                    // `ioQueue` is a concurrent dispatch queue, so this block runs on
+                    // POOLED GCD worker threads that the system retires when idle.
+                    // libcrypto plants thread-local state (ERR stacks, the 3.x
+                    // "master key" sparse array) on whatever thread runs a TLS
+                    // handshake, and reclaims it in a pthread TSD DESTRUCTOR at
+                    // thread exit. A 3-day process accumulated that state across
+                    // dozens of workers; when GCD retired one ~15min after a wake,
+                    // the destructor walked a days-old sparse array and crashed on
+                    // freed memory (sa_doall → ossl_sa_free → clean_master_key,
+                    // SIGSEGV at a 0x8080... poison address). OPENSSL_thread_stop is
+                    // the API the OpenSSL docs REQUIRE of threads the library didn't
+                    // create: it releases the per-thread state deterministically,
+                    // HERE, microseconds after it was planted and while it is
+                    // certainly valid - so thread retirement finds nothing to
+                    // reclaim. Cost: per-call state re-creation, trivial next to the
+                    // TLS handshake this block just performed. (The RTP/control
+                    // paths run on OWNED long-lived threads and the audio decrypt
+                    // path is plaintext for our hosts, so this transport is the one
+                    // pooled-thread OpenSSL user; the Swift-concurrency cooperative
+                    // pool's threads persist for the process lifetime.)
+                    defer { OPENSSL_thread_stop() }
+                    do {
+                        let response = try performBlocking(
+                            host: host, port: port, target: target, userAgent: userAgent,
+                            tls: tls, credential: credential, timeout: timeout,
+                            cancellation: cancellation)
+                        if cancellation.isCancelled { throw CancellationError() }
+                        cont.resume(returning: response)
+                    } catch {
+                        cont.resume(throwing: cancellation.isCancelled ? CancellationError() : error)
+                    }
                 }
+            }
+            try Task.checkCancellation()
+            return response
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+
+    /// Interrupt a pending PIN response without closing a descriptor while a
+    /// worker still owns it. Locking shutdown and release prevents fd reuse races.
+    private final class SocketCancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cancelled = false
+        private var socket: Int32?
+
+        var isCancelled: Bool { lock.withLock { cancelled } }
+
+        func attach(_ fd: Int32) -> Bool {
+            lock.withLock {
+                guard !cancelled else { return false }
+                socket = fd
+                return true
+            }
+        }
+
+        func release() { lock.withLock { socket = nil } }
+
+        func cancel() {
+            lock.withLock {
+                cancelled = true
+                if let socket { _ = Darwin.shutdown(socket, SHUT_RDWR) }
             }
         }
     }
@@ -90,13 +129,23 @@ enum ControlTransport {
                                         userAgent: String,
                                         tls: Bool,
                                         credential: TLSCredential,
-                                        timeout: TimeInterval) throws -> Response {
+                                        timeout: TimeInterval,
+                                        cancellation: SocketCancellation) throws -> Response {
+        if cancellation.isCancelled { throw CancellationError() }
         let timeoutMs = Int32(max(1, timeout) * 1000)
         let fd = gl_tcp_connect(host, String(port), timeoutMs)
         guard fd >= 0 else {
             throw StreamError.hostUnreachable("connect to \(host):\(port) failed or timed out")
         }
-        defer { close(fd) }
+        defer {
+            cancellation.release()
+            close(fd)
+        }
+        // A cancelled TLS/read request may still be inside a socket write.
+        // Report EPIPE to the worker instead of terminating the app with SIGPIPE.
+        var noSignal: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
+        guard cancellation.attach(fd) else { throw CancellationError() }
 
         // Build the request bytes once - same for the TLS and plaintext paths.
         var request = "GET \(target) HTTP/1.1\r\n"

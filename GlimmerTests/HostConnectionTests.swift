@@ -1,8 +1,120 @@
 import Foundation
+import Network
 import Testing
 @testable import Glimmer
 
 struct HostConnectionTests {
+    @Test func discoveryKeepsServicesAdvertisedUnderEitherAlias() {
+        var services = DiscoveryServiceSet()
+        #expect(services.update(["pc"], for: "gfe") == ["pc"])
+        #expect(services.update([], for: "sunshine") == ["pc"])
+        #expect(services.update(["pc", "other"], for: "sunshine") == ["pc", "other"])
+        #expect(services.update([], for: "gfe") == ["pc", "other"])
+        #expect(services.update([], for: "sunshine").isEmpty)
+    }
+
+    @Test func nearbyPCsExcludeSavedIDsEvenAfterAnAddressChange() {
+        let saved = savedPC(id: "KNOWN", address: "192.0.2.1")
+        let moved = HostDiscovery.Discovered(id: "bonjour", displayName: "Renamed PC", host: "192.0.2.2", port: 47989, serverID: "known")
+        #expect(NearbyPCList.available([moved], saved: [saved]).isEmpty)
+    }
+
+    @Test func nearbyPCsMatchCanonicalAddressesAndDeduplicateAliases() {
+        let saved = savedPC(id: "saved", address: "2001:db8::1")
+        let same = HostDiscovery.Discovered(id: "v6", displayName: "PC", host: "[2001:0DB8:0:0:0:0:0:1]", port: 47989)
+        let one = HostDiscovery.Discovered(id: "one", displayName: "Gaming PC", host: "192.0.2.2", port: 47989, serverID: "new")
+        let alias = HostDiscovery.Discovered(id: "alias", displayName: "Other service name", host: "192.0.2.3", port: 47989, serverID: "new")
+        #expect(NearbyPCList.available([same, one, alias], saved: [saved]).count == 1)
+        let duplicates = [one, .init(id: "other-alias", displayName: "Another name", host: one.host, port: one.port)]
+        #expect(NearbyPCList.available(duplicates, saved: []).count == 1)
+    }
+
+    @Test func aMatchingFriendlyNameDoesNotHideAnUnrelatedNearbyPC() {
+        let saved = savedPC(id: "saved", address: "192.0.2.1")
+        let other = HostDiscovery.Discovered(id: "new", displayName: saved.name, host: "192.0.2.2", port: 47989, serverID: "different")
+        #expect(NearbyPCList.available([other], saved: [saved]) == [other])
+    }
+
+    private func savedPC(id: String, address: String) -> Glimmer.Host {
+        Glimmer.Host(id: id, name: "Gaming PC", customName: nil, localAddress: address, manualAddress: nil,
+             apps: [], lastConnected: nil, serverCertPEM: nil, appVersion: nil, gfeVersion: nil, macAddress: nil)
+    }
+
+    @Test func manuallyEnteringAKnownAddressFindsTheExistingPCWithoutPairingAgain() {
+        let host = savedPC(id: "saved", address: "GAMING.local.")
+        #expect(NearbyPCList.savedPC(at: "gaming.local", in: [host])?.id == "saved")
+        #expect(NearbyPCList.savedPC(at: "other.local", in: [host]) == nil)
+    }
+
+    @Test @MainActor func cancellingInlinePairingRejectsALateSuccess() async {
+        let flow = PCPairingFlow()
+        let gate = LatencySampleGate()
+        var selected: String?
+        flow.start(pin: "1234", pair: { _ in
+            _ = await gate.read()
+            return .paired("pc")
+        }, completed: { selected = $0 })
+        #expect(await eventually { gate.waiting })
+        flow.cancel()
+        #expect(flow.isCancelling)
+        gate.resume(1)
+        #expect(await eventually { !flow.isRunning })
+        #expect(selected == nil && flow.pin == nil && flow.error == nil)
+    }
+
+    @Test @MainActor func replacingInlinePairingCannotSelectThePreviousPC() async {
+        let flow = PCPairingFlow()
+        let old = LatencySampleGate()
+        var selected: [String] = []
+        flow.start(pin: "1234", pair: { _ in
+            _ = await old.read()
+            return .paired("old")
+        }, completed: { selected.append($0) })
+        #expect(await eventually { old.waiting })
+        flow.reset()
+        flow.start(pin: "5678", pair: { _ in .paired("new") }, completed: { selected.append($0) })
+        #expect(await eventually { selected == ["new"] })
+        old.resume(1)
+        #expect(await eventually { old.returned })
+        #expect(selected == ["new"] && !flow.isRunning)
+    }
+
+    @Test @MainActor func retryingInlinePairingClearsThePreviousFailureAndUsesANewPIN() async {
+        let flow = PCPairingFlow()
+        flow.start(pin: "1234", pair: { _ in .failed("Couldn't reach PC") }, completed: { _ in Issue.record("Unexpected success") })
+        #expect(await eventually { flow.error != nil })
+        let gate = LatencySampleGate()
+        flow.start(pin: "5678", pair: { pin in
+            #expect(pin == "5678")
+            _ = await gate.read()
+            return .failed("New attempt")
+        }, completed: { _ in Issue.record("Unexpected success") })
+        #expect(flow.pin == "5678" && flow.error == nil)
+        #expect(await eventually { gate.waiting })
+        flow.cancel()
+        gate.resume(nil)
+        #expect(await eventually { !flow.isRunning })
+    }
+
+    @Test @MainActor func cancellingAControlRequestInterruptsAnActivePINWait() async throws {
+        let server = try WaitingControlServer()
+        defer { server.stop() }
+        #expect(await eventually { server.port != nil })
+        guard let port = server.port else { return }
+        let request = Task {
+            try await ControlTransport.get(host: "127.0.0.1", port: Int(port), target: "/pair", userAgent: "Shimmer test",
+                tls: false, credential: .init(clientCertPEM: nil, clientKeyPEM: nil, pinnedCertPEM: nil), timeout: 10)
+        }
+        #expect(await eventually { server.receivedRequest })
+        let started = ContinuousClock.now
+        request.cancel()
+        do {
+            _ = try await request.value
+            Issue.record("A cancelled request must not return a successful response")
+        } catch { #expect(error is CancellationError) }
+        #expect(started.duration(to: .now) < .seconds(1))
+    }
+
     @Test func graphScaleAdaptsFromFastLANToSlowerConnections() {
         for (maximum, upper) in [(0.4, 1.0), (1, 1), (1.2, 2), (4, 5),
                                  (9, 10), (26, 50), (99, 100), (101, 200)] {
@@ -276,5 +388,41 @@ private final class LatencySampleGate {
     func resume(_ value: Double?) {
         continuation?.resume(returning: value)
         continuation = nil
+    }
+}
+
+@MainActor private final class WaitingControlServer {
+    let listener: NWListener
+    private(set) var port: UInt16?
+    private(set) var receivedRequest = false
+    private var connections: [NWConnection] = []
+
+    init() throws {
+        listener = try NWListener(using: .tcp, on: .any)
+        listener.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
+                guard let self else { return }
+                if case .ready = state { self.port = self.listener.port?.rawValue }
+            }
+        }
+        listener.newConnectionHandler = { [weak self] connection in
+            Task { @MainActor in
+                guard let self else { connection.cancel(); return }
+                self.connections.append(connection)
+                connection.start(queue: .global())
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, _ in
+                    Task { @MainActor in self?.receivedRequest = data?.isEmpty == false }
+                    // Bound a regression's wait so a broken cancellation test
+                    // reports a failure instead of hanging the test runner.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 2) { connection.cancel() }
+                }
+            }
+        }
+        listener.start(queue: .global())
+    }
+
+    func stop() {
+        listener.cancel()
+        connections.forEach { $0.cancel() }
     }
 }

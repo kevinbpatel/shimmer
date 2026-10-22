@@ -44,13 +44,15 @@ public actor PairingClient {
     /// before throwing - leaving a half-paired state on the host side trips
     /// "Already pairing" errors on retry.
     public func pair(pin: String) async throws -> ServerInfo {
+        try Task.checkCancellation()
         do {
             return try await runPairingFlow(pin: pin)
         } catch {
             // Best-effort cleanup. Swallow any error from unpair - we're
             // already in the failure path and the original error is what
             // the caller cares about.
-            await sendUnpair()
+            // Cleanup must still run after the caller cancels the PIN wait.
+            await Task { await self.sendUnpair() }.value
             throw error
         }
     }
@@ -275,8 +277,9 @@ public actor PairingClient {
         // the user lands on the `NetworkClient.fetchServerInfo` pin-mismatch
         // error which directs them to Settings → PCs → ... → "Trust new cert
         // and re-pair". That action wipes the pin and reopens the
-        // PairSheet - the next successful run through this function
+        // pairing pane - the next successful run through this function
         // overwrites the persisted PEM with the new one.
+        try Task.checkCancellation()
         persistPinnedCert(serverCertPEM: serverCertPEM)
 
         log.info("Pairing succeeded for \(self.server.address, privacy: .public)")
