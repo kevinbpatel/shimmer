@@ -3,7 +3,7 @@
 //
 //  Saved PCs and nearby Bonjour discoveries share the sidebar. The detail
 //  pane shows either a saved PC's apps and latency test, or the pairing flow
-//  for a PC the user is adding. Discovery never writes a saved host record.
+//  for a PC the user is adding. Saved routes refresh only after pinned TLS verification.
 //
 
 import SwiftUI
@@ -15,12 +15,16 @@ struct ComputersTab: View {
 
     @State private var pairingTarget: PCPairingTarget?
     @State private var discovered: [HostDiscovery.Discovered] = []
-    @State private var discoverySettled = false
     @State private var showManualAddress = false
     @State private var pendingManualAddress: String?
     @State private var showUnpairConfirm = false
     @State private var search = ""
     @State private var latencyTest = HostLatencyTest()
+
+    private struct DiscoveryRouteScope: Hashable {
+        let discoveries: [HostDiscovery.Discovered]
+        let paused: Bool
+    }
 
     private struct LatencyScope: Equatable {
         let hostID: String?
@@ -67,9 +71,8 @@ struct ComputersTab: View {
             }
             await browser.stop()
         }
-        .task {
-            try? await Task.sleep(for: .seconds(7))
-            if !Task.isCancelled { discoverySettled = true }
+        .task(id: DiscoveryRouteScope(discoveries: discovered, paused: model.pairingInFlight || model.isStreaming)) {
+            await model.refreshDiscoveredHostAddresses(discovered)
         }
         .onChange(of: latencyScope) { latencyTest.reset() }
         .onDisappear { latencyTest.reset() }
@@ -97,35 +100,29 @@ struct ComputersTab: View {
                                 pairingTarget = nil
                                 model.selectHost(host)
                             } label: {
-                                HostRow(host: host, selected: pairingTarget == nil && host.id == model.selectedHost?.id)
+                                HostRow(host: host, address: model.dialAddress(for: host), selected: pairingTarget == nil && host.id == model.selectedHost?.id)
                             }
                             .buttonStyle(.plain)
                             .disabled(model.pairingInFlight)
-                            .accessibilityLabel("\(host.displayName), saved PC, \(host.localAddress ?? host.manualAddress ?? host.name)")
+                            .accessibilityLabel("\(host.displayName), saved PC, \(model.dialAddress(for: host))")
                             .hostContextMenu(host)
                         }
                     }
-                    sidebarHeading("Nearby PCs")
-                        .padding(.top, model.hosts.isEmpty ? 0 : 10)
-                    ForEach(nearby) { pc in
-                        Button {
-                            latencyTest.reset()
-                            pairingTarget = PCPairingTarget(name: pc.displayName, address: pc.host)
-                        } label: {
-                            NearbyPCRow(pc: pc, selected: pairingTarget?.address == pc.host)
+                    if !nearby.isEmpty {
+                        sidebarHeading("Nearby PCs")
+                            .padding(.top, model.hosts.isEmpty ? 0 : 10)
+                        ForEach(nearby) { pc in
+                            Button {
+                                latencyTest.reset()
+                                pairingTarget = PCPairingTarget(name: pc.displayName, address: pc.host)
+                            } label: {
+                                NearbyPCRow(pc: pc, selected: pairingTarget?.address == pc.host)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.pairingInFlight)
+                            .help("Pair with \(pc.displayName) to add this PC")
+                            .accessibilityLabel("\(pc.displayName), nearby PC, not added, \(pc.host)")
                         }
-                        .buttonStyle(.plain)
-                        .disabled(model.pairingInFlight)
-                        .help("Pair with \(pc.displayName) to add this PC")
-                        .accessibilityLabel("\(pc.displayName), nearby PC, not added, \(pc.host)")
-                    }
-                    if nearby.isEmpty {
-                        Text(discoverySettled ? "No new PCs found on this network." : "Looking for PCs on this network…")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 8)
                     }
                 }
                 .padding(.horizontal, 6)
@@ -586,6 +583,7 @@ private struct NearbyPCRow: View {
 /// the shape of the reference app's account rows (48pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
+    let address: String
     let selected: Bool
 
     var body: some View {
@@ -596,7 +594,7 @@ private struct HostRow: View {
                 Text(host.displayName)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                Text(host.localAddress ?? host.manualAddress ?? host.name)
+                Text(address)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

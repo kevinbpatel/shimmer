@@ -211,3 +211,17 @@ private final class ServiceAddressResolver: NSObject, @preconcurrency NetService
         callback?.resume(returning: result)
     }
 }
+
+/// Identifies candidates; this never treats a Bonjour or HTTP UUID as proof.
+/// Non-default control ports are not yet supported by saved-host persistence.
+struct DiscoveredHostRoute {
+    static func savedHost(for pc: HostDiscovery.Discovered, in hosts: [Host]) -> Host? {
+        guard pc.port == 47989, let id = pc.serverID, !id.isEmpty else { return nil }
+        return hosts.first { $0.id.caseInsensitiveCompare(id) == .orderedSame }
+    }
+
+    static func authenticates(_ responseID: String?, hostID: String) -> Bool {
+        guard let id = responseID, !id.isEmpty, !hostID.isEmpty else { return false }
+        return id.caseInsensitiveCompare(hostID) == .orderedSame
+    }
+}

@@ -13,6 +13,32 @@ struct HostConnectionTests {
         #expect(services.update([], for: "sunshine").isEmpty)
     }
 
+    @Test func discoveryRefreshMatchesUUIDRatherThanNameOrStaleAddress() {
+        let host = savedPC(id: "KNOWN", address: "100.64.0.10")
+        let moved = HostDiscovery.Discovered(id: "bonjour", displayName: "Renamed", host: "192.168.1.9", port: 47989, serverID: "known")
+        #expect(DiscoveredHostRoute.savedHost(for: moved, in: [host]) == host)
+        let impostor = HostDiscovery.Discovered(id: "other", displayName: host.name, host: moved.host, port: 47989, serverID: "other")
+        #expect(DiscoveredHostRoute.savedHost(for: impostor, in: [host]) == nil)
+        let unidentified = HostDiscovery.Discovered(id: "missing", displayName: host.name, host: moved.host, port: 47989)
+        #expect(DiscoveredHostRoute.savedHost(for: unidentified, in: [host]) == nil)
+        let customPort = HostDiscovery.Discovered(id: "custom", displayName: host.name, host: moved.host, port: 48000, serverID: host.id)
+        #expect(DiscoveredHostRoute.savedHost(for: customPort, in: [host]) == nil)
+    }
+
+    @Test func routeRefreshRequiresMatchingAuthenticatedUUID() {
+        #expect(DiscoveredHostRoute.authenticates("known", hostID: "KNOWN"))
+        #expect(!DiscoveredHostRoute.authenticates(nil, hostID: "known"))
+        #expect(!DiscoveredHostRoute.authenticates("", hostID: "known"))
+        #expect(!DiscoveredHostRoute.authenticates("other", hostID: "known"))
+    }
+
+    @Test func aRefreshedLocalRouteKeepsTheManualAddressAsFallback() {
+        let host = Glimmer.Host(id: "pc", name: "PC", customName: nil,
+            localAddress: "192.168.1.9", manualAddress: "100.64.0.10", apps: [],
+            lastConnected: nil, serverCertPEM: nil, appVersion: nil, gfeVersion: nil, macAddress: nil)
+        #expect(AppModel.candidateAddresses(for: host) == ["192.168.1.9", "100.64.0.10"])
+    }
+
     @Test func nearbyPCsExcludeSavedIDsEvenAfterAnAddressChange() {
         let saved = savedPC(id: "KNOWN", address: "192.0.2.1")
         let moved = HostDiscovery.Discovered(id: "bonjour", displayName: "Renamed PC", host: "192.0.2.2", port: 47989, serverID: "known")

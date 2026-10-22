@@ -163,6 +163,40 @@ extension AppModel {
         }
     }
 
+    /// Bonjour's UUID is a lookup hint only. A saved PC's existing certificate
+    /// and the UUID in its HTTPS response must both authenticate the new route.
+    /// Keep the manually entered address untouched for remote-network fallback.
+    func refreshDiscoveredHostAddresses(_ discoveries: [HostDiscovery.Discovered]) async {
+        guard !pairingInFlight, !isStreaming else { return }
+        var checked = Set<String>()
+        for pc in discoveries {
+            guard !Task.isCancelled, !pairingInFlight, !isStreaming else { return }
+            guard let host = DiscoveredHostRoute.savedHost(for: pc, in: hosts),
+                  host.localAddress != pc.host,
+                  checked.insert("\(host.id)|\(pc.host)").inserted else { continue }
+            var info = nativeServerInfo(for: host)
+            guard let pin = info.serverCertPEM else { continue }
+            info.address = pc.host
+            let client = NetworkClient(server: info)
+            let authenticatedID = try? await client.verifiedServerID()
+            await client.shutdown()
+            guard !Task.isCancelled, !pairingInFlight, !isStreaming else { return }
+            guard DiscoveredHostRoute.authenticates(authenticatedID, hostID: host.id),
+                  let current = hosts.first(where: { $0.id == host.id }), current == host,
+                  nativeServerInfo(for: current).serverCertPEM == pin else { continue }
+            let defaults = UserDefaults.standard
+            let slot = hostSlot(for: host.id, defaults: defaults)
+            guard slot > 0 else { continue }
+            defaults.set(pc.host, forKey: "hosts.\(slot).localaddress")
+            reachableAddressByHost[host.id] = pc.host
+            loadHosts()
+            if selectedHost?.id == host.id {
+                hostLiveStatus = nil
+                restartHostStatusPolling()
+            }
+        }
+    }
+
     /// Find the `hosts.N` slot index for a host id (uuid, hostname fallback) -
     /// the shared lookup renameHost pioneered. 0 = no match.
     private func hostSlot(for hostID: String, defaults: UserDefaults) -> Int {

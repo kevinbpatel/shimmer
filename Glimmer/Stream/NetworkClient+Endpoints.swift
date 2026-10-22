@@ -103,6 +103,17 @@ extension NetworkClient {
         return server
     }
 
+    /// Authenticate a discovered route without HTTP fallback or changing the pin.
+    /// The UUID must come from the authenticated response, never the input hint.
+    func verifiedServerID() async throws -> String? {
+        guard server.serverCertPEM != nil else { return nil }
+        try await ensureIdentityLoaded()
+        let xml = try await rawRequest(path: "serverinfo", query: [:], extraQuery: nil,
+                                       usePaired: true, timeout: 3)
+        try Self.verifyStatus(xml)
+        return xml.string(forChild: "uniqueid")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// Turn a paired-path (HTTPS) failure into the user-facing verdict, once
     /// the plain-HTTP probe has proven the host is up. The `detail` strings
     /// are ControlTransport's own (stable, ours), so matching on them is a
