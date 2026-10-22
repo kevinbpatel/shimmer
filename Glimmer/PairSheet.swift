@@ -120,9 +120,6 @@ struct PCPairingPane: View {
                         Spacer()
                     }
                 } else {
-                    Text("Pair this PC to add it to your saved PCs and stream its apps.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                     Button("Pair PC", action: begin)
                         .buttonStyle(.borderedProminent)
                         .disabled(model.pairingInFlight)
