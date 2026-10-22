@@ -111,17 +111,21 @@ struct ComputersTab: View {
                     pairingAddress = ""
                     showPairSheet = true
                 } label: {
-                    Text("Add PC…").frame(maxWidth: .infinity)
+                    Text("Add PC…")
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 16)
                 }
                 Button {
                     showManualAddress.toggle()
                 } label: {
                     Image(systemName: "chevron.down")
-                        .frame(width: 12)
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 12, height: 16)
                 }
                 .help("Add a PC using an IP address or hostname")
                 .accessibilityLabel("Add PC using an address")
-                .popover(isPresented: $showManualAddress, arrowEdge: .bottom) {
+                .popover(isPresented: $showManualAddress,
+                         attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     ManualAddressPopover(cancel: { showManualAddress = false }) { address in
                         pendingManualAddress = address
                         showManualAddress = false
@@ -135,6 +139,9 @@ struct ComputersTab: View {
                     }
                 }
             }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: 6))
+            .controlSize(.regular)
             .padding(.horizontal, 6)
             .padding(.vertical, 8)
         }
