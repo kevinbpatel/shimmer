@@ -362,6 +362,7 @@ extension AppModel {
         defaults.removeObject(forKey: "glimmer.lastConnected.\(host.id)")
         defaults.removeObject(forKey: Self.lastStreamedKey(for: host.id))
         HostCodecPreference.forget(hostID: host.id)
+        HostIcon.forget(hostID: host.id)
         if defaults.string(forKey: "glimmer.selectedHostID") == host.id {
             defaults.removeObject(forKey: "glimmer.selectedHostID")
         }

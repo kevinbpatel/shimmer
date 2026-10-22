@@ -429,14 +429,7 @@ private struct HostRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(Color.accentColor.opacity(0.22))
-                .frame(width: SettingsMetrics.sidebarIconSize,
-                       height: SettingsMetrics.sidebarIconSize)
-                .overlay(
-                    Image(systemName: "display")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(Color.accentColor))
+            HostIdentityIcon(host: host)
             VStack(alignment: .leading, spacing: 0) {
                 Text(host.displayName)
                     .font(.system(size: 13, weight: .semibold))
@@ -454,6 +447,44 @@ private struct HostRow: View {
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(selected ? Color.primary.opacity(0.13) : Color.clear))
+    }
+}
+
+/// The icon preference is keyed by stable host ID, independently of the
+/// replaceable Host snapshots. AppStorage updates both the row and menu.
+struct HostIdentityIcon: View {
+    let host: Host
+    @AppStorage private var preference: HostIcon
+
+    init(host: Host) {
+        self.host = host
+        _preference = AppStorage(wrappedValue: .automatic, HostIcon.storageKey(for: host.id))
+    }
+
+    var body: some View {
+        let icon = preference.resolved(serverName: host.name)
+        let rgb = icon.backgroundRGB
+        let colour = Color(red: Double((rgb >> 16) & 255) / 255,
+                           green: Double((rgb >> 8) & 255) / 255,
+                           blue: Double(rgb & 255) / 255)
+        Circle()
+            .fill(icon == .computer ? Color.accentColor.opacity(0.22) : colour)
+            .frame(width: SettingsMetrics.sidebarIconSize, height: SettingsMetrics.sidebarIconSize)
+            .overlay {
+                if let asset = icon.assetName {
+                    Image(asset)
+                        .renderingMode(icon == .chimeraOS ? .original : .template)
+                        .resizable().scaledToFit()
+                        .foregroundStyle(icon == .linux ? Color.black : .white)
+                        .frame(width: 25, height: 25)
+                } else {
+                    Image(systemName: icon == .macOS ? "apple.logo" : "display")
+                        .font(.system(size: icon == .macOS ? 23 : 18))
+                        .foregroundStyle(icon == .computer ? Color.accentColor : .white)
+                }
+            }
+            .help(icon == .computer ? "Server icon · Right-click to choose" : "\(icon.title) icon · Right-click to change")
+            .accessibilityLabel(icon == .computer ? "Server" : "\(icon.title) server icon")
     }
 }
 

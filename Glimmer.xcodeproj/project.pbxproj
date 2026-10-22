@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CE1000000000000000000102 /* HostIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1000000000000000000101 /* HostIcon.swift */; };
+		CE1000000000000000000202 /* HostIconTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1000000000000000000201 /* HostIconTests.swift */; };
+		CE1000000000000000000302 /* HostIconNotices in Resources */ = {isa = PBXBuildFile; fileRef = CE1000000000000000000301 /* HostIconNotices */; };
 		040BDEEE8B8E58AC0375BF3A /* StreamingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448F2B492E4B38A0CFF51260 /* StreamingState.swift */; };
 		086CF5A56FDAE0E5A8341CEA /* Glimmer Login Helper.app in Embed Login Helper */ = {isa = PBXBuildFile; fileRef = 68E50C51912216A5F5FDA2C6 /* Glimmer Login Helper.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		109EA4B557EB9EFC0400C751 /* AWDLHelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2C61CA646A8599B4EC06C5 /* AWDLHelperManager.swift */; };
@@ -324,6 +327,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		CE1000000000000000000101 /* HostIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostIcon.swift; sourceTree = "<group>"; };
+		CE1000000000000000000201 /* HostIconTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostIconTests.swift; sourceTree = "<group>"; };
+		CE1000000000000000000301 /* HostIconNotices */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HostIconNotices; path = "docs/assets/host-icons"; sourceTree = SOURCE_ROOT; };
 		064F5F39A59E54E022FEE74E /* FuzzTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FuzzTests.swift; sourceTree = "<group>"; };
 		1A6B7F5AA2DBCDB1B8D9A413 /* HostsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostsStore.swift; sourceTree = "<group>"; };
 		B4F0AC710000000000000002 /* AppModel+HostActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+HostActivity.swift"; sourceTree = "<group>"; };
@@ -662,6 +668,7 @@
 			children = (
 				9158C8506080330EC17875A9 /* Host.swift */,
 				A1B2C3D4E5F6000100000C01 /* HostCodecPreference.swift */,
+				CE1000000000000000000101 /* HostIcon.swift */,
 				DEC0DE840000000000000002 /* StreamDisplayMode.swift */,
 				A1C0DEKAWPOL200000000000 /* KeepAwakePolicy.swift */,
 				A1C0DE782000000000000000 /* StreamChoices.swift */,
@@ -724,6 +731,7 @@
 				A10000013 /* AppModel.swift */,
 				A1C0DE902000000000000000 /* AppArtworkStore.swift */,
 				A10000014 /* Assets.xcassets */,
+				CE1000000000000000000301 /* HostIconNotices */,
 				A10000015 /* Info.plist */,
 				A10000016 /* Glimmer.entitlements */,
 				AB00000001 /* Types.swift */,
@@ -977,6 +985,7 @@
 				A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
 				A1C0DE932000000000000000 /* AppSymbolTests.swift */,
+				CE1000000000000000000201 /* HostIconTests.swift */,
 				DEC0DE840000000000000014 /* TerminationGateTests.swift */,
 				DEC0DE84000000000000001C /* WindowPointerTests.swift */,
 				DEC0DE2026083000000000A1 /* IOReportSamplerLifetimeTests.swift */,
@@ -1104,6 +1113,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000004 /* Assets.xcassets in Resources */,
+				CE1000000000000000000302 /* HostIconNotices in Resources */,
 				AA0FDB79371DF1443B9A0D0F /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1343,6 +1353,7 @@
 				CC00000006 /* VideoDecoder+Bitstream.swift in Sources */,
 				BBF95775D96E9853A40ADED0 /* Host.swift in Sources */,
 				A1B2C3D4E5F6000200000C01 /* HostCodecPreference.swift in Sources */,
+				CE1000000000000000000102 /* HostIcon.swift in Sources */,
 				82EEF25A701FD81C0CDC8240 /* HostsStore.swift in Sources */,
 				B4F0AC710000000000000001 /* AppModel+HostActivity.swift in Sources */,
 				BC8B3FD0322A256049C1CAF8 /* QualityCalculator.swift in Sources */,
@@ -1395,6 +1406,7 @@
 				A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,
 				A1C0DE931000000000000000 /* AppSymbolTests.swift in Sources */,
+				CE1000000000000000000202 /* HostIconTests.swift in Sources */,
 				DEC0DE840000000000000013 /* TerminationGateTests.swift in Sources */,
 				DEC0DE84000000000000001B /* WindowPointerTests.swift in Sources */,
 				DEC0DE2026083000000000A2 /* IOReportSamplerLifetimeTests.swift in Sources */,
