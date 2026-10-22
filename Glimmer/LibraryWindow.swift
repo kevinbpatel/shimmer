@@ -152,9 +152,14 @@ struct ComputersTab: View {
                                         Button {
                                             model.resumeStreamWindow()
                                         } label: {
-                                            Label("Show stream", systemImage: "arrow.up.forward.app.fill")
+                                            Label("Show stream", systemImage: "pip.exit")
                                                 .labelStyle(.iconOnly)
+                                                .font(.system(size: 15))
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 24, height: 24)
+                                                .contentShape(Rectangle())
                                         }
+                                        .buttonStyle(.plain)
                                         .help("Show \(app.name) stream")
                                         .accessibilityLabel("Show \(app.name) stream")
                                     }

@@ -26,12 +26,15 @@ struct AppShell: View {
             // The title bar area: the system title is hidden (see
             // WindowChromeTweak) so it can be centred here, clear of the
             // traffic lights, exactly as the reference app has it.
-            Text("Shimmer")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 30)
-            SettingsTabBar(selection: $model.settingsTab)
+            VStack(spacing: 0) {
+                Text("Shimmer")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 30)
+                SettingsTabBar(selection: $model.settingsTab)
+            }
+            .background(Color(nsColor: .underPageBackgroundColor))
             Divider()
             switch model.settingsTab {
             case .computers: ComputersTab()
