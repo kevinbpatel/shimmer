@@ -1,26 +1,30 @@
 //
 //  LibraryWindow.swift
 //
-//  The Computers tab: PCs down the left, the selected PC's apps as a grid of
-//  cover art on the right, and the actions along the bottom edge - the shape of
-//  Tailscale's Accounts tab, inside the same tabbed window as Settings and
-//  About rather than a page of its own.
-//
-//  Everything underneath is unchanged - `selectHost`, `requestStream`,
-//  `PairSheet`, the host context menu and the artwork store are the same calls
-//  the old hero card made.
+//  Saved PCs and nearby Bonjour discoveries share the sidebar. The detail
+//  pane shows either a saved PC's apps and latency test, or the pairing flow
+//  for a PC the user is adding. Saved routes refresh only after pinned TLS verification.
 //
 
 import SwiftUI
 import Charts
+import Network
 
 struct ComputersTab: View {
     @Environment(AppModel.self) private var model
 
-    @State private var showPairSheet = false
+    @State private var pairingTarget: PCPairingTarget?
+    @State private var discovered: [HostDiscovery.Discovered] = []
+    @State private var showManualAddress = false
+    @State private var pendingManualAddress: String?
     @State private var showUnpairConfirm = false
     @State private var search = ""
     @State private var latencyTest = HostLatencyTest()
+
+    private struct DiscoveryRouteScope: Hashable {
+        let discoveries: [HostDiscovery.Discovered]
+        let paused: Bool
+    }
 
     private struct LatencyScope: Equatable {
         let hostID: String?
@@ -36,16 +40,8 @@ struct ComputersTab: View {
                      streamHostID: model.activeStreamHostID)
     }
 
-    /// Selection is the host ID, not the Host: Host is a value type the store
-    /// replaces wholesale on every refresh, so tagging rows with it would drop
-    /// the selection on each poll.
-    private var hostSelection: Binding<String?> {
-        Binding(
-            get: { model.selectedHost?.id },
-            set: { id in
-                guard let id, let host = model.hosts.first(where: { $0.id == id }) else { return }
-                model.selectHost(host)
-            })
+    private var nearby: [HostDiscovery.Discovered] {
+        NearbyPCList.available(discovered, saved: model.hosts)
     }
 
     private var apps: [LibraryApp] {
@@ -64,9 +60,19 @@ struct ComputersTab: View {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .sheet(isPresented: $showPairSheet) {
-            PairSheet(initialAddress: "")
-                .presentationBackground(.thinMaterial)
+        .task(id: model.pairingInFlight) {
+            // Each task owns its browser. Cancelling an older task can never
+            // stop the browser belonging to a newly opened Servers tab.
+            guard !model.pairingInFlight else { return }
+            let browser = HostDiscovery()
+            for await results in await browser.start() {
+                guard !Task.isCancelled else { break }
+                discovered = results
+            }
+            await browser.stop()
+        }
+        .task(id: DiscoveryRouteScope(discoveries: discovered, paused: model.pairingInFlight || model.isStreaming)) {
+            await model.refreshDiscoveredHostAddresses(discovered)
         }
         .onChange(of: latencyScope) { latencyTest.reset() }
         .onDisappear { latencyTest.reset() }
@@ -84,44 +90,105 @@ struct ComputersTab: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            // Hand-rolled rather than a `List`: a sidebar List paints its
-            // selection in the ACCENT colour, and the reference app's selected
-            // row is a neutral grey plate. No section header either - its
-            // account list has none and the tab is already called Computers.
             ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(model.hosts) { host in
-                        HostRow(host: host, selected: host.id == model.selectedHost?.id)
-                            .contentShape(Rectangle())
-                            .onTapGesture { model.selectHost(host) }
+                VStack(alignment: .leading, spacing: 0) {
+                    if !model.hosts.isEmpty {
+                        ForEach(model.hosts) { host in
+                            Button {
+                                guard !model.pairingInFlight else { return }
+                                pairingTarget = nil
+                                model.selectHost(host)
+                            } label: {
+                                HostRow(host: host, address: model.dialAddress(for: host), selected: pairingTarget == nil && host.id == model.selectedHost?.id)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.pairingInFlight)
+                            .accessibilityLabel("\(host.displayName), saved PC, \(model.dialAddress(for: host))")
                             .hostContextMenu(host)
+                        }
+                    }
+                    if !nearby.isEmpty {
+                        sidebarHeading("Nearby PCs")
+                            .padding(.top, model.hosts.isEmpty ? 0 : 10)
+                        ForEach(nearby) { pc in
+                            Button {
+                                latencyTest.reset()
+                                pairingTarget = PCPairingTarget(name: pc.displayName, address: pc.host)
+                            } label: {
+                                NearbyPCRow(pc: pc, selected: pairingTarget?.address == pc.host)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.pairingInFlight)
+                            .help("Pair with \(pc.displayName) to add this PC")
+                            .accessibilityLabel("\(pc.displayName), nearby PC, not added, \(pc.host)")
+                        }
                     }
                 }
                 .padding(.horizontal, 6)
-                .padding(.top, 10)
+                .padding(.top, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
-            // A full-width button on a 39pt bar, like "Add Account…".
             Button {
-                showPairSheet = true
+                showManualAddress = true
             } label: {
-                Text("Add PC…").frame(maxWidth: .infinity)
+                Text("Add by Address…")
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 16)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: 6))
+            .controlSize(.regular)
+            .disabled(model.pairingInFlight)
+            .help("Add a PC using an IP address or hostname")
+            .popover(isPresented: $showManualAddress,
+                     attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                ManualAddressPopover(cancel: { showManualAddress = false }) { address in
+                    pendingManualAddress = address
+                    showManualAddress = false
+                }
+                .onDisappear {
+                    guard let address = pendingManualAddress else { return }
+                    pendingManualAddress = nil
+                    latencyTest.reset()
+                    if let host = NearbyPCList.savedPC(at: address, in: model.hosts) {
+                        pairingTarget = nil
+                        model.selectHost(host)
+                    } else {
+                        pairingTarget = PCPairingTarget(name: "Add PC", address: address, startImmediately: true)
+                    }
+                }
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 8)
         }
     }
 
+    private func sidebarHeading(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+    }
+
     // MARK: Detail
 
     @ViewBuilder
     private var detail: some View {
-        if let host = model.selectedHost {
+        if let target = pairingTarget {
+            PCPairingPane(target: target) { id in
+                if let host = model.hosts.first(where: { $0.id == id }) {
+                    model.selectHost(host)
+                    pairingTarget = nil
+                }
+            }
+            .id(target.id)
+        } else if let host = model.selectedHost {
             VStack(spacing: 0) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         // Apps lead: they are what the page is FOR. The PC's
                         // name is not repeated here - the row selected in the
                         // sidebar already says which machine this is.
@@ -196,9 +263,8 @@ struct ComputersTab: View {
                         }
 
                     }
-                    .padding(.top, 22)
+                    .padding(.top, 12)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: .infinity)
@@ -298,6 +364,25 @@ struct ComputersTab: View {
     }
 }
 
+/// A readable zero-based scale for the measurements currently in view. Keep
+/// clean tick values without imposing a 10 ms floor on fast connections.
+struct LatencyGraphScale {
+    let upperBound: Double
+    var ticks: [Double] { [0, upperBound / 2, upperBound] }
+
+    init(maximum: Double?) {
+        guard let maximum, maximum.isFinite, maximum >= 0,
+              maximum < Double(Int.max) else {
+            upperBound = 10
+            return
+        }
+        let value = max(1, maximum)
+        let magnitude = pow(10, floor(log10(value)))
+        let step = [1.0, 2, 5, 10].first { $0 * magnitude >= value } ?? 10
+        upperBound = max(value, step * magnitude)
+    }
+}
+
 /// An opt-in Tailscale-style diagnostic: a quiet result header, blue trace,
 /// and readable millisecond labels on the right. Completed results are frozen.
 private struct NetworkHistoryGraph: View {
@@ -309,8 +394,7 @@ private struct NetworkHistoryGraph: View {
 
     var body: some View {
         let now = test.sampledAt
-        let maximum = test.history.statistics(at: now)?.maximum ?? 0
-        let ceiling = max(10, ceil(maximum * 1.15 / 10) * 10)
+        let scale = LatencyGraphScale(maximum: test.history.statistics(at: now)?.maximum)
         let start = max(now.addingTimeInterval(-HostLatencyHistory.duration),
                         min(now.addingTimeInterval(-10), test.history.readings.first?.capturedAt ?? now))
         VStack(alignment: .leading, spacing: 7) {
@@ -357,22 +441,25 @@ private struct NetworkHistoryGraph: View {
                     }
                 }
                 .chartXScale(domain: start...now)
-                .chartYScale(domain: 0...ceiling)
+                .chartYScale(domain: 0...scale.upperBound,
+                             range: .plotDimension(startPadding: 8, endPadding: 8))
                 .chartXAxis(.hidden)
                 .chartYAxis {
-                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
-                        AxisValueLabel {
+                    AxisMarks(position: .trailing, values: scale.ticks) { value in
+                        AxisValueLabel(collisionResolution: .disabled, horizontalSpacing: 8) {
                             if let ms = value.as(Double.self) {
-                                Text("\(ms.formatted(.number.precision(.fractionLength(0))))ms")
+                                Text("\(ms.formatted(.number.precision(.fractionLength(0...1))))ms")
                                     .font(.system(size: 11))
+                                    .monospacedDigit()
                                     .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                                    .frame(minWidth: 36, alignment: .trailing)
                             }
                         }
                     }
                 }
                 .chartLegend(.hidden)
                 .chartPlotStyle { plot in plot.clipped() }
-                .frame(height: 100)
+                .frame(height: 80)
                 .opacity(test.hasRun ? 1 : 0.4)
                 .overlay(alignment: .center) {
                     if !test.hasRun {
@@ -419,22 +506,93 @@ private struct EthernetPortGlyph: Shape {
     }
 }
 
+/// Discovery is transient and untrusted. Match stable server IDs or exact
+/// saved addresses; a friendly name alone must never hide another user's PC.
+struct NearbyPCList {
+    static func savedPC(at address: String, in saved: [Host]) -> Host? {
+        let key = addressKey(address)
+        return saved.first { host in
+            [host.localAddress, host.manualAddress].compactMap { $0 }.contains { addressKey($0) == key }
+        }
+    }
+
+    static func available(_ found: [HostDiscovery.Discovered], saved: [Host]) -> [HostDiscovery.Discovered] {
+        let ids = Set(saved.map { $0.id.lowercased() })
+        let addresses = Set(saved.flatMap { [$0.localAddress, $0.manualAddress].compactMap { $0 }.map(addressKey) })
+        var seenIDs = Set<String>()
+        var seenAddresses = Set<String>()
+        return found.sorted {
+            let order = $0.displayName.localizedStandardCompare($1.displayName)
+            if order != .orderedSame { return order == .orderedAscending }
+            if $0.host != $1.host { return $0.host < $1.host }
+            return $0.id < $1.id
+        }.filter { pc in
+            let address = addressKey(pc.host)
+            if let id = pc.serverID, ids.contains(id.lowercased()) { return false }
+            guard !addresses.contains(address) else { return false }
+            let endpoint = "\(address):\(pc.port)"
+            let duplicateAddress = !seenAddresses.insert(endpoint).inserted
+            let duplicateID = pc.serverID.map { !seenIDs.insert($0.lowercased()).inserted } ?? false
+            return !duplicateAddress && !duplicateID
+        }
+    }
+
+    private static func addressKey(_ input: String) -> String {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased()
+        let pieces = value.split(separator: "%", maxSplits: 1)
+        let plain = pieces.first.map(String.init) ?? value
+        if let ip = IPv4Address(plain) { return "v4:" + ip.rawValue.base64EncodedString() }
+        if let ip = IPv6Address(plain) {
+            let bytes = Array(ip.rawValue)
+            let zone = bytes[0] == 0xfe && bytes[1] & 0xc0 == 0x80 && pieces.count == 2 ? "%" + pieces[1] : ""
+            return "v6:" + ip.rawValue.base64EncodedString() + zone
+        }
+        return value.hasSuffix(".") ? String(value.dropLast()) : value
+    }
+}
+
+private struct NearbyPCRow: View {
+    let pc: HostDiscovery.Discovered
+    let selected: Bool
+    var body: some View {
+        HStack(spacing: 8) {
+            HostSystemGlyph(icon: HostIcon.suggested(for: pc.displayName))
+                .foregroundStyle(.secondary)
+                .frame(width: SettingsMetrics.sidebarIconSize, height: SettingsMetrics.sidebarIconSize)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(pc.displayName).font(.system(size: 13)).lineLimit(1)
+                Text(pc.host).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .frame(minHeight: SettingsMetrics.sidebarRowHeight)
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.primary.opacity(0.13) : .clear))
+        .contentShape(Rectangle())
+    }
+}
+
 // MARK: - Sidebar row
 
 /// One PC: a round glyph, the name, and the address beneath -
 /// the shape of the reference app's account rows (48pt plate, 6pt inset).
 private struct HostRow: View {
     let host: Host
+    let address: String
     let selected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             HostIdentityIcon(host: host)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(host.displayName)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                Text(host.localAddress ?? host.manualAddress ?? host.name)
+                Text(address)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -471,20 +629,30 @@ struct HostIdentityIcon: View {
             .fill(icon == .computer ? Color.accentColor.opacity(0.22) : colour)
             .frame(width: SettingsMetrics.sidebarIconSize, height: SettingsMetrics.sidebarIconSize)
             .overlay {
-                if let asset = icon.assetName {
-                    Image(asset)
-                        .renderingMode(icon == .chimeraOS ? .original : .template)
-                        .resizable().scaledToFit()
-                        .foregroundStyle(icon == .linux ? Color.black : .white)
-                        .frame(width: 25, height: 25)
-                } else {
-                    Image(systemName: icon == .macOS ? "apple.logo" : "display")
-                        .font(.system(size: icon == .macOS ? 23 : 18))
-                        .foregroundStyle(icon == .computer ? Color.accentColor : .white)
-                }
+                HostSystemGlyph(icon: icon)
+                    .foregroundStyle(icon == .computer ? Color.accentColor : icon == .linux ? .black : .white)
             }
             .help(icon == .computer ? "Server icon · Right-click to choose" : "\(icon.title) icon · Right-click to change")
             .accessibilityLabel(icon == .computer ? "Server" : "\(icon.title) server icon")
+    }
+}
+
+/// Shared OS/distro artwork for paired hosts and transient Bonjour rows.
+/// The caller supplies the foreground style and surrounding presentation.
+private struct HostSystemGlyph: View {
+    let icon: HostIcon
+
+    var body: some View {
+        if let asset = icon.assetName {
+            Image(asset)
+                .renderingMode(icon == .chimeraOS ? .original : .template)
+                .resizable().scaledToFit()
+                .frame(width: 25, height: 25)
+        } else {
+            Image(systemName: icon == .macOS ? "apple.logo" : "desktopcomputer")
+                .font(.system(size: icon == .macOS ? 23 : 18))
+                .frame(width: 25, height: 25)
+        }
     }
 }
 

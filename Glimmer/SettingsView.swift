@@ -19,6 +19,8 @@ import SwiftUI
 
 struct AppShell: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.controlActiveState) private var activeState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         @Bindable var model = model
@@ -29,12 +31,13 @@ struct AppShell: View {
             VStack(spacing: 0) {
                 Text("Shimmer")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(activeState == .inactive ? .secondary : .primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 30)
                 SettingsTabBar(selection: $model.settingsTab)
             }
-            .background(Color(nsColor: .underPageBackgroundColor))
+            .background(Color(nsColor: colorScheme == .dark
+                              ? .windowBackgroundColor : .textBackgroundColor))
             Divider()
             switch model.settingsTab {
             case .computers: ComputersTab()

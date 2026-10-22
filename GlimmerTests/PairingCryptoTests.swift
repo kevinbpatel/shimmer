@@ -195,3 +195,182 @@ struct PairingCryptoTests {
         #expect(s1.count == 256)
     }
 }
+
+/// Exercise the production PairingClient through every protocol round, with
+/// Sunshine's side computed independently from generated test credentials.
+private final class ProtocolPairingHost: @unchecked Sendable {
+    typealias Identity = (certPEM: String, keyPEM: String)
+    let id = "pairing-protocol-test-\(UUID().uuidString)"
+    let host: Identity
+    let pin: String
+    let forgedSignature: Bool
+    let failTLS: Bool
+    let changedID: Bool
+    private let lock = NSLock()
+    private var aesKey = Data()
+    private var clientCert = ""
+    private var clientHash = Data()
+    private var requests: [(path: String, query: [String: String], timeout: TimeInterval)] = []
+    private let challenge = Data(repeating: 0x37, count: 16)
+    private let secret = Data(repeating: 0x52, count: 16)
+
+    init(host: Identity, pin: String = "4821", forgedSignature: Bool = false,
+         failTLS: Bool = false, changedID: Bool = false) {
+        self.host = host; self.pin = pin; self.forgedSignature = forgedSignature
+        self.failTLS = failTLS; self.changedID = changedID
+    }
+
+    var recordedRequests: [(path: String, query: [String: String], timeout: TimeInterval)] {
+        lock.lock(); defer { lock.unlock() }; return requests
+    }
+
+    func respond(target: String, tls: Bool, credential: ControlTransport.TLSCredential,
+                 timeout: TimeInterval) throws -> ControlTransport.Response {
+        lock.lock(); defer { lock.unlock() }
+        let url = URLComponents(string: "http://test" + target)!
+        let query = Dictionary(uniqueKeysWithValues: (url.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        requests.append((url.path, query, timeout))
+        func response(_ content: String) -> ControlTransport.Response {
+            .init(status: 200, body: Data("<root status_code=\"200\">\(content)</root>".utf8))
+        }
+        if tls {
+            if failTLS { throw StreamError.hostUnreachable("test TLS connection dropped") }
+            guard credential.pinnedCertPEM == host.certPEM, credential.clientCertPEM == clientCert else {
+                throw StreamError.hostUnreachable("test pin or client certificate mismatch")
+            }
+        }
+        if url.path == "/serverinfo" {
+            return response("<uniqueid>\(changedID ? "another-PC" : id)</uniqueid>")
+        }
+        if query["phrase"] == "getservercert" {
+            let salt = try #require(query["salt"].flatMap { Data(hex: $0) })
+            let bytes = try #require(query["clientcert"].flatMap { Data(hex: $0) })
+            clientCert = try #require(String(data: bytes, encoding: .utf8))
+            aesKey = Data(SHA256.hash(data: salt + Data(pin.utf8)).prefix(16))
+            return response("<paired>1</paired><plaincert>\(Data(host.certPEM.utf8).hex())</plaincert>")
+        }
+        if let bytes = query["clientchallenge"].flatMap({ Data(hex: $0) }) {
+            let random = try PairingClient.aesEcbDecrypt(bytes, key: aesKey)
+            let hash = try PairingClient.digest(random + PairingClient.signatureFromPemCert(host.certPEM) + secret, sha256: true)
+            let encrypted = try PairingClient.aesEcbEncrypt(hash + challenge, key: aesKey)
+            return response("<paired>1</paired><challengeresponse>\(encrypted.hex())</challengeresponse>")
+        }
+        if let bytes = query["serverchallengeresp"].flatMap({ Data(hex: $0) }) {
+            clientHash = try PairingClient.aesEcbDecrypt(bytes, key: aesKey)
+            var signed = try PairingClient.signMessage(secret, privateKeyPEM: host.keyPEM)
+            if forgedSignature { signed[0] ^= 0xFF }
+            return response("<paired>1</paired><pairingsecret>\((secret + signed).hex())</pairingsecret>")
+        }
+        if let bytes = query["clientpairingsecret"].flatMap({ Data(hex: $0) }) {
+            let clientSecret = Data(bytes.prefix(16))
+            let signatureOK = try PairingClient.verifySignature(data: clientSecret,
+                signature: Data(bytes.dropFirst(16)), serverCertPEM: clientCert)
+            let expected = try PairingClient.digest(challenge + PairingClient.signatureFromPemCert(clientCert) + clientSecret, sha256: true)
+            return response("<paired>\(signatureOK && expected == clientHash ? 1 : 0)</paired>")
+        }
+        if query["phrase"] == "pairchallenge", tls { return response("<paired>1</paired>") }
+        Issue.record("Unexpected protocol endpoint: \(url.path)")
+        return response("<paired>0</paired>")
+    }
+}
+
+struct PairingProtocolRegressionTests {
+    private func attempt(_ host: ProtocolPairingHost, pin: String = "4821") async throws -> ServerInfo {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let info = ServerInfo(address: "test.invalid", uniqueId: host.id, serverName: "Test PC")
+        let client = NetworkClient(server: info, transport: { _, _, target, _, tls, credential, timeout in
+            try host.respond(target: target, tls: tls, credential: credential, timeout: timeout)
+        }, identity: { (identity.certPEM, identity.keyPEM, "test-install-identity") })
+        return try await PairingClient(network: client, server: info).pair(pin: pin)
+    }
+
+    @Test func completeHandshakeUsesInstallIdentityAndPinsOnlyAfterHTTPSIdentityCheck() async throws {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let host = ProtocolPairingHost(host: identity)
+        defer { PinnedCertStore.delete(forHostID: host.id) }
+        let result = try await attempt(host)
+        #expect(result.pairStatus == .paired)
+        #expect(PinnedCertStore.load(forHostID: host.id) == host.host.certPEM)
+        let requests = host.recordedRequests
+        #expect(requests.map(\.path) == ["/pair", "/pair", "/pair", "/pair", "/pair", "/serverinfo"])
+        #expect(requests.allSatisfy { $0.query["uniqueid"] == "test-install-identity" })
+        #expect(requests.first?.timeout == NetworkClient.pinEntryTimeout)
+        #expect(requests.first?.query["devicename"] == NetworkClient.pairingDeviceName)
+    }
+
+    @Test(arguments: [false, true]) func wrongPINAndForgedSignatureNeverPersistAPin(forged: Bool) async throws {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let host = ProtocolPairingHost(host: identity, forgedSignature: forged)
+        defer { PinnedCertStore.delete(forHostID: host.id) }
+        do {
+            _ = try await attempt(host, pin: forged ? "4821" : "4822")
+            Issue.record("Invalid pairing was accepted")
+        } catch StreamError.pairingRejected { }
+        #expect(PinnedCertStore.load(forHostID: host.id) == nil)
+        #expect(!host.recordedRequests.contains { $0.path == "/unpair" })
+    }
+
+    @Test(arguments: [false, true]) func droppedTLSOrChangedPCIdentityNeverCommitsPairing(changedID: Bool) async throws {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let host = ProtocolPairingHost(host: identity, failTLS: !changedID, changedID: changedID)
+        defer { PinnedCertStore.delete(forHostID: host.id) }
+        await #expect(throws: (any Error).self) { _ = try await attempt(host) }
+        #expect(PinnedCertStore.load(forHostID: host.id) == nil)
+        #expect(!host.recordedRequests.contains { $0.path == "/unpair" })
+    }
+}
+
+private actor HeldPairingRequest {
+    private(set) var targets: [String] = []
+    func read(_ target: String) async throws -> ControlTransport.Response {
+        targets.append(target)
+        try await Task.sleep(for: .seconds(60))
+        throw StreamError.hostUnreachable("test request expired")
+    }
+}
+
+extension PairingProtocolRegressionTests {
+    @Test func pinWaitDistinguishesTimeoutCancellationAndConnectionLoss() {
+        let deadline = Date(timeIntervalSince1970: 500)
+        let lost = StreamError.hostUnreachable("test socket closed")
+        #expect(PairingClient.pinEntryError(lost, deadline: deadline, now: deadline) as? PairingAttemptFailure == .timedOut)
+        #expect(PairingClient.pinEntryError(lost, deadline: deadline, now: deadline.addingTimeInterval(-20)) as? PairingAttemptFailure == .disconnected)
+        #expect(PairingClient.pinEntryError(CancellationError(), deadline: deadline, now: deadline) is CancellationError)
+    }
+
+    @Test func cancellingTheProductionPairingFlowDoesNotPinOrSendAnUnpairRequest() async throws {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let id = "pairing-cancel-test-\(UUID().uuidString)"
+        defer { PinnedCertStore.delete(forHostID: id) }
+        let pending = HeldPairingRequest()
+        let info = ServerInfo(address: "test.invalid", uniqueId: id, serverName: "Test PC")
+        let network = NetworkClient(server: info, transport: { _, _, target, _, _, _, _ in
+            try await pending.read(target)
+        }, identity: { (identity.certPEM, identity.keyPEM, "cancel-test-install") })
+        let task = Task { try await PairingClient(network: network, server: info).pair(pin: "4821") }
+        for _ in 0..<100 {
+            if !(await pending.targets).isEmpty { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!(await pending.targets).isEmpty)
+        task.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect((await pending.targets).count == 1)
+        #expect(PinnedCertStore.load(forHostID: id) == nil)
+    }
+
+    @Test func busyPairingIsReportedWithoutChangingTheSavedPin() async throws {
+        let identity = try await IdentityManager.shared.generateKeyPairAndCert()
+        let id = "pairing-busy-test-\(UUID().uuidString)"
+        defer { PinnedCertStore.delete(forHostID: id) }
+        let info = ServerInfo(address: "test.invalid", uniqueId: id, serverName: "Test PC")
+        let network = NetworkClient(server: info, transport: { _, _, _, _, _, _, _ in
+            .init(status: 200, body: Data("<root status_code=\"200\"><paired>1</paired></root>".utf8))
+        }, identity: { (identity.certPEM, identity.keyPEM, "busy-test-install") })
+        let error = await #expect(throws: PairingAttemptFailure.self) {
+            _ = try await PairingClient(network: network, server: info).pair(pin: "4821")
+        }
+        #expect(error == .busy)
+        #expect(PinnedCertStore.load(forHostID: id) == nil)
+    }
+}

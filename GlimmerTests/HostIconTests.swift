@@ -14,6 +14,7 @@ struct HostIconTests {
         #expect(HostIcon.suggested(for: "Linux Mint") == .mint)
         #expect(HostIcon.suggested(for: "windows-gaming") == .windows)
         #expect(HostIcon.suggested(for: "macos-studio") == .macOS)
+        #expect(HostIcon.suggested(for: "Mac") == .macOS)
         #expect(HostIcon.suggested(for: "archer") == .computer)
         #expect(HostIcon.suggested(for: "my-mint-green-pc") == .computer)
         #expect(HostIcon.suggested(for: "desktop.ubuntu.example") == .computer)
@@ -22,6 +23,16 @@ struct HostIconTests {
         #expect(HostIcon.suggested(for: "ubuntu-windows") == .computer)
         #expect(HostIcon.suggested(for: "steam-pc") == .computer)
         #expect(HostIcon.suggested(for: "pop-osx-pc") == .macOS)
+    }
+
+    @Test func advertisedAppleAndWindowsNamesSuggestTheirSystemIcons() {
+        for name in ["Kevin’s Mac mini", "Kevins-MacBook-Pro", "MacBookAir", "iMac", "MacStudio"] {
+            #expect(HostIcon.suggested(for: name) == .macOS)
+        }
+        #expect(HostIcon.suggested(for: "Windows11-Gaming") == .windows)
+        #expect(HostIcon.suggested(for: "Windows10") == .windows)
+        #expect(HostIcon.suggested(for: "macaroni") == .computer)
+        #expect(HostIcon.suggested(for: "windowseat") == .computer)
     }
 
     @Test func explicitChoiceOverridesNamesAndAutomaticUsesTheOriginalServerName() {

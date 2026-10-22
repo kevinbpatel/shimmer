@@ -16,69 +16,9 @@ import SwiftUI
 // MARK: - Empty pairing state
 
 struct EmptyPairingState: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showPair = false
-
     var body: some View {
-        // No leading/trailing Spacers: they centred this state inside a window
-        // taller than itself, and the window now sizes to its content, so there
-        // is no extra height to centre within - only height they would invent.
-        VStack(spacing: 26) {
-            ZStack {
-                // Floating glass medallion behind the hero symbol -
-                // accent-tinted so it picks up the system tint.
-                Circle()
-                    .frame(width: 144, height: 144)
-                    .glassEffect(
-                        .regular.tint(Color.accentColor.opacity(0.18)),
-                        in: .circle
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.22),
-                                        Color.white.opacity(0.04)
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                ),
-                                lineWidth: 1
-                            )
-                    }
-                Image(systemName: "display.and.arrow.down")
-                    .font(.system(size: 60, weight: .light))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.tint)
-                    .symbolEffect(.pulse.byLayer, options: .repeating, isActive: !reduceMotion)
-            }
-
-            VStack(spacing: 10) {
-                Text("Let's find your gaming PC")
-                    .font(.system(size: 26, weight: .bold))
-                    .tracking(-0.4)
-                Text("Shimmer plays games from your gaming PC, on this Mac.")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 440)
-            }
-
-            Button {
-                showPair = true
-            } label: {
-                Label("Pair a PC", systemImage: "plus.circle.fill")
-                    .frame(minWidth: 260)
-            }
-            .buttonStyle(StreamButtonStyle())
-            .controlSize(.large)
-        }
-        .padding(40)
-        .fixedSize(horizontal: false, vertical: true)
-        .sheet(isPresented: $showPair) {
-            PairSheet().environment(model)
-        }
+        ContentUnavailableView("Add your gaming PC", systemImage: "desktopcomputer",
+            description: Text("Choose a nearby PC in the sidebar, or use Add by Address to enter its IP address or hostname."))
     }
 }
 
