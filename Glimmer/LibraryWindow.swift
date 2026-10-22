@@ -93,7 +93,6 @@ struct ComputersTab: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if !model.hosts.isEmpty {
-                        sidebarHeading("Saved PCs")
                         ForEach(model.hosts) { host in
                             Button {
                                 guard !model.pairingInFlight else { return }
