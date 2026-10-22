@@ -167,7 +167,7 @@ struct ManualAddressPopover: View {
             Text("Add PC by Address")
                 .font(.system(size: 13, weight: .bold))
                 .frame(maxWidth: .infinity)
-            Text("Enter the IP address or hostname of the PC you want to stream from.")
+            Text("Enter the PC’s IP address or hostname.")
                 .fixedSize(horizontal: false, vertical: true)
             TextField("192.168.1.10 or pc.local", text: $address)
                 .textFieldStyle(.roundedBorder)
