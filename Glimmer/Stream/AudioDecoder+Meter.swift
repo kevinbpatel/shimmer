@@ -340,7 +340,7 @@ extension AudioDecoder {
         let ordinal = TelemetryCounters.shared.audioUnderrunTotal.value
         let backlog = suppressed > 0 ? " (+\(suppressed) since last line)" : ""
         Diag.notice(
-            "audio under-run #\(ordinal)\(backlog) - playout drained to empty; route \(route), "
+            "audio under-run #\(ordinal)\(backlog) - playout drained to empty; route \(route, privacy: .private), "
             + "cushion target \(Int(targetMs))ms",
             "Stream")
     }

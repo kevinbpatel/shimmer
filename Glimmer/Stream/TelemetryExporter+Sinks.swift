@@ -40,7 +40,7 @@ extension TelemetryExporter {
         let histograms = FrameTimingTracker.shared?.histograms.snapshot()
         let report = SessionReport(
             sessionId: sessionId,
-            client: TelemetryRenderer.clientNameRaw,
+            client: TelemetryRenderer.clientLabel,
             host: serverLabel,
             buildCommit: BuildInfo.commit,
             buildDate: BuildInfo.date,
@@ -80,8 +80,8 @@ extension TelemetryExporter {
         let sinceConnect =
             Double(now.uptimeNanoseconds &- connectInstant.uptimeNanoseconds) / 1_000_000_000.0
         let count = counters.bookmarkTotal.value
-        Diag.notice(String(format: "BOOKMARK #%llu at t+%.3fs - user flagged jank "
-            + "(\"that felt bad\")", count, sinceConnect), Self.logCategory)
+        Diag.notice("\(String(format: "BOOKMARK #%llu at t+%.3fs - user flagged jank (\"that felt bad\")", count, sinceConnect))",
+                    Self.logCategory)
         workQueue.async { [weak self] in
             guard let self else { return }
             let iso = self.isoFormatter.string(from: Date())

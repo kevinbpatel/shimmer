@@ -360,7 +360,7 @@ final class RtpAudioReceiver: @unchecked Sendable {
         // when telemetry is on.
         TelemetryCounters.shared.anchorAudioStreamStart()
         startPingLoop()
-        Diag.notice("NativeAudio ping started → \(host):\(audioPort) "
+        Diag.notice("NativeAudio ping started → \(host, privacy: .private):\(audioPort) "
             + "(\(pingPayload.isEmpty ? "legacy ping" : "16-byte ping"), "
             + "burst \(Int(Self.burstIntervalSec * 1000))ms for "
             + "\(Int(Self.burstDurationSec))s → steady conditional "
@@ -388,7 +388,7 @@ final class RtpAudioReceiver: @unchecked Sendable {
         receiveStarted = true
         startReceiveLoop()
         armAudioPendingProbe()
-        Diag.notice("NativeAudio receive started → \(host):\(audioPort) "
+        Diag.notice("NativeAudio receive started → \(host, privacy: .private):\(audioPort) "
             + "(packetDuration=\(audioPacketDuration)ms, "
             + "\(audioEncryption ? "AES-CBC" : "plaintext"))", Self.cat)
     }

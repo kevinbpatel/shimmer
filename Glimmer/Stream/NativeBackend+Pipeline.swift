@@ -29,13 +29,13 @@ extension NativeBackend {
         // keeps DNS off the socket-setup paths, and fails a bad name in one
         // place with an error that says so.
         guard let host = UdpPinger.resolveHost(server.address) else {
-            Diag.error("native backend: could not resolve host \"\(server.address)\" "
+            Diag.error("native backend: could not resolve host \"\(server.address, privacy: .private)\" "
                 + "- check the name resolves (DNS/mDNS) from this Mac", Self.logCategory)
             throw EnetError.socketFailure(
                 "could not resolve host \"\(server.address)\"")
         }
         if case .name = NWEndpoint.Host(server.address) {
-            Diag.notice("native backend: resolved \"\(server.address)\" → \(host) "
+            Diag.notice("native backend: resolved \"\(server.address, privacy: .private)\" → \(host, privacy: .private) "
                 + "(one resolve for all channels)", Self.logCategory)
         }
 
@@ -187,7 +187,7 @@ extension NativeBackend {
         do {
             try await receiver.start()
         } catch {
-            Diag.error("native backend: video receiver start failed: \(error)", Self.logCategory)
+            Diag.error("native backend: video receiver start failed: \(error, privacy: .private)", Self.logCategory)
             events.stageFailed("video stream initialization", code: -1)
             throw StreamError.sessionFailed(-1)
         }
@@ -318,7 +318,7 @@ extension NativeBackend {
         do {
             try receiver.startPing()
         } catch {
-            Diag.error("native backend: audio ping start failed: \(error)", Self.logCategory)
+            Diag.error("native backend: audio ping start failed: \(error, privacy: .private)", Self.logCategory)
             withState { audioReceiver = nil }
         }
     }
@@ -340,7 +340,7 @@ extension NativeBackend {
         do {
             try receiver.startReceive()
         } catch {
-            Diag.error("native backend: audio receive start failed: \(error)", Self.logCategory)
+            Diag.error("native backend: audio receive start failed: \(error, privacy: .private)", Self.logCategory)
             // Keep the ping alive (it keeps the A/V session up); only receive failed.
             // H7: surface the video-only state instead of swallowing it - a
             // queryable counter + a non-fatal event (the visual stream is fine).
@@ -375,8 +375,8 @@ extension NativeBackend {
         let rtspTargetUrl = server.rtspSessionUrl.isEmpty
             ? "rtsp://\(urlAddr):\(rtspPort)"
             : server.rtspSessionUrl
-        Diag.info("name resolution: host=\(server.address) rtspPort=\(rtspPort) "
-            + "appVer=\(server.appVersion) quad=\(appVersionQuad)", Self.logCategory)
+        Diag.info("name resolution: host=\(server.address, privacy: .private) rtspPort=\(rtspPort) "
+            + "appVer=\(server.appVersion, privacy: .private) quad=\(appVersionQuad)", Self.logCategory)
         events.stageComplete("name resolution")
 
         if checkInterrupted() {
@@ -410,7 +410,7 @@ extension NativeBackend {
         do {
             handshake = try await rtsp.performHandshake()
         } catch {
-            Diag.error("native backend: RTSP handshake failed: \(error)", Self.logCategory)
+            Diag.error("native backend: RTSP handshake failed: \(error, privacy: .private)", Self.logCategory)
             events.stageFailed("RTSP handshake", code: rtspCode(error))
             throw error
         }
@@ -443,7 +443,7 @@ extension NativeBackend {
         do {
             crypto = try ControlCrypto(rikey: config.remoteInputAesKey)
         } catch {
-            Diag.error("native backend: control crypto init failed: \(error)", Self.logCategory)
+            Diag.error("native backend: control crypto init failed: \(error, privacy: .private)", Self.logCategory)
             events.stageFailed("control stream initialization", code: -1)
             throw StreamError.crypto("\(error)")
         }
@@ -461,7 +461,7 @@ extension NativeBackend {
                 stageDone: { name in events.stageComplete(name) },
                 stageFailed: { name, code in events.stageFailed(name, code: code) })
         } catch {
-            Diag.error("native backend: control stream failed: \(error)", Self.logCategory)
+            Diag.error("native backend: control stream failed: \(error, privacy: .private)", Self.logCategory)
             // establishAndStart already fired the specific stageFailed.
             throw error
         }

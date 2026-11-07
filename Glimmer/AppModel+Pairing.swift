@@ -155,7 +155,7 @@ extension AppModel {
                 apps = try await pairedClient.appList()
                     .map { PairedApp(id: $0.id, name: $0.name, hdr: $0.hdrCapable, hidden: $0.hidden) }
             } catch {
-                log.error("post-pair /applist failed: \(error.localizedDescription, privacy: .public)")
+                log.error("post-pair /applist failed: \(error.localizedDescription, privacy: .private)")
             }
             guard !Task.isCancelled else { pairingPhase = .idle; return nil }
             if apps.isEmpty {

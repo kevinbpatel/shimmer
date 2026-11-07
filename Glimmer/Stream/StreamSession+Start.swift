@@ -411,7 +411,7 @@ extension StreamSession {
         // swiftlint:disable:next line_length
         self.log.info("Stream config: \(cfgSnapshot.width, privacy: .public)x\(cfgSnapshot.height, privacy: .public)@\(cfgSnapshot.fps, privacy: .public) bitrate=\(cfgSnapshot.bitrate, privacy: .public) packetSize=\(cfgSnapshot.packetSize, privacy: .public) audio=\(cfgSnapshot.audioConfiguration, privacy: .public) videoFormats=0x\(String(cfgSnapshot.supportedVideoFormats, radix: 16), privacy: .public) refreshRateX100=\(cfgSnapshot.clientRefreshRateX100, privacy: .public) colorSpace=\(cfgSnapshot.colorSpace, privacy: .public) colorRange=\(cfgSnapshot.colorRange, privacy: .public) encryption=0x\(String(cfgSnapshot.encryptionFlags, radix: 16), privacy: .public) remote=\(cfgSnapshot.streamingRemotely, privacy: .public) display=\(displayName, privacy: .public) displayMaxFps=\(displayMaxFps, privacy: .public)")
         Diag.notice("Stream config: \(cfgSnapshot.width)x\(cfgSnapshot.height)@\(cfgSnapshot.fps), "
-            + "\(cfgSnapshot.bitrate / 1000) Mbps, display \(displayName)", "Stream")
+            + "\(cfgSnapshot.bitrate / 1000) Mbps, display \(displayName, privacy: .private)", "Stream")
     }
 
     /// Arm the post-connection timers: the 2 Hz stats-overlay updater, the

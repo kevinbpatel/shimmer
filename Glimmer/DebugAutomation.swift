@@ -87,7 +87,7 @@ extension AppModel {
                 || ($0.manualAddress?.localizedCaseInsensitiveContains(match) ?? false)
         }
         if host == nil {
-            log.error("DEBUG automation: no host matching '\(match, privacy: .public)' among \(self.hosts.map(\.name), privacy: .public)")
+            log.error("DEBUG automation: no host matching '\(match, privacy: .private)' among \(self.hosts.map(\.name), privacy: .private)")
         }
         return host
     }
@@ -173,7 +173,7 @@ extension AppModel {
         let returnAfter = Self.debugKnob("return-after").flatMap(Double.init)
         let closeAfter = Self.debugKnob("pip-close-after").flatMap(Double.init)
         let againAfter = Self.debugKnob("pip-again-after").flatMap(Double.init)
-        log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .public) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
+        log.notice("DEBUG automation armed: stream host~=\(hostMatch, privacy: .private) pipAfter=\(pipAfter ?? -1) quitAfter=\(quitAfter ?? -1)")
 
         // Give discovery/host-load a beat, then select + stream.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -184,10 +184,10 @@ extension AppModel {
                     || ($0.localAddress?.localizedCaseInsensitiveContains(hostMatch) ?? false)
                     || ($0.manualAddress?.localizedCaseInsensitiveContains(hostMatch) ?? false)
             }) else {
-                self.log.error("DEBUG automation: no host matching '\(hostMatch, privacy: .public)' among \(self.hosts.map(\.name), privacy: .public)")
+                self.log.error("DEBUG automation: no host matching '\(hostMatch, privacy: .private)' among \(self.hosts.map(\.name), privacy: .private)")
                 return
             }
-            self.log.notice("DEBUG automation: selecting \(host.name, privacy: .public) (\(host.apps.count) apps) and streaming default")
+            self.log.notice("DEBUG automation: selecting \(host.name, privacy: .private) (\(host.apps.count) apps) and streaming default")
             self.selectHost(host)
             self.streamDefaultApp()
             self.armDebugPiPAndQuit(pipAfter: pipAfter, returnAfter: returnAfter, closeAfter: closeAfter,
@@ -206,7 +206,7 @@ extension AppModel {
             guard let self else { t.invalidate(); return }
             // Give up after 30s of not reaching streaming.
             if Date().timeIntervalSince(start) > 30 {
-                self.log.error("DEBUG automation: stream never reached .streaming within 30s (phase=\(String(describing: self.streamPhase), privacy: .public))")
+                self.log.error("DEBUG automation: stream never reached .streaming within 30s (phase=\(String(describing: self.streamPhase), privacy: .private))")
                 t.invalidate(); return
             }
             guard self.streamPhase == .streaming, !fired else { return }

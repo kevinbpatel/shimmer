@@ -220,7 +220,7 @@ extension StreamSession {
                 continue
             }
             if reconnectServer?.address != address {
-                Diag.notice("reconnect: host answers at \(address) - switching to it", "Stream")
+                Diag.notice("reconnect: host answers at \(address, privacy: .private) - switching to it", "Stream")
                 reconnectServer?.address = address
             }
             Diag.notice("reconnect attempt \(reconnectAttempts)/\(Self.reconnectAttemptCap)...", "Stream")
@@ -369,7 +369,7 @@ extension StreamSession {
                 serverInfo: serverInfo, launch: launch, backendConfig: backendConfig,
                 setup: (win, inp, dec), network: net, duringReconnect: true)
         } catch {
-            Diag.notice("reconnect attempt failed: \(error)", "Stream")
+            Diag.notice("reconnect attempt failed: \(error, privacy: .private)", "Stream")
             await net.shutdown()
             self.network = nil
             return false

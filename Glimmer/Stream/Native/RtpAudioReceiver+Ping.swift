@@ -103,7 +103,7 @@ extension RtpAudioReceiver {
         EnvSignalController.shared.audioPingsSentTotal.increment()
         if pingCount == 1 {
             pingStartTimeUs.store(UInt64(DispatchTime.now().uptimeNanoseconds / 1000))
-            Diag.notice("NativeAudio first audio ping sent → \(host):\(audioPort) "
+            Diag.notice("NativeAudio first audio ping sent → \(host, privacy: .private):\(audioPort) "
                 + "(\(pingPayload.isEmpty ? "legacy" : "payload") seq=\(pingCount))", Self.cat)
         }
     }

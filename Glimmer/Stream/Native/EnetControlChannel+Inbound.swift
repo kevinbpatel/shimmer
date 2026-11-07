@@ -243,7 +243,7 @@ extension EnetControlChannel {
         do {
             inner = try crypto.open(bytes)
         } catch {
-            Diag.error("ENet failed to decrypt inbound control: \(error)", Self.logCategory)
+            Diag.error("ENet failed to decrypt inbound control: \(error, privacy: .private)", Self.logCategory)
             return
         }
         // inner = [type LE][payloadLength LE][payload]

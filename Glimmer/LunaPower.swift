@@ -237,7 +237,7 @@ final class LunaPower {
             devices = try JSONDecoder().decode([Device].self, from: data)
             devicesFetchedAt = Date()
         } catch {
-            log.error("luna devices failed: \(error.localizedDescription, privacy: .public)")
+            log.error("luna devices failed: \(error.localizedDescription, privacy: .private)")
             devices = []
             devicesFetchedAt = Date()   // don't hammer a broken luna; TTL still applies
         }

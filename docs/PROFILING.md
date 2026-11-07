@@ -258,7 +258,8 @@ When enabled, a stream writes to `~/Library/Logs/Glimmer/`:
 - `telemetry-<timestamp>.ndjson` - per-second stream metrics;
 - `telemetry-session-<timestamp>.json` - a one-shot session scorecard;
 - `telemetry-frames-<timestamp>.ndjson` - the per-frame trace, segmented;
-- `glimmer-<timestamp>.log` - a richer per-session diagnostic log.
+- `glimmer-<timestamp>.log` - a richer per-session diagnostic log, with PC names,
+  addresses and error text shown as `<private>`.
 
 The exporter also serves the per-second metrics on a local Prometheus endpoint,
 which is what a maintainer-local dashboard rig would scrape. No such rig is in

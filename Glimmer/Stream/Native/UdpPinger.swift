@@ -114,7 +114,7 @@ final class UdpPinger: @unchecked Sendable {
 
     func start() {
         guard let (dest, len, family) = UdpPinger.makeSockaddr(for: host, port: port) else {
-            Diag.error("\(label) pinger: could not build address for \(host)", Self.cat)
+            Diag.error("\(label) pinger: could not build address for \(host, privacy: .private)", Self.cat)
             return
         }
         destAddr = dest
@@ -192,7 +192,7 @@ final class UdpPinger: @unchecked Sendable {
             }
         }
         if pingCount == 1 {
-            Diag.notice("\(label) first ping sent → \(host):\(port) "
+            Diag.notice("\(label) first ping sent → \(host, privacy: .private):\(port) "
                 + "(\(payload.isEmpty ? "legacy" : "payload") seq=1)", Self.cat)
         }
     }

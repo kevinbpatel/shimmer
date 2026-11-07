@@ -325,6 +325,13 @@ the comment at `StreamBridgeContext.eventContinuation` (in
     timings, codec format ints, error codes).
   - `privacy: .private` (the default) for anything PII-adjacent: host addresses,
     host names, error message strings, host versions.
+  - `Diag.*` takes the same `privacy:` argument as `Logger`, but defaults to
+    `.public`, so mark those values `.private` there too:
+    `Diag.info("Connecting to \(address, privacy: .private)", "Stream")`.
+    Private values reach only the in-app log viewer. The system log (and so
+    `shimmerctl logs`), the session file and the viewer's Copy, which people
+    attach to public issues, show `<private>` in their place. Telemetry names
+    the PC and the Mac by per-install pseudonyms, never their names.
   - Never log:
     - Key characters from `keyDown` events (a later change fixed the regression
       where chars=... leaked at `.public`).

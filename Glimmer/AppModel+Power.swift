@@ -34,14 +34,14 @@ extension AppModel {
         Self.wakeTask = Task { @MainActor in
             do {
                 try await LunaPower.shared.perform("on", deviceID: device.id, hostID: host.id)
-                Diag.notice("luna: \(host.displayName) confirmed awake", "Power")
+                Diag.notice("luna: \(host.displayName, privacy: .private) confirmed awake", "Power")
                 restartHostStatusPolling()
                 guard thenConnect, !Task.isCancelled else { return }
                 if await waitForSunshine(host: host, budgetSeconds: 90) {
                     guard selectedHost?.id == host.id, !isStreaming else { return }
                     streamDefaultApp()
                 } else if !Task.isCancelled {
-                    Diag.notice("luna: \(host.displayName) awake but Sunshine did not "
+                    Diag.notice("luna: \(host.displayName, privacy: .private) awake but Sunshine did not "
                         + "answer within 90s - not auto-connecting", "Power")
                 }
             } catch is CancellationError {
@@ -51,8 +51,8 @@ extension AppModel {
                 // show - the tile falls straight back to offline + Wake.
             } catch {
                 // LunaPower recorded lastActionError for the tile subtext.
-                Diag.notice("luna: wake \(host.displayName) failed - "
-                    + "\(error.localizedDescription)", "Power")
+                Diag.notice("luna: wake \(host.displayName, privacy: .private) failed - "
+                    + "\(error.localizedDescription, privacy: .private)", "Power")
             }
         }
     }
@@ -66,7 +66,7 @@ extension AppModel {
     /// latched state - a cancel followed by a fresh Wake starts clean.
     func cancelWake(_ host: Host) {
         guard LunaPower.shared.actionInFlight[host.id] == "on" else { return }
-        Diag.notice("luna: wake \(host.displayName) cancelled by the user - abandoning "
+        Diag.notice("luna: wake \(host.displayName, privacy: .private) cancelled by the user - abandoning "
             + "the wait (UpSnap has the request; the PC may still come up)", "Power")
         Self.wakeTask?.cancel()
         Self.wakeTask = nil
@@ -82,10 +82,10 @@ extension AppModel {
         Task { @MainActor in
             do {
                 try await LunaPower.shared.perform(verb, deviceID: device.id, hostID: host.id)
-                Diag.notice("luna: \(verb) \(host.displayName) confirmed", "Power")
+                Diag.notice("luna: \(verb) \(host.displayName, privacy: .private) confirmed", "Power")
             } catch {
-                Diag.notice("luna: \(verb) \(host.displayName) failed - "
-                    + "\(error.localizedDescription)", "Power")
+                Diag.notice("luna: \(verb) \(host.displayName, privacy: .private) failed - "
+                    + "\(error.localizedDescription, privacy: .private)", "Power")
             }
             restartHostStatusPolling()
         }

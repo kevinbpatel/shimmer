@@ -57,7 +57,7 @@ extension NetworkClient {
                 fetchedOverPaired = true
             } catch let err as StreamError {
                 if case .hostUnreachable(let detail) = err {
-                    log.error("HTTPS to pinned host failed (\(detail, privacy: .public)) - refusing HTTP fallback to preserve cert pin")
+                    log.error("HTTPS to pinned host failed (\(detail, privacy: .private)) - refusing HTTP fallback to preserve cert pin")
                     // Disambiguate before blaming the network: a READ-ONLY
                     // plain-HTTP probe (the pin is NEVER rebound from it -
                     // the C2 contract above stands). It answers exactly one

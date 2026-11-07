@@ -37,7 +37,7 @@ extension AudioDecoder {
         audioMeterLock.unlock()
         // First-sample NOTICE - a new sampler announces itself (success AND
         // failure shape) rather than going silently dark.
-        Diag.notice("audio output route: \(route)", "Stream")
+        Diag.notice("audio output route: \(route, privacy: .private)", "Stream")
         var addr = Self.defaultOutputDeviceAddress
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             guard let self else { return }
@@ -47,7 +47,7 @@ extension AudioDecoder {
             self.audioRouteCache = fresh
             self.audioMeterLock.unlock()
             if fresh != previous {
-                Diag.notice("audio route changed: \(previous) → \(fresh)", "Stream")
+                Diag.notice("audio route changed: \(previous, privacy: .private) → \(fresh, privacy: .private)", "Stream")
             }
         }
         let status = AudioObjectAddPropertyListenerBlock(

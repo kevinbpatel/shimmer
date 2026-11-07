@@ -53,7 +53,7 @@ enum LoginItemManager {
             Diag.notice("login item registered (helper) → \(statusLabel(helper.status))", "LoginItem")
             return helper.status
         } catch {
-            Diag.error("login item registration FAILED: \(error.localizedDescription)", "LoginItem")
+            Diag.error("login item registration FAILED: \(error.localizedDescription, privacy: .private)", "LoginItem")
             return .notFound
         }
     }
@@ -96,7 +96,7 @@ enum LoginItemManager {
                     : "launchd reports the login item cannot spawn"
                 Diag.notice("login item \(why) - re-registering so launchd refreshes its code requirement", "LoginItem")
                 do { try helper.unregister() } catch {
-                    Diag.error("login item unregister FAILED: \(error.localizedDescription)", "LoginItem")
+                    Diag.error("login item unregister FAILED: \(error.localizedDescription, privacy: .private)", "LoginItem")
                 }
                 apply(launchAtLogin: true)
             } else {

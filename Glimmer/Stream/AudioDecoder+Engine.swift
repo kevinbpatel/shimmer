@@ -218,7 +218,7 @@ extension AudioDecoder {
             if !engine.isRunning { try engine.start() }
         } catch {
             log.error("AVAudioEngine.start: \(error.localizedDescription)")
-            Diag.error("audio engine start FAILED: \(error.localizedDescription)", "Stream.Audio")
+            Diag.error("audio engine start FAILED: \(error.localizedDescription, privacy: .private)", "Stream.Audio")
             return false
         }
         applyOutputVolumeLocked()
@@ -360,7 +360,7 @@ extension AudioDecoder {
             engineRestartRetries = 0
             Diag.notice("audio engine restart retry \(attempt) succeeded", "Stream.Audio")
         } catch {
-            Diag.error("audio engine restart retry \(attempt) failed: \(error.localizedDescription)", "Stream.Audio")
+            Diag.error("audio engine restart retry \(attempt) failed: \(error.localizedDescription, privacy: .private)", "Stream.Audio")
             scheduleEngineRestartRetry()
         }
     }
@@ -404,7 +404,7 @@ extension AudioDecoder {
             }
             guard noRaise, startError == nil, engine.isRunning else {
                 Diag.error("audio engine start at prime edge FAILED "
-                    + "(\(startError.map { $0.localizedDescription } ?? "NSException")) "
+                    + "(\(startError.map { $0.localizedDescription } ?? "NSException", privacy: .private)) "
                     + "- staying un-primed, retry armed", "Stream.Audio")
                 scheduleEngineRestartRetry()
                 return false
@@ -443,7 +443,7 @@ extension AudioDecoder {
                 engineRestartRetries = 0
             } catch {
                 Diag.error("audio engine restart in stall recovery FAILED: "
-                    + "\(error.localizedDescription)", "Stream.Audio")
+                    + "\(error.localizedDescription, privacy: .private)", "Stream.Audio")
                 scheduleEngineRestartRetry()
             }
         }
@@ -499,7 +499,7 @@ extension AudioDecoder {
                 engineRestartRetries = 0
             } catch {
                 Diag.error("audio engine restart after config change FAILED: "
-                    + "\(error.localizedDescription)", "Stream.Audio")
+                    + "\(error.localizedDescription, privacy: .private)", "Stream.Audio")
                 scheduleEngineRestartRetry()
             }
         }

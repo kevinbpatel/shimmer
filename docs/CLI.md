@@ -28,6 +28,10 @@ scripts/shimmerctl logs --last 10m
 scripts/shimmerctl test-stream --host gaming-pc --seconds 12
 ```
 
+`logs`, `doctor` and `test-stream` read the unified log, where PC names and
+addresses, and most connection error details, appear as `<private>`. Settings →
+Diagnostics → Logs shows the full lines on the Mac itself.
+
 The stream test uses the installed app's existing launch automation and real
 pairing, certificate pinning, stream configuration, decoder, and teardown. It
 starts the saved default app on the named host. The client quits after the test

@@ -74,7 +74,7 @@ extension AppModel {
             }
             let occupant = Self.occupantName(currentGameID: fresh.currentGameID, apps: host.apps)
             if Self.isTakeover(occupant: occupant, launching: app.name) {
-                Diag.notice("Takeover check: \(host.displayName) is running \(occupant ?? "?") - asking before launching \(app.name)", "Stream")
+                Diag.notice("Takeover check: \(host.displayName, privacy: .private) is running \(occupant ?? "?") - asking before launching \(app.name)", "Stream")
                 self.pendingTakeover = PendingTakeover(app: app, host: host, occupantApp: occupant ?? "")
                 return
             }
@@ -120,10 +120,10 @@ extension AppModel {
         // its launch surfaces while a session exists, but a double-click can
         // land before SwiftUI re-renders - this guard is the actual wall.
         guard !isStreaming else {
-            Diag.notice("Ignoring stream request (\(app.name) on \(host.displayName)) - a session is already in flight", "Stream")
+            Diag.notice("Ignoring stream request (\(app.name) on \(host.displayName, privacy: .private)) - a session is already in flight", "Stream")
             return
         }
-        Diag.notice("Starting stream → \(host.displayName) · \(app.name)", "Stream")
+        Diag.notice("Starting stream → \(host.displayName, privacy: .private) · \(app.name)", "Stream")
         streamPhase = .connecting(stage: "Connecting to \(host.displayName)…")
         nativeStreamError = nil
         nativeHDRActive = false
@@ -299,12 +299,12 @@ extension AppModel {
             // gets an actionable line. StreamError already carries
             // user-facing copy and is handled on its own path.
             let localized = (caughtError as NSError).localizedDescription
-            self.log.error("Stream start failed for \(hostName, privacy: .public): \(localized, privacy: .public)")
+            self.log.error("Stream start failed for \(hostName, privacy: .private): \(localized, privacy: .private)")
             // Diag too - the os.Logger line above never reaches the in-app
             // log viewer or the Diag file, which made pre-flight failures
             // (the only line naming the real cause) invisible in every
             // pasted log. One line, ERROR level, same redaction rules.
-            Diag.error("Stream start failed for \(hostName): \(localized)", "Stream")
+            Diag.error("Stream start failed for \(hostName, privacy: .private): \(localized, privacy: .private)", "Stream")
             // HONEST banner: only show the "make sure it's awake" copy
             // for a GENUINE reach failure (host off / not on the
             // network). A pairing or launch failure means the host

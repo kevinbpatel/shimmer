@@ -8,9 +8,12 @@ body:
         Thanks for taking the time to report a bug. Glimmer's debugging culture
         is telemetry-first: a session scorecard plus the session log usually
         localizes a streaming problem in minutes, where a prose description
-        alone can take days. The telemetry is **opt-in, local-only, and carries
-        only performance numbers - never secrets, addresses, or input
-        contents.**
+        alone can take days. Telemetry is **opt-in and stays on your Mac until
+        you attach it.** The files carry performance numbers and the app's log
+        lines, including the app you streamed and your display and network
+        setup. Your PC and Mac appear as short codes, not names, and addresses
+        and error details read `<private>`. Encryption keys, PINs and the text
+        you type are never recorded.
   - type: input
     id: version
     attributes:
@@ -70,11 +73,15 @@ body:
            the next stream, not the running one.
         2. Reproduce the problem in a stream. When it "feels bad", press
            **⌃B** to drop a timestamped bookmark into the telemetry.
-        3. End the stream, then attach from `~/Library/Logs/Glimmer/`:
+        3. End the stream, then attach from `~/Library/Logs/Shimmer/`:
            - `telemetry-session-<timestamp>.json` - the session scorecard
            - `glimmer-<timestamp>.log` - the session log
            - (optionally) `telemetry-<timestamp>.ndjson` - per-second metrics,
              if the file isn't too large to attach
+
+        Lines copied from Settings → Diagnostics → Logs and the session files
+        redact private fields. Review them before uploading; streamed app names
+        and display or network details may remain.
       placeholder: Drag and drop the files here.
   - type: textarea
     id: extra

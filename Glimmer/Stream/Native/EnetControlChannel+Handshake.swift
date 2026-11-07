@@ -94,7 +94,7 @@ extension EnetControlChannel {
             }
             conn.start(queue: queue)
         }
-        Diag.info("ENet UDP socket ready → \(host):\(port)", Self.logCategory)
+        Diag.info("ENet UDP socket ready → \(host, privacy: .private):\(port)", Self.logCategory)
     }
 
     // MARK: - CONNECT (host.c enet_host_connect)

@@ -310,6 +310,13 @@ their session use the host PC's recording tools, not the Mac's.
 - VT decode errors and codec configuration ints (`videoFormat=0x...`, `bytes=N`,
   `idr=true/false`).
 - Host addresses at `.private` privacy (default).
+- `Diag` lines, which take Logger's `privacy:` argument (`LogStore.swift`).
+  Private values (PC names and addresses, uniqueids, error text) reach only the
+  in-app log viewer, and show as `<private>` in the unified log (what
+  `shimmerctl logs` reads), the session file and lines copied from the viewer.
+  Keys, PINs and certificates stay out of the message entirely.
+- Telemetry files, which name the PC and the Mac only by pseudonyms keyed to a
+  random per-install salt.
 - Pin-mismatch events (no fingerprints).
 - Pairing-step transitions (no payload data).
 

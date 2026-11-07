@@ -177,7 +177,7 @@ extension AppModel {
                 await MainActor.run { [weak self] in
                     if self?.reachableAddressByHost[snap.id] != address {
                         self?.reachableAddressByHost[snap.id] = address
-                        Diag.info("Host reachable at \(address)", "Stream")
+                        Diag.info("Host reachable at \(address, privacy: .private)", "Stream")
                     }
                 }
                 break

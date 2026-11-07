@@ -1,15 +1,10 @@
 //
 //  LogStore.swift
 //
-//  In-app ring buffer for a Sunshine-style troubleshooting log.
-//
-//  Why not just read os_log? `OSLogStore(scope: .currentProcessIdentifier)` is
-//  not reliably readable on this platform - the Troubleshooting log viewer came
-//  up empty even though os_log was emitting.
-//  So the canonical troubleshooting record is THIS in-memory ring buffer, which
-//  the viewer reads directly. Every entry is ALSO mirrored to os_log (.public -
-//  callers pass already-redacted strings, same discipline as the rest of the
-//  app) so Console.app and `log stream` keep working for live debugging.
+//  The troubleshooting log: a ring the in-app viewer reads (OSLogStore can't read
+//  this process back reliably), mirrored to os_log and the session file. Private
+//  values reach only the viewer; os_log (and so `shimmerctl logs`), the session
+//  file and the viewer's Copy, which people attach to issues, show "<private>".
 //
 
 import Foundation
@@ -44,6 +39,8 @@ struct LogEntry: Identifiable, Sendable {
     let level: LogLevel
     let category: String
     let message: String
+    /// The message with private values as "<private>"; nil when nothing in it was private.
+    let redactedMessage: String?
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -53,8 +50,13 @@ struct LogEntry: Identifiable, Sendable {
 
     var timeString: String { Self.timeFormatter.string(from: date) }
 
-    /// Plain one-line form for copy/export.
+    /// Plain one-line form, full detail.
     var plain: String { "\(timeString)  \(level.label.uppercased())  [\(category)]  \(message)" }
+
+    /// What Copy puts on the pasteboard: copied lines end up in public issues, like the session file.
+    var shareable: String {
+        "\(timeString)  \(level.label.uppercased())  [\(category)]  \(redactedMessage ?? message)"
+    }
 }
 
 /// Thread-safe ring buffer. Entries arrive from many threads (stream callbacks,
@@ -71,37 +73,34 @@ final class LogStore: @unchecked Sendable {
 
     private init() { buffer.reserveCapacity(capacity) }
 
-    func log(_ level: LogLevel, _ message: String, category: String) {
+    func log(_ level: LogLevel, _ diag: DiagMessage, category: String) {
+        let message = diag.text
+        let redacted = diag.systemLogText
         lock.lock()
         let id = nextID
         nextID &+= 1
-        buffer.append(LogEntry(id: id, date: Date(), level: level, category: category, message: message))
+        buffer.append(LogEntry(id: id, date: Date(), level: level, category: category, message: message,
+                               redactedMessage: redacted == message ? nil : redacted))
         if buffer.count > capacity { buffer.removeFirst(buffer.count - capacity) }
         lock.unlock()
 
-        // Mirror to os_log so Console / `log stream` still see everything live.
-        // Messages are already redacted by the caller, so .public is correct.
+        // Mirror to os_log so Console / `log stream` / `shimmerctl logs` still see
+        // everything live. Private values are already "<private>" here, so .public
+        // keeps the wording greppable.
         let logger = Logger(subsystem: "io.ugfugl.Glimmer", category: category)
         switch level {
-        case .debug: logger.debug("\(message, privacy: .public)")
-        case .info: logger.info("\(message, privacy: .public)")
-        case .notice: logger.notice("\(message, privacy: .public)")
-        case .warning: logger.warning("\(message, privacy: .public)")
-        case .error: logger.error("\(message, privacy: .public)")
+        case .debug: logger.debug("\(redacted, privacy: .public)")
+        case .info: logger.info("\(redacted, privacy: .public)")
+        case .notice: logger.notice("\(redacted, privacy: .public)")
+        case .warning: logger.warning("\(redacted, privacy: .public)")
+        case .error: logger.error("\(redacted, privacy: .public)")
         }
 
-        // Third sink (gate-checked, default OFF): when telemetry/debug is enabled
-        // for a streaming session, ALSO mirror the line to a per-session text file
-        // so the rich os_log/Diag record - not just the telemetry NDJSON - is
-        // persisted and shippable into a remote log sink. The
-        // append is a single optional load when off (no file, no lock, no
-        // allocation) and, when on, only pushes a pre-rendered line into an
-        // in-memory buffer drained by a background timer - never an I/O (or fsync)
-        // on the producing thread, so a slow disk can never serialise a hot-path
-        // logger against the file. Mirrors the FrameTraceWriter discipline.
-        if let sink = SessionLogFileSink.shared {
-            sink.append(level: level, category: category, message: message)
-        }
+        // Third sink (gate-checked, default OFF): a per-session text file. One
+        // optional load when off; when on, only an in-memory append drained by a
+        // background timer, never I/O on the producing thread. The file gets the
+        // redacted line: people attach it to public issues.
+        SessionLogFileSink.shared?.append(level: level, category: category, message: redacted)
     }
 
     /// Newest-last snapshot for the viewer.
@@ -115,13 +114,86 @@ final class LogStore: @unchecked Sendable {
     }
 }
 
-/// Terse façade for call sites. `Diag.info("stream connected", "Stream")`.
+/// Terse façade: `Diag.info("Connecting to \(address, privacy: .private)", "Stream")`.
+/// Interpolations take Logger's `privacy:` argument and default to public; a
+/// private value reaches only the in-app viewer, never the system log, the
+/// session file or the viewer's Copy.
 enum Diag {
-    static func debug(_ message: String, _ category: String) { LogStore.shared.log(.debug, message, category: category) }
-    static func info(_ message: String, _ category: String) { LogStore.shared.log(.info, message, category: category) }
-    static func notice(_ message: String, _ category: String) { LogStore.shared.log(.notice, message, category: category) }
-    static func warn(_ message: String, _ category: String) { LogStore.shared.log(.warning, message, category: category) }
-    static func error(_ message: String, _ category: String) { LogStore.shared.log(.error, message, category: category) }
+    static func debug(_ message: DiagMessage, _ category: String) { LogStore.shared.log(.debug, message, category: category) }
+    static func info(_ message: DiagMessage, _ category: String) { LogStore.shared.log(.info, message, category: category) }
+    static func notice(_ message: DiagMessage, _ category: String) { LogStore.shared.log(.notice, message, category: category) }
+    static func warn(_ message: DiagMessage, _ category: String) { LogStore.shared.log(.warning, message, category: category) }
+    static func error(_ message: DiagMessage, _ category: String) { LogStore.shared.log(.error, message, category: category) }
+}
+
+/// Logger's spelling, so a Diag line reads like the `log` line beside it.
+enum DiagPrivacy: Sendable {
+    case `public`, `private`
+}
+
+/// One Diag line in two renderings: `text` for the in-app viewer, `systemLogText`
+/// for os_log, the session file and Copy. The redacted copy is built only once a
+/// private value appears.
+struct DiagMessage: ExpressibleByStringInterpolation, Sendable {
+    let text: String
+    private let redacted: String?
+
+    var systemLogText: String { redacted ?? text }
+
+    init(stringLiteral value: String) {
+        text = value
+        redacted = nil
+    }
+
+    init(stringInterpolation: StringInterpolation) {
+        text = stringInterpolation.text
+        redacted = stringInterpolation.redacted
+    }
+
+    private init(text: String, redacted: String?) {
+        self.text = text
+        self.redacted = redacted
+    }
+
+    /// Long lines wrap with `+`; each piece keeps its own private values.
+    static func + (lhs: DiagMessage, rhs: DiagMessage) -> DiagMessage {
+        let redacted = lhs.redacted == nil && rhs.redacted == nil ? nil : lhs.systemLogText + rhs.systemLogText
+        return DiagMessage(text: lhs.text + rhs.text, redacted: redacted)
+    }
+
+    struct StringInterpolation: StringInterpolationProtocol {
+        fileprivate var text = ""
+        fileprivate var redacted: String?
+
+        init(literalCapacity: Int, interpolationCount: Int) {
+            text.reserveCapacity(literalCapacity + interpolationCount * 8)
+        }
+
+        mutating func appendLiteral(_ literal: String) {
+            text += literal
+            redacted? += literal
+        }
+
+        mutating func appendInterpolation<Value>(_ value: Value, privacy: DiagPrivacy = .public) {
+            let rendered = String(describing: value)
+            switch privacy {
+            case .public:
+                redacted? += rendered
+            case .private:
+                if redacted == nil { redacted = text }
+                redacted? += "<private>"
+            }
+            text += rendered
+        }
+
+        /// A nested line keeps its own private values, or goes private whole, instead
+        /// of rendering as a struct dump.
+        mutating func appendInterpolation(_ message: DiagMessage, privacy: DiagPrivacy = .public) {
+            if redacted == nil, privacy == .private || message.redacted != nil { redacted = text }
+            redacted? += privacy == .private ? "<private>" : message.systemLogText
+            text += message.text
+        }
+    }
 }
 
 // MARK: - Per-session file sink (gate-checked, buffered, off the hot path)
@@ -156,9 +228,9 @@ enum Diag {
 ///   * Torn down with the session (`stop()` flushes + closes), so the file is
 ///     complete and the gate returns to zero-cost.
 ///
-/// SECRET-FREE by inheritance: callers already redact before calling Diag (the
-/// same `.public` discipline the os_log mirror relies on), so the file carries
-/// only what is already safe to print.
+/// REDACTED: the file mirrors Diag's `systemLogText`, the same rendering os_log
+/// gets, so PC names, addresses and error text marked `.private` read
+/// "<private>". People attach this file to public issues.
 ///
 /// `@unchecked Sendable`: the pending buffer is `os_unfair_lock`-guarded; the file
 /// handle + flush timer are confined to `flushQueue`.
@@ -174,7 +246,7 @@ final class SessionLogFileSink: @unchecked Sendable {
     /// telemetry wiring. No-op (nothing installed, `shared` stays nil ⇒ hot path
     /// stays zero-cost) when off. The gate is resolved by the caller and passed in
     /// so this type has no dependency direction into the Stream module.
-    static func startIfEnabled(enabled: Bool) {
+    static func startIfEnabled(enabled: Bool, directory: URL = defaultDirectory) {
         guard enabled else { return }
         // Check-and-install under the lock so concurrent enables can't both create
         // a sink. open() runs off-lock; it only dispatches onto flushQueue.
@@ -184,7 +256,13 @@ final class SessionLogFileSink: @unchecked Sendable {
             box = created
             return created
         }
-        sink?.open()
+        sink?.open(in: directory)
+    }
+
+    /// `~/Library/Logs/Shimmer`, shared with the telemetry NDJSON files.
+    static var defaultDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
     }
 
     /// Tear down + clear the singleton. Flushes whatever is pending and closes the
@@ -240,15 +318,13 @@ final class SessionLogFileSink: @unchecked Sendable {
 
     /// Open the per-session file + arm the flush timer. Mirrors the telemetry
     /// NDJSON path so both land in one directory a log shipper can mount.
-    private func open() {
+    private func open(in dir: URL) {
         flushQueue.async { [weak self] in
             guard let self else { return }
-            let dir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Logs/Shimmer", isDirectory: true)
             do {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             } catch {
-                self.log.error("Diag file sink: could not create log dir: \(error.localizedDescription, privacy: .public)")
+                self.log.error("Diag file sink: could not create log dir: \(error.localizedDescription, privacy: .private)")
                 return
             }
             // ISO8601 with ':' is filename-legal on APFS; same stamp shape as the
@@ -263,7 +339,7 @@ final class SessionLogFileSink: @unchecked Sendable {
                 self.fileHandle = try FileHandle(forWritingTo: url)
                 self.log.notice("Diag file sink → \(url.path, privacy: .public)")
             } catch {
-                self.log.error("Diag file sink: could not open file: \(error.localizedDescription, privacy: .public)")
+                self.log.error("Diag file sink: could not open file: \(error.localizedDescription, privacy: .private)")
                 return
             }
             let timer = DispatchSource.makeTimerSource(queue: self.flushQueue)
@@ -326,7 +402,7 @@ final class SessionLogFileSink: @unchecked Sendable {
         do {
             try fileHandle.write(contentsOf: data)
         } catch {
-            log.error("Diag file sink write failed: \(error.localizedDescription, privacy: .public)")
+            log.error("Diag file sink write failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 }

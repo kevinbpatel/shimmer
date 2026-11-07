@@ -110,14 +110,14 @@ extension RtpAudioReceiver {
         startupVerdictBurst = burst
         let droppedMs = startupDroppedPackets * audioPacketDuration
         let rate = arrivedMs / max(elapsedMs, 0.001)
-        Diag.notice("NativeAudio METRIC startup-pacing=\(burst ? "burst" : "paced") "
-            + String(format: "rate=%.1fx", rate)
+        let rateText = String(format: "rate=%.1fx", rate)
+        let idleText = idleResolved ? " resolved-on-idle" : ""
+        let outcome = burst ? " - backlog flushed; kept the decoded window as the cushion"
+                            : " - live flow from the first packet; nothing withheld"
+        Diag.notice("NativeAudio METRIC startup-pacing=\(burst ? "burst" : "paced") \(rateText)"
             + " (\(String(format: "%.0f", arrivedMs))ms audio in "
             + "\(String(format: "%.0f", elapsedMs))ms)"
-            + " dropped=\(droppedMs)ms"
-            + (idleResolved ? " resolved-on-idle" : "")
-            + (burst ? " - backlog flushed; kept the decoded window as the cushion"
-                     : " - live flow from the first packet; nothing withheld"), Self.cat)
+            + " dropped=\(droppedMs)ms\(idleText)\(outcome)", Self.cat)
         emitAudioTtfEvent()
     }
 
