@@ -11,7 +11,10 @@
 //  disagree. The name → glyph mapping is AppSymbolTests' job.
 //
 
+import Foundation
+import Observation
 import Testing
+import os
 @testable import Glimmer
 
 struct HeroAppTargetTests {
@@ -26,6 +29,56 @@ struct HeroAppTargetTests {
     ]
 
     // MARK: The lookup
+
+    @Test @MainActor func aLiveStreamKeepsItsAppDespiteAnOlderHostSnapshot() {
+        let model = AppModel()
+        let host = Host(id: "active-app-regression", name: "Test PC", customName: nil,
+                        localAddress: nil, manualAddress: nil, apps: Self.library,
+                        lastConnected: nil, serverCertPEM: nil, appVersion: nil,
+                        gfeVersion: nil, macAddress: nil)
+        model.selectedHost = host
+        model.hostLiveStatus = HostLiveStatus(hostID: host.id,
+                                             state: .streamingApp(name: "Desktop"),
+                                             capturedAt: .now)
+        let steam = Self.library[2]
+        model.activeStreamApp = steam
+        model.isStreaming = true
+        model.nativeStreamBackgrounded = true
+
+        #expect(model.heroTargetApp == steam)
+        #expect(model.heroTargetAppName == "Steam Big Picture")
+        #expect(model.heroTargetApp?.glyph == .asset("SteamGlyph"))
+        #expect(model.liveStreamRowTitle == "Back to Steam Big Picture")
+
+        // Snapshot expiry and library/host changes cannot rename a live stream.
+        model.hostLiveStatus?.capturedAt = .distantPast
+        model.selectedHost = nil
+        #expect(model.heroTargetApp == steam)
+        #expect(model.liveStreamRowTitle == "Back to Steam Big Picture")
+
+        // Once the session ends, the launcher follows the host again.
+        model.isStreaming = false
+        model.activeStreamApp = nil
+        model.selectedHost = host
+        model.hostLiveStatus?.capturedAt = .now
+        #expect(model.heroTargetApp?.name == "Desktop")
+    }
+
+    @Test @MainActor func theLiveAppGlyphObservesSessionIdentityChanges() {
+        let model = AppModel()
+        model.isStreaming = true
+        model.activeStreamApp = Self.library[0]
+        let changed = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking {
+            _ = model.heroTargetApp?.glyph
+        } onChange: {
+            changed.withLock { $0 = true }
+        }
+        model.activeStreamApp = Self.library[2]
+        #expect(changed.withLock { $0 })
+        #expect(model.heroTargetApp?.glyph == .asset("SteamGlyph"))
+        model.isStreaming = false
+    }
 
     @Test func theLastPlayedAppWins() {
         for name in ["Steam Big Picture", "Low Res Desktop", "Elden Ring", "Desktop"] {
@@ -58,7 +111,7 @@ struct HeroAppTargetTests {
         let steam = AppModel.resolveHeroApp(in: Self.library, named: "Steam Big Picture")
         #expect(steam?.glyph == .asset("SteamGlyph"))
         let desktop = AppModel.resolveHeroApp(in: Self.library, named: "Low Res Desktop")
-        #expect(desktop?.glyph == .symbol("desktopcomputer"))
+        #expect(desktop?.glyph == .symbol("display"))
         let game = AppModel.resolveHeroApp(in: Self.library, named: "Elden Ring")
         #expect(game?.glyph == .symbol("gamecontroller.fill"))
     }

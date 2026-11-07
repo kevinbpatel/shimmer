@@ -32,7 +32,10 @@ struct RawHIDControl: View {
     private let poll = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private var currentlyWorking: Bool {
-        DualSenseHID.shared.reportCount > 0 || DualSenseHID.accessGranted
+        // `--debug-show-permission-row=1`: show the "Input Monitoring is off"
+        // row on a Mac that has the permission, for screenshots.
+        if AppModel.debugKnob("show-permission-row") != nil { return false }
+        return DualSenseHID.shared.reportCount > 0 || DualSenseHID.accessGranted
     }
 
     /// `true` once the user has been sent to System Settings, so the row can
@@ -49,7 +52,7 @@ struct RawHIDControl: View {
         // card - four controls for one setting, on a page whose grammar is one
         // label and one control. The warning line below borrows the shape the
         // login-item and Wi-Fi helper rows already use for "macOS needs you to
-        // approve this": one short orange line, one button.
+        // approve this": one status line, one native button.
         Toggle("Use the Options, Create and Mute buttons", isOn: enabledBinding)
             .alert("Enable enhanced DualSense buttons?", isPresented: $showExplain) {
                 Button("Enable") { enable() }
@@ -57,9 +60,9 @@ struct RawHIDControl: View {
             } message: {
                 Text(AppModel.rawHIDExplanation)
             }
+        SettingsHelp("Requires Input Monitoring permission in System Settings.")
         if model.rawHIDControllerEnabled, !working {
             SettingsNotice(
-                icon: "exclamationmark.triangle.fill",
                 message: sentToSettings ? "Relaunch to finish" : "Input Monitoring is off"
             ) {
                 if sentToSettings {
@@ -70,7 +73,7 @@ struct RawHIDControl: View {
                               ? "Finish the current stream first"
                               : "macOS applies Input Monitoring only when the app restarts")
                 } else {
-                    Button("Open Input Monitoring…") {
+                    Button("Open Settings") {
                         // Only advance to "Relaunch to finish" if we really did
                         // hand the user to System Settings; if the system prompt
                         // came up instead, answering it IS the step.

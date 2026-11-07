@@ -65,7 +65,7 @@ extension AppModel {
         let appGlyph: LibraryApp.Glyph? = isStreaming
             ? heroTargetApp?.glyph ?? .symbol("play.fill")
             : runningAppName != nil ? heroTargetApp?.glyph : nil
-        return MenuBarPresentation(warning: nativeStreamError != nil,
+        return MenuBarPresentation(warning: menuBarShowsStreamError,
                                    battery: menuBarControllerBattery,
                                    playStation: menuBarControllerGlyph == .playStation,
                                    appGlyph: appGlyph)
@@ -157,6 +157,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let status = model.selectedHost == nil ? "No PC paired" : model.selectedHostStatusLine
         menu.addItem(hosted(MenuHeaderRow(title: title, status: status)))
         menu.addItem(.separator())
+
+        if let error = model.nativeStreamError {
+            menu.addItem(hosted(
+                Text(error)
+                    .font(.system(size: 12))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
+            ))
+            menu.addItem(action("Dismiss", #selector(dismissWarning)))
+            menu.addItem(.separator())
+        }
 
         if model.selectedHost != nil {
             if model.isStreaming {
@@ -271,6 +284,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func resumeStream() { model.resumeStreamWindow() }
     @objc private func enterPictureInPicture() { model.enterPictureInPicture() }
     @objc private func endStream() { model.endStream() }
+    @objc private func dismissWarning() { model.nativeStreamError = nil }
 
     @objc private func switchHost(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String,

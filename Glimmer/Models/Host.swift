@@ -83,7 +83,7 @@ struct LibraryApp: Identifiable, Hashable {
         // them, and two near-identical monitor icons side by side read as an
         // inconsistency rather than a distinction.
         if has("big picture") { return "gamecontroller.fill" }
-        if has("desktop") { return "desktopcomputer" }
+        if has("desktop") { return "display" }
         if has("terminal", "shell", "command prompt", "powershell") { return "terminal" }
         if has("remote", "rdp", "vnc") { return "display.and.arrow.down" }
 

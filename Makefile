@@ -161,6 +161,9 @@ app:
 		OPUS_PREFIX=$(OPUS_PREFIX) \
 		CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath $(DERIVED) -destination 'platform=macOS' build
+	@install -m 0755 scripts/shimmerctl-launcher.sh "$(GLIMMER_APP_SRC)/Contents/Resources/shimmerctl"
+	@install -m 0644 scripts/shimmerctl "$(GLIMMER_APP_SRC)/Contents/Resources/shimmerctl.py"
+	@install -m 0644 docs/CLI.md "$(GLIMMER_APP_SRC)/Contents/Resources/CLI.md"
 # CODE_SIGNING_ALLOWED=NO: signing is owned EXCLUSIVELY by the `sign` target
 # (keychain-pinned, prompt-free). Xcode's Automatic signing during the build
 # resolves identities from the login keychain and produces a password prompt

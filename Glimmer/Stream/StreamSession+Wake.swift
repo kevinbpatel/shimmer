@@ -55,14 +55,20 @@ extension StreamSession {
     /// (the latch keeps the FIRST concrete reason, so a host terminate still wins).
     func handleSystemWillSleep() async {
         guard isStreaming, !stopInProgress else { return }
+        systemSleeping = true
+        wakeProbeTask?.cancel()
+        wakeProbeTask = nil
         noteTelemetryDisconnect(.systemSleep)
     }
 
-    /// On wake: if the session is live and idle of any teardown/episode, count the
-    /// wake, re-anchor the silence clock + solicit a ping, and start the bounded
-    /// liveness probe. Everything downstream routes through `handleHostTerminate`.
+    /// Wake always unpauses an active reconnect and renews its bounded budget.
+    /// A live session outside an episode also probes the old connection before
+    /// rebuilding it. Everything downstream routes through `handleHostTerminate`.
     func handleSystemWake() async {
-        guard isStreaming, reachedLiveState, !stopInProgress, !isReconnecting else { return }
+        guard isStreaming, !stopInProgress else { return }
+        systemSleeping = false
+        reconnectWakeRevision &+= 1
+        guard reachedLiveState, !isReconnecting else { return }
         TelemetryCounters.shared.wakeTotal.increment()
         Diag.notice("Woke from sleep mid-stream - re-anchoring the dead-peer clock "
             + "and probing the link (it may be stale on a new AP).", "Stream")

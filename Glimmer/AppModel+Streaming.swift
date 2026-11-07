@@ -148,6 +148,7 @@ extension AppModel {
         ConnectTimingTelemetry.shared.anchorClick()
         Self.connectCapsuleShown = false
         Self.connectCancelRequested = false
+        activeStreamApp = app
         activeStreamHostID = host.id
         activeStreamHasVideo = false
         isStreaming = true
@@ -260,7 +261,8 @@ extension AppModel {
                     onPictureInPictureChanged: { [weak self] active in
                         self?.nativeStreamPictureInPicture = active
                     },
-                    pipPointerProvider: { true }
+                    pipPointerProvider: { true },
+                    reconnectAddresses: Self.candidateAddresses(for: host)
                 )
                 for await event in events {
                     // Pass the SESSION's host, not selectedHost: ⌘1-⌘9 / the
@@ -316,6 +318,9 @@ extension AppModel {
             // reach-failure copy is correct there.)
             self.nativeStreamError =
                 Self.connectFailureBanner(for: caughtError, hostName: hostName)
+            if Self.isTransientConnectionFailure(caughtError) {
+                markStreamInterruption(hostID: host.id)
+            }
         }
         // M3: do NOT unconditionally clear nativeStreamError here. A host-side
         // "ended unexpectedly" terminate (code != 0) already set the banner on
@@ -331,6 +336,7 @@ extension AppModel {
         self.activeStreamHasVideo = false
         self.streamPhase = .idle
         self.isStreaming = false
+        self.activeStreamApp = nil
         // Restore awdl0 (AirDrop/Continuity) now the stream is down - covers the
         // clean-stop, error, and user-cancel paths since this is the single
         // teardown site. No-op if the helper was never engaged.
@@ -384,12 +390,28 @@ extension AppModel {
         }
     }
 
-    /// Map a start()-throw error to an honest user-facing banner. The
-    /// "asleep / make sure it's awake" copy is reserved for a GENUINE reach
-    /// failure (host off / not on the network / handshake never completed) -
-    /// it must never be shown for a pairing or launch failure, where the host
-    /// demonstrably answered. Static so it has no actor state and is trivially
-    /// unit-testable.
+    /// Network interruptions never raise the menu-bar triangle; failures that
+    /// need the user (pairing, certificates, the decoder) do.
+    nonisolated static func isTransientConnectionFailure(_ error: Error) -> Bool {
+        if let streamError = error as? StreamError {
+            switch streamError {
+            case .hostUnreachable(let detail):
+                let message = detail.lowercased()
+                return !message.contains("cert") && !message.contains("mitm")
+                    && !message.contains("restart sunshine")
+            case .sessionFailed, .truncatedRead: return true
+            default: return false
+            }
+        }
+        // Anything else on the start path (NWError, POSIX) is a reach failure -
+        // connectFailureBanner words it that way too.
+        guard let urlError = error as? URLError else { return true }
+        return [.networkConnectionLost, .notConnectedToInternet, .timedOut,
+                .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed].contains(urlError.code)
+    }
+
+    /// Preserve actionable pairing/security guidance instead of reporting all
+    /// start failures as an unreachable host.
     static func connectFailureBanner(for error: Error, hostName: String) -> String {
         guard let streamError = error as? StreamError else {
             // Any non-StreamError on the start path is unexpected - the control
@@ -453,7 +475,9 @@ extension AppModel {
         case .stageComplete:              break
         case .stageFailed:
             nativeStreamError = "Couldn't reach \(host.displayName)."
+            markStreamInterruption(hostID: host.id)
         case .connectionEstablished:
+            nativeStreamError = nil
             streamPhase = .streaming
             logConnectHoldAdjudication()
             // Receipt wall-clock starts at the LIVE edge (not the click) so
@@ -469,6 +493,10 @@ extension AppModel {
             activeStreamWidth = 0; activeStreamHeight = 0; activeStreamFps = 0
             if code != 0 {
                 nativeStreamError = "Stream to \(host.displayName) ended unexpectedly."
+                if code == StreamSession.deadPeerTerminationCode {
+                    nativeStreamError = "Connection to \(host.displayName) was interrupted. Stream again to resume."
+                }
+                markStreamInterruption(hostID: host.id)
             }
         case .reconnecting:
             // The host closed a live session (it likely restarted across a
@@ -479,6 +507,7 @@ extension AppModel {
             // the engine gives up, a real .connectionTerminated.
             streamPhase = .connecting(stage: "Reconnecting to \(host.displayName)…")
         case .reconnected:
+            nativeStreamError = nil
             // Resumed in place. (The fresh .connectionEstablished / .firstFrame
             // edges also promote the phase, so this is belt-and-braces.)
             streamPhase = .streaming
@@ -514,6 +543,7 @@ extension AppModel {
     /// transition within ~one frame.
     private func promoteToStreamingOnFirstFrame() {
         guard case .connecting = streamPhase else { return }
+        nativeStreamError = nil
         streamPhase = .streaming
         logConnectHoldAdjudication()
         // Same live-edge stamp as .connectionEstablished - whichever edge

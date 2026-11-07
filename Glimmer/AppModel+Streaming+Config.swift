@@ -115,7 +115,8 @@ extension AppModel {
     /// else the configured default app. The AppIconsRow accent ring follows
     /// this so the ring can never disagree with the button's verb.
     var heroTargetAppName: String {
-        resumableAppName ?? defaultAppName
+        if isStreaming, let app = activeStreamApp { return app.name }
+        return resumableAppName ?? defaultAppName
     }
 
     /// The same target as a library entry, so a surface naming it can also draw
@@ -125,6 +126,9 @@ extension AppModel {
     /// eventually show one app and launch another. nil only when the host has
     /// no apps at all, which is the case the caller draws a bare play arrow for.
     var heroTargetApp: LibraryApp? {
+        // A live session has its own identity. The launcher fallback can name
+        // an older host session, and the selected host/library can change.
+        if isStreaming, let app = activeStreamApp { return app }
         guard let host = selectedHost else { return nil }
         return Self.resolveHeroApp(in: host.apps, named: heroTargetAppName)
     }

@@ -26,6 +26,7 @@ struct AppPane: View {
     /// in System Settings > Login Items - surfaced inline so the user is not
     /// left with a toggle that silently does nothing at the next reboot.
     @State private var loginItemNeedsApproval = false
+    @State private var showCLIIntegration = false
 
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
@@ -43,27 +44,20 @@ struct AppPane: View {
             SettingsField("General") {
                 Toggle("Show status in menu bar", isOn: $model.showMenuBarItem)
                     .help("Shows the active app, controller battery, or a warning. Hidden when idle; Shimmer stays available in the Dock.")
+                SettingsHelp("Hidden when idle. Shimmer stays available in the Dock.")
                 // The login helper suppresses the window; Dock access remains
                 // available whenever there is no useful menu-bar status.
                 Toggle("Be ready at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in
                         scheduleLoginItemRegistration(launchAtLogin: on)
                     }
+                SettingsHelp("Starts quietly when you sign in.")
                 if loginItemNeedsApproval {
-                    SettingsNotice(icon: "exclamationmark.triangle.fill",
-                                   message: "macOS needs you to approve Shimmer in Login Items.") {
+                    SettingsNotice(message: "macOS needs you to approve Shimmer in Login Items.") {
                         Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
                     }
                 }
             }
-
-            SettingsRule()
-
-            SettingsField("Stats overlay") {
-                Toggle("Show stream health over the picture", isOn: $model.showStreamStats)
-            }
-
-            SettingsRule()
 
             // Deliberately NOT behind the `showDiagnostics` reveal the rest of
             // this group sits behind. This switch is the first thing to flip
@@ -71,8 +65,11 @@ struct AppPane: View {
             // (one JSON object per second, plus GET /snapshot on loopback) is
             // how anyone, human or otherwise, finds out WHY. A troubleshooting
             // switch nobody can find troubleshoots nothing.
-            SettingsField("Troubleshooting") {
-                Toggle("Record stream health while streaming", isOn: $model.telemetryEnabled)
+            SettingsField("Stream health") {
+                Toggle("Show over the picture", isOn: $model.showStreamStats)
+                Toggle("Record while streaming", isOn: $model.telemetryEnabled)
+                    .settingsStackedToggle()
+                SettingsHelp("Saves local recordings for diagnosing stream issues.")
                 if model.telemetryEnabled {
                     Button("Show recordings in Finder") {
                         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -84,8 +81,16 @@ struct AppPane: View {
                 }
             }
 
+            SettingsField("CLI integration") {
+                HStack {
+                    Text("Diagnose Shimmer from Terminal.")
+                    Spacer(minLength: 8)
+                    Button("Show Me How") { showCLIIntegration = true }
+                        .settingsTrailingButton()
+                }
+            }
+
             if model.showDiagnostics {
-                SettingsRule()
                 SettingsField("Diagnostics") {
                     DisclosureGroup("Controller input test") {
                         ControllerInputTest().settingsControl(maxWidth: SettingsMetrics.wideControlWidth)
@@ -97,6 +102,9 @@ struct AppPane: View {
                     .frame(maxWidth: 560, alignment: .leading)
                 }
             }
+        }
+        .sheet(isPresented: $showCLIIntegration) {
+            CLIIntegrationSheet().environment(model)
         }
         .onAppear {
             guard launchAtLogin else { loginItemNeedsApproval = false; return }

@@ -45,6 +45,7 @@
 		A100017A /* SettingsGeneralStreamingPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100017B /* SettingsGeneralStreamingPanes.swift */; };
 		A100018A /* SettingsPCsShortcutsPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100018B /* SettingsPCsShortcutsPanes.swift */; };
 		A100019A /* AboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100019B /* AboutPane.swift */; };
+		04E4D673A3624136A035F8F2 /* CLIIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */; };
 		A100020A /* DiagnosticsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100020B /* DiagnosticsPane.swift */; };
 		A1009001 /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1009002 /* UpdaterController.swift */; };
 		A1009012 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A1009011 /* Sparkle */; };
@@ -274,6 +275,7 @@
 		A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */; };
 		A1C0HEROTST10000000000 /* HeroAppTargetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */; };
 		B4F0AC720000000000000001 /* HostActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F0AC720000000000000002 /* HostActivityTests.swift */; };
+		B4F0A1C20000000000000001 /* SleepRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */; };
 		B9E351AA8D864ACAB1563301 /* HostConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */; };
 		A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */; };
 		A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */; };
@@ -372,6 +374,7 @@
 		A100017B /* SettingsGeneralStreamingPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGeneralStreamingPanes.swift; sourceTree = "<group>"; };
 		A100018B /* SettingsPCsShortcutsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPCsShortcutsPanes.swift; sourceTree = "<group>"; };
 		A100019B /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
+		DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIIntegration.swift; sourceTree = "<group>"; };
 		A100020B /* DiagnosticsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsPane.swift; sourceTree = "<group>"; };
 		A1009002 /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000100000C01 /* HostCodecPreference.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostCodecPreference.swift; sourceTree = "<group>"; };
@@ -600,6 +603,7 @@
 		A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StreamVolumeTests.swift"; sourceTree = "<group>"; };
 		A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HeroAppTargetTests.swift"; sourceTree = "<group>"; };
 		B4F0AC720000000000000002 /* HostActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HostActivityTests.swift"; sourceTree = "<group>"; };
+		B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRecoveryTests.swift; sourceTree = "<group>"; };
 		B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostConnectionTests.swift; sourceTree = "<group>"; };
 		A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarBatteryGlyphTests.swift"; sourceTree = "<group>"; };
 		A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FrameRateRangeTests.swift"; sourceTree = "<group>"; };
@@ -726,6 +730,7 @@
 				DEC0DE05000000000000000B /* SettingsGeneralStreamingPanes+LoginItem.swift */,
 				A100018B /* SettingsPCsShortcutsPanes.swift */,
 				A100019B /* AboutPane.swift */,
+				DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */,
 				A100011B /* DualSenseHID.swift */,
 				D20000A2 /* DualSenseHID+Decode.swift */,
 				A10000013 /* AppModel.swift */,
@@ -981,6 +986,7 @@
 				A1C0DESVOLTST20000000000 /* StreamVolumeTests.swift */,
 				A1C0HEROTST20000000000 /* HeroAppTargetTests.swift */,
 				B4F0AC720000000000000002 /* HostActivityTests.swift */,
+				B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */,
 				B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */,
 				A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
@@ -1157,6 +1163,7 @@
 				DEC0DE05000000000000000A /* SettingsGeneralStreamingPanes+LoginItem.swift in Sources */,
 				A100018A /* SettingsPCsShortcutsPanes.swift in Sources */,
 				A100019A /* AboutPane.swift in Sources */,
+				04E4D673A3624136A035F8F2 /* CLIIntegration.swift in Sources */,
 				A100011A /* DualSenseHID.swift in Sources */,
 				D20000A3 /* DualSenseHID+Decode.swift in Sources */,
 				A10000003 /* AppModel.swift in Sources */,
@@ -1402,6 +1409,7 @@
 				A1C0DESVOLTST10000000000 /* StreamVolumeTests.swift in Sources */,
 				A1C0HEROTST10000000000 /* HeroAppTargetTests.swift in Sources */,
 				B4F0AC720000000000000001 /* HostActivityTests.swift in Sources */,
+				B4F0A1C20000000000000001 /* SleepRecoveryTests.swift in Sources */,
 				B9E351AA8D864ACAB1563301 /* HostConnectionTests.swift in Sources */,
 				A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,

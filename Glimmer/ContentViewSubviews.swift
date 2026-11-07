@@ -15,10 +15,179 @@ import SwiftUI
 
 // MARK: - Empty pairing state
 
-struct EmptyPairingState: View {
+struct FirstPCSetup: View {
+    let nearby: [HostDiscovery.Discovered]
+    @Binding var address: String
+    let connect: (String) -> Void
+    var error: String? = nil
+
+    private var trimmedAddress: String {
+        address.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
-        ContentUnavailableView("Add your gaming PC", systemImage: "desktopcomputer",
-            description: Text("Choose a nearby PC in the sidebar, or use Add by Address to enter its IP address or hostname."))
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 12) {
+                    VStack(spacing: 12) {
+                        Image("AboutAppIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 72, height: 72)
+                            .accessibilityHidden(true)
+                        VStack(spacing: 4) {
+                            Text("Welcome to Shimmer")
+                                .font(.system(size: 22, weight: .semibold))
+                            // Reuse the subtitle for feedback rather than
+                            // leaving an empty alert-sized gap above the field.
+                            ZStack {
+                                if let error {
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundStyle(.orange)
+                                            .accessibilityHidden(true)
+                                        Text(error)
+                                            .font(.system(size: 13))
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+                                    .background(Color.orange.opacity(0.055),
+                                                in: RoundedRectangle(cornerRadius: 7))
+                                    .accessibilityElement(children: .combine)
+                                } else {
+                                    Text("Add your first PC to get started.")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .multilineTextAlignment(.center)
+                            .frame(minHeight: 34)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(spacing: 0) {
+                            HStack(spacing: 10) {
+                                TextField("PC address or Tailscale IP", text: $address)
+                                    .font(.system(size: 14))
+                                    .textFieldStyle(.roundedBorder)
+                                    .controlSize(.large)
+                                    .frame(height: FirstPCMetrics.buttonHeight)
+                                    .disableAutocorrection(true)
+                                    .accessibilityLabel("PC IP address, hostname, or Tailscale address")
+                                    .help("Enter the PC’s IP address or hostname, including a Tailscale address")
+                                    .onSubmit(submit)
+                                Button("Connect", action: submit)
+                                    .buttonStyle(.borderedProminent)
+                                    .buttonBorderShape(.roundedRectangle(radius: 5))
+                                    .controlSize(.large)
+                                    .disabled(trimmedAddress.isEmpty)
+                            }
+                            .frame(height: FirstPCMetrics.buttonHeight)
+                        }
+                        if !nearby.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Nearby PCs")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.leading, 2)
+                                ForEach(nearby) { pc in
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "desktopcomputer")
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 22)
+                                            .accessibilityHidden(true)
+                                        Text(pc.displayName)
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(.primary)
+                                            .lineLimit(1)
+                                        Spacer(minLength: 8)
+                                        Button {
+                                            address = pc.host
+                                            connect(pc.host)
+                                        } label: {
+                                            Text("Pair")
+                                                .font(.system(size: 13))
+                                                .frame(minWidth: 40)
+                                        }
+                                            .buttonStyle(.bordered)
+                                            .buttonBorderShape(.roundedRectangle(radius: 5))
+                                            .controlSize(.small)
+                                            .help("Pair with \(pc.displayName)")
+                                            .accessibilityLabel("Pair with nearby PC \(pc.displayName), \(pc.host)")
+                                    }
+                                    .padding(.leading, 10)
+                                    .padding(.trailing, 4)
+                                    .modifier(FirstPCRowStyle())
+                                }
+                            }
+                        }
+                    }
+                }
+                .font(.system(size: 14))
+                .frame(maxWidth: 400)
+                .padding(.horizontal, 28)
+                .padding(.top, 40)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: geometry.size.height, alignment: .top)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .onChange(of: error) { _, message in
+            if let message { AccessibilityNotification.Announcement(message).post() }
+        }
+    }
+
+    private func submit() {
+        guard !trimmedAddress.isEmpty else { return }
+        connect(trimmedAddress)
+    }
+}
+
+/// Shared, persistent feedback for address and pairing failures.
+struct PCConnectionErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text(message)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 13))
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(Color.orange.opacity(0.055), in: RoundedRectangle(cornerRadius: 7))
+        .accessibilityElement(children: .combine)
+        .onAppear {
+            AccessibilityNotification.Announcement(message).post()
+        }
+    }
+}
+
+private enum FirstPCMetrics {
+    static let rowHeight: CGFloat = 36
+    static let buttonHeight: CGFloat = 28
+    static let cornerRadius: CGFloat = 8
+}
+
+private struct FirstPCRowStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity)
+            .frame(height: FirstPCMetrics.rowHeight)
+            .background(Color(nsColor: .textBackgroundColor),
+                        in: RoundedRectangle(cornerRadius: FirstPCMetrics.cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: FirstPCMetrics.cornerRadius)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
     }
 }
 

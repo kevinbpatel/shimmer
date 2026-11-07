@@ -276,6 +276,23 @@ extension AppModel {
             guard let self else { return }
             guard let host = self.selectedHost, host.id == expectedHostID else { return }
             self.hostLiveStatus = status
+            self.clearRecoveredInterruption(status)
+        }
+    }
+
+    /// Retire a historical link-loss warning only after a newer authenticated
+    /// serverinfo response from that same host. TCP-only fallback is not proof
+    /// of recovery, and pairing/decoder/security failures never get this expiry.
+    @MainActor func clearRecoveredInterruption(_ status: HostLiveStatus) {
+        guard !isStreaming, let interruption = interruptedStreamHost,
+              status.hostID == interruption.id,
+              status.sunshineVersion != nil,
+              status.capturedAt >= interruption.failedAt,
+              Date().timeIntervalSince(status.capturedAt) <= HostLiveStatus.stale else { return }
+        switch status.state {
+        case .idle, .streamingApp, .streamingUnknownApp:
+            nativeStreamError = nil
+        default: break
         }
     }
 }

@@ -1,352 +1,48 @@
 # Changelog
 
-## Unreleased
+## Shimmer (unreleased) - based on glimmer 2026.9.0
 
-Mouse input can be turned off: "Disable mouse input" in Settings (next to the
-⌘ shortcuts toggle), or "Disable Mouse" / "Enable Mouse" in the menu-bar
-dropdown. With it off, nothing from the mouse or trackpad reaches the PC and
-the stream never grabs or hides the Mac pointer - so controller-only play can
-Cmd-Tab in and out without the pointer getting trapped. The menu row applies to
-a live stream immediately.
+Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 
-The menu bar has an "End Stream" row while a stream is live: it ends the
-stream and leaves Shimmer running. Ending it this way follows "Quit the game on
-the PC" like every other way of ending a stream. "Picture in Picture" stays in
-the menu while the stream is already in Picture in Picture, greyed out, instead
-of disappearing.
+### Picture in Picture
+- ⌃⌥P, or Picture in Picture in the menu bar, moves the stream into macOS's
+  floating PiP window; it can also pop out automatically when you switch apps.
+  Controllers keep playing; the mouse over the PiP window drives the host
+  pointer.
+- Works around the AVKit sample-buffer PiP crop and black-overlay bugs
+  (Apple FB22411168), leaves no ghost Stage Manager tile, and waits for the
+  stream's first frame.
 
-"Keep the Mac awake" is a single toggle again (on while streaming, or off)
-instead of a three-way Always / Only while showing / Never control. A saved
-"Only while showing" choice becomes on.
+### One window
+- Servers, Stream, General and About tabs replace the launcher and the
+  separate Settings window, laid out like a native Mac utility.
+- Servers lists paired and nearby PCs, pairs them in place, shows each PC's
+  apps with Stream / Resume, the Mac's connection route, and an opt-in latency
+  test. PCs can show a Linux, Windows, SteamOS or macOS logo.
+- Settings are grouped with clear labels, descriptions and native buttons;
+  the scrolling pages size the window to their content.
 
-The "macOS needs your approval" warnings in Settings - Input Monitoring for the
-enhanced DualSense buttons, Login Items, the Wi-Fi helper - are a proper tinted
-callout now: the icon and message on the left, the button pinned to the right
-inside a rounded box, instead of an icon, orange text and a button floating in a
-loose row. All three share one component, so they match.
+### Menu bar
+- While streaming, the icon is the app you're streaming, with the
+  controller's battery. End Stream and Picture in Picture rows. The item can
+  hide when idle.
 
-Two Settings controls moved to where they belong: "Smooth out Wi-Fi stutter" is
-on the Stream tab now (it tunes the stream), and the stats overlay is on General
-next to Troubleshooting (it is a diagnostic, not a picture setting).
+### Streaming and input
+- Stop disconnects; Quit ends the game on the PC.
+- "Disable mouse input" stops forwarding the mouse and never grabs the
+  pointer. "Keep the Mac awake" while streaming.
+- A PC's manual address (for example its Tailscale address) is used when the
+  home address isn't reachable. A stream dropped by sleep or a network change
+  no longer leaves a stale error.
+- An opt-in 60 ms ceiling on the audio playout cushion. Codec caps remove
+  whole codec families. Colour on SDR displays is no longer over-saturated.
 
-Settings tabs: the machines tab is now "Servers" with a server-rack icon
-(clearer than "PCs", and its own glyph distinct from the host rows), and the
-Stream tab's Wi-Fi-looking radio-waves icon becomes a screen-with-play glyph
-that reads as the video you watch.
+### Tools
+- `shimmerctl`: check connectivity, read logs and run test streams, locally
+  or on another Mac over SSH ([docs/CLI.md](docs/CLI.md)).
 
-The menu-bar dropdown drops the Stream detail section and the "N% battery"
-controller row - the header already says what is streaming, and the controller's
-charge shows on the menu-bar icon itself, so both were redundant.
-
-The menu-bar header's second line says what is streaming while a stream is live
-- "Streaming at 1080p60", with " HDR" when HDR is on - instead of a bare
-"Connected". It falls back to "Streaming" for the moment before the decoder has
-reported its format, and to the host's online/asleep status when idle as before.
-
-The Resolution picker drops the HiDPI option. It streamed an upscaled virtual
-"Looks like" size of the panel, which muddled the choice more than it helped;
-Match display and the explicit 720p/1080p/1440p/2160p sizes cover the ground.
-Anyone who had HiDPI selected is moved to Match display once, automatically.
-
-The stream window opens at the resolution's own size now, 1:1. A 1080p stream
-lands on exactly 1920x1080 physical pixels (960x540 points on a 2x display),
-1440p on 2560x1440, 4K on 3840x2160 - each stream pixel on one screen pixel, no
-upscaling blur, whatever you set the resolution to. It used to reopen at
-whatever size you last dragged the window to, which threw the pixel density off;
-now it always matches the stream, and only your window position is remembered.
-A resolution larger than the screen scales down to fit, keeping aspect.
-
-A controller that wakes a moment after the stream comes up now reaches the game
-on its own. A sleepy or low-battery DualSense can have its raw-HID link up (the
-PlayStation button works) while GameController has not yet handed the pad to
-Shimmer; the stream used to check for the pad once at connect and then only wait
-for a connect event, so a pad that appeared a beat late stayed dead until a full
-restart. The stream now re-scans for the pad for the first several seconds after
-it connects, so it - and its battery reading - self-heal within seconds.
-
-Under Stage Manager, a stream started from the menu bar opened behind
-whatever was focused. Shimmer was still a menu-bar-only app at that moment -
-no Dock icon, and, it turns out, no stage of its own - so the new window fell
-in behind the stage on screen, and a Cmd-Tab away from it had no way back.
-The app is a regular one now for as long as a stream is live (window, hidden,
-or Picture in Picture), and returns to the menu bar when the stream ends.
-The controller also reaches the host for the whole stream whether or not
-Shimmer is the app in front - as moonlight-qt does - instead of only while
-its window is focused or in Picture in Picture.
-
-The menu-bar controller mark says "charging" with a bolt you can see. It was
-Steam's bolt at Steam's size, lying on its side the way Big Picture's does -
-which reads there because it is white on a green fill, and did not read here
-because a menu-bar template gets one colour, leaving a 4pt speck punched out
-of a black fill. Now, while the pad is plugged in, the battery holds one solid
-upright bolt and nothing else; the level comes back the moment it's unplugged,
-and is always in the dropdown. The charge inside the battery also sits the
-same distance from the wall as the wall is thick, as Steam's does; on Retina it
-had a 3-pixel gap beside a 2-pixel wall.
-
-Settings is two pages now, the way a game's are: Stream (resolution, frame
-rate, bitrate, codec, HDR, how the stream is shown, Picture in Picture, audio,
-keep-awake, what happens when it ends, the stats overlay) and General
-(shortcuts, the controller, login, the Wi-Fi helper, troubleshooting). Neither
-scrolls. The tabs read PCs · Stream · General · About.
-
-Settings › Audio › "Prefer low latency over smoothness" caps the adaptive
-audio cushion at 60 ms on every link. The cushion exists to ride out Wi-Fi
-hiccups, and after one it can sit at 100 ms or more for minutes; with this on
-it takes the occasional blip instead. Off by default, and it lands on the
-running stream.
-
-Fix: choosing "HEVC" for a PC could still get an AV1 stream, and a stream with
-HDR off could still come as 10-bit. Both narrowings removed only the Main
-profiles and left the 4:4:4 ones advertised; they now remove whole families by
-the protocol's own masks.
-
-Shimmer declares Game Mode support. When a stream is full screen and in
-front, macOS 14+ can give it CPU/GPU priority and double the Bluetooth
-sampling rate for controllers and AirPods; it engages and disengages on its
-own, shows a controller icon in the menu bar while on, and that icon's menu is
-where it is turned off. Picture in Picture and window mode are untouched.
-
-Ending a stream no longer quits the game. A stop is a disconnect: the PC keeps
-the app running, the menu bar and library say "<app> running", and the next
-Stream click resumes it where it was (the host takes the new resolution and
-refresh on resume). Settings › "When the stream ends › Quit the game on the
-PC" restores the old behaviour. Apps a
-PC launches detached (a Steam Big Picture entry, say) were never Sunshine's to
-end and are unaffected either way.
-
-Whether a stream keeps the Mac awake is a choice now - Settings › "Keep the
-Mac awake": Always (what every build so far did), Only while showing, or
-Never. "Only while showing" follows the stream window: up and being played,
-the display stays on; hidden or parked in Picture in Picture, the Mac's own
-sleep rules apply. A change lands on the running stream. The App Nap opt-out
-that keeps a backgrounded stream at full priority is separate and unchanged
-(and no longer quietly forbids system sleep on its own).
-
-Shimmer starts in the menu bar. Every launch - Dock, Spotlight, login - comes
-up with no window and no Dock icon; "Open Shimmer" in the menu bar brings the
-window up when you want it. The one exception is a first run with no PC
-paired, where the window opens so there is something to pair from. The "Stay
-hidden at login" toggle is gone with it: login launches behave like every
-other launch, and "Be ready at login" no longer needs a second decision.
-
-The menu bar opens with a header like Tailscale's: the PC's name, and under
-it what the PC is doing - Online, Asleep or offline, Streaming <app> from
-another device, Connected while this Mac is streaming it. It is a plain
-header, not a row: it doesn't highlight or do anything. The small "bazzite" /
-"Connected to bazzite" section title it replaces is gone. (Under the hood
-the dropdown is a native AppKit menu now rather than SwiftUI's, which is what
-makes an inert header possible - and gives Switch PC and the volume ladder
-real checkmarks.)
-
-The menu bar's window rows moved to the bottom, the way Tailscale's menu is
-laid out: the stream first, then "Settings…" and "Open Shimmer" together, and
-"Quit Shimmer" on its own.
-
-The menu bar's live-session rows are one row now, named and iconed off the
-app: "Streaming <app>" while the window is up, "Back to <app>" whenever it is
-hidden or in Picture in Picture. It used to be a greyed-out "Stream <app>"
-plus a separate "Back to stream".
-
-Settings is labels and controls only - every explanatory paragraph under a
-control is gone, and so is the Appearance picker: the app follows the system
-the way a Mac app should.
-
-The "Your next stream" summary row is gone.
-
-10-bit profiles are no longer advertised when HDR is off, so an SDR stream now
-arrives as 8-bit with native Rec.709 tags rather than 10-bit tagged BT.2020.
-
-Fix: colours were over-saturated on an SDR display - contrast and vibrancy
-visibly pushed. Asking for HDR makes Sunshine encode 10-bit and advertise
-BT.2020 primaries, but the desktop it captures is still Rec.709, so the stream
-arrived tagged BT.2020 with an SDR transfer and macOS gamut-mapped 709 content
-as if it were 2020. A BT.2020 tag with a non-PQ transfer while the host reports
-HDR off is now read as the mis-tag it is and rendered Rec.709. HDR is also no
-longer requested at all on a display with no headroom, since it cannot help
-there and this is exactly how it hurts.
-
-Fix: Picture in Picture chosen from the menu bar while the stream window was
-already hidden - after closing an earlier PiP with ×, or a switch-away
-without auto-PiP - opened a PiP window showing only the bottom-left corner of
-the picture. The entry path relied on the hide step to set up the mirror
-source, and the hide step does nothing for a window that is already hidden,
-so PiP started on the off-screen full-size layer. A hidden window is now put
-back on screen invisibly (alpha 0, click-through, pre-shrunk) before PiP
-starts, exactly as a visible one is. (In window mode on macOS 26.6 the first
-cut of this crashed on the way back in: suspending the window's aspect lock
-had left it with resize increments of zero, which AppKit's order-in frame
-standardization divided by. The lock is now cleared the documented way, and
-the window is ordered in before its chrome is touched.)
-
-Fix: Troubleshooting's relaunch could hang the app with the stream still up.
-Quitting with a live session stops it first, on the main actor - and a quit
-requested from inside a Grand Central Dispatch block can never get there
-(AppKit waits in a nested loop that the still-running block starves). Every
-programmatic quit now goes through the run loop, as Cmd-Q always did.
-
-Fix: returning to the stream (Dock, menu bar, "Show the stream") in the
-instant Picture in Picture was still opening left the PiP window up for good,
-showing the bottom-left corner of the picture. The stop we issued from inside
-AVKit's own "started" callback was silently dropped - as was every later one -
-so the window's return and the PiP outlived each other. That stop is now
-issued a run-loop turn later, where AVKit honours it, and a watchdog keeps the
-PiP state machine honest should AVKit ever drop another.
-
-Fix: a white hairline down one edge of the Picture in Picture window, at
-some sizes and not others. The PiP window is sized in whole pixels and so is
-almost never exactly on the stream's aspect, and the source layer that macOS
-mirrors 1:1 into it was sized to the window - so `.resizeAspect` left a
-sub-pixel pillarbox that showed through as the panel's white backing. The
-source now sits exactly on the stream's aspect line (fractional on one axis,
-overhanging the window by under a pixel where the mirror clips it), so the
-video fills it edge to edge at every size.
-
-The Picture in Picture pause button no longer does anything. macOS draws that
-transport in its own process, so it cannot be removed, but a live game has
-nothing to pause - it only froze the picture and then jumped.
-
-Two pickers are gone. Audio channels are always the richest layout this Mac's
-default output can take, and there is no "default app" setting: the library
-shows a button per app, so the menu-bar item, the launch after pairing, and
-wake-then-resume all target whatever you last played on that PC (or whatever
-the PC reports running right now), falling back to Desktop.
-
-Three switches became behaviour: raw mouse motion while streaming, the mouse
-over the Picture in Picture window moving the host pointer, and covering the
-notch in full screen. All three defaulted on, turning them off made things
-worse, and none of them earned a row in Settings.
-
-A PC's apps lead its page, as buttons with a native symbol: a Mac for either
-desktop, and Steam's own mark for Steam. The PC's
-name isn't repeated above them - the row selected in the list already says
-which machine you're looking at.
-
-Each PC's page is a field list - Address, Status (with a live dot), Last
-played - and its apps are plain macOS buttons with a system symbol, the way a
-Mac app states facts and offers actions. The round badge above the name is
-gone, the window background is opaque rather than a material that picked up
-the desktop behind it, and the tab strip greys out when the window isn't
-frontmost like every other piece of macOS chrome.
-
-App tiles are macOS icons, not cover cards. Each app gets an SF Symbol chosen
-from its name on a rounded-square plate tinted by a hue derived from that name
-- the way real app icons are told apart. Hosts do serve box art, but
-Sunshine's stock art is a generic plate with DESKTOP or STEAM printed on it,
-which reads as a cheap card; the artwork is still there behind Settings >
-"Show cover art from the PC" for a library that has real covers.
-
-The window is a fixed 600pt wide and cannot be dragged, and its height follows
-the tab - like the app it is modelled on.
-
-One window, three tabs - Computers, Settings, About - with the title centred
-above them. Computers mirrors the reference app's account tab: a 200pt list of
-PCs with a round glyph, a status dot and the address under the name, a
-full-height divider, and a bottom bar carrying "Add PC…" and "Remove PC…";
-the detail column leads with a centred badge, the PC's name and its address
-before the covers. The PC list and its cover grid are the Computers tab (a sidebar, a
-grid and an "Add PC…" button on the bottom edge); every setting is one
-scrolling page under Settings. The metrics are copied from Tailscale's own
-Settings window, measured off a screen capture of it: the label gutter, the
-18pt checkboxes, the note indent and wrap, the row rhythm, the tab strip and
-the accent-tinted selected tab.
-
-Settings live in the main window now, not a separate Settings window. A row of
-icon tabs across the top - Stream, Video, Audio, Input, PCs, App, About -
-switches pages, and every page is flat rows: the label right-aligned in a
-gutter, its controls beside it, the explanation underneath in grey. No
-sidebar, no stacked rounded cards. The shape is Tailscale's Settings window.
-⌘, still opens it; Esc or Done goes back to the library. The app's accent
-colour is the standard blue rather than glimmer's purple.
-
-The launcher is a library. PCs live in a sidebar, the selected PC's apps fill
-the window as a grid of cover art, and the toolbar carries the PC's name and
-address, add-PC, Settings, and a search field. Click a cover to stream it.
-The window resizes, so a bigger window shows more games.
-
-This replaces the fixed-size hero card - one PC, its name in 34pt, a row of
-small tiles and a Stream button - which could not grow and put the PC, rather
-than the games, at the centre of the screen. The shape is
-moonlight-macos-enhanced's, which is Moonlight's.
-
-Settings are legible again. The window was translucent (`.thinMaterial`) with
-the form's own background hidden, so whatever sat behind it showed through the
-CONTENT - park Settings over the launcher's purple card and every row became a
-low-contrast lavender smear. The content is opaque now, like System Settings;
-the sidebar keeps the translucency that is actually meant to be translucent.
-
-Settings > App > Appearance pins the app to Light or Dark instead of always
-following the system.
-
-The launcher shows your PC's real cover art. Each app tile is now the artwork
-the host serves for that app (`/appasset` — the same box art Moonlight shows,
-600×800), fetched once over the existing paired mutual-TLS connection and
-cached on disk under `~/Library/Caches/Shimmer/BoxArt`. Apps the host has no
-art for keep the old symbol treatment. Tiles are larger to suit, so the
-launcher window is a little taller. The app your PC is running right now wears
-a badge on its tile, and hovering a cover brings it forward.
-
-Settings are reorganised into Stream, Video, Audio, Input, PCs, App,
-Diagnostics, and About - the layout moonlight-macos-enhanced uses, on top of
-glimmer's preset model.
-
-The Stream pane now asks the three questions directly. **Resolution** is one
-picker: Match display (with the panel's pixel size in the label), HiDPI, the
-standard 720p / 1080p / 1440p / 4K sizes, or Custom with typed numbers - and
-the choice is kept until you change it, so a 1080p pick no longer reads as
-"went back to native" after a relaunch. **Frame rate** is its own picker
-(Match display, 30-240 Hz, or a typed value) and applies under every
-resolution, not only Custom. **Bitrate** is back: an always-visible stepped
-slider (5-300 Mbps) with a "Set automatically" switch; automatic keeps
-glimmer's derived recommendation (the slider rests on it, so turning it off
-starts from a sensible value), and a manual number goes to the host verbatim.
-HDR and the Full screen / Window choice apply under every resolution too. The
-Video pane holds the per-PC codec (the same setting as the launcher's
-right-click menu), HDR, and the stats overlay; Audio holds the channel layout
-(follow this Mac's output, or force stereo / 5.1 / 7.1) and the mute switch;
-App holds login items, the default action, and the Wi-Fi helper.
-
-While the stream is popped out, the Mac pointer over the Picture in Picture
-window now drives the host pointer 1:1 (a plain click on the picture clicks
-there; dragging the window or its controls never reaches the host). Settings ›
-Stream › Picture in Picture, on by default.
-
-Fix: in Window mode the Picture in Picture picture came up letterboxed inside
-the panel; the mirror source is now sized by its content rect, and the
-window's aspect lock, minimum size, and frame autosave are suspended while it
-serves as the source (so the tiny PiP-sized frame is never saved as your
-window).
-
-The app is now Shimmer. It installs as `Shimmer.app`, identifies itself as
-`com.kevinbpatel.shimmer` (login helper `com.kevinbpatel.shimmer.LoginHelper`),
-and keeps its data under `Application Support/Shimmer` and `Logs/Shimmer`. An
-existing glimmer install upgrades in place: on first launch Shimmer copies the
-paired PCs, preferences, and client identity forward - no re-pairing - and
-leaves glimmer's own files alone. The Swift module and source tree keep the
-`Glimmer` name so upstream changes still merge cleanly, and the Wi-Fi helper
-daemon keeps its launchd label (renaming a registered daemon would force a
-re-approval); only its owning app changed.
-
-Fix: the Picture in Picture window showed only the bottom-left corner of the
-stream. macOS's sample-buffer PiP mirrors the source layer at 1:1 pixels with
-no scaling (an Apple bug, FB22411168), so a fullscreen source only ever filled
-one corner of the PiP window. Glimmer now keeps the stream window on screen but
-invisible while popped out and sizes it to the PiP window, so the whole frame
-shows and stays filled as you resize PiP. Verified against a live stream.
-
-Pop the stream out into macOS's Picture in Picture window.
-
-Press ⌃⌥P during a stream (rebindable in Settings › Input) and the game
-moves into the same floating, corner-snapping window macOS gives movies — on
-top of your other apps while you work. It's fed by the very layer the
-fullscreen window paints into, so there's no second decode path and no extra
-latency; the frame pacer just rides the display's own refresh instead of the
-(now-hidden) window's. Controllers keep driving the game from the corner
-(keyboard and mouse stay with whatever app is frontmost, the way any PiP video
-behaves). Switch away from the stream and it pops out automatically (Settings ›
-Streaming, on by default); close the PiP window and the stream simply waits in
-the background like a Cmd-Tab-away; click the return button or the Dock icon to
-go back to fullscreen.
+### Ported from later glimmer releases
+- Identity storage never reads or deletes Keychain items (glimmer 8aaaaa5).
 
 ## 2026.9.0 - 2026-09-10
 

@@ -132,7 +132,8 @@ cleanup:
 // request until the OS default (~75s). We do a non-blocking connect + poll so it
 // fails fast. On success the socket is returned in BLOCKING mode with
 // SO_RCVTIMEO/SO_SNDTIMEO set to the same deadline, so the TLS handshake and HTTP
-// read/write that follow on this fd inherit the bound. Returns the fd, or -1.
+// read/write that follow on this fd inherit the bound. Returns the fd, -1 for
+// a connection failure, -2 for an unknown name, or -3 for another lookup error.
 // `host` may be a hostname or a numeric IP; `port` is the decimal string.
 static inline int gl_tcp_connect(const char * _Nonnull host, const char * _Nonnull port, int timeout_ms) {
     struct addrinfo hints;
@@ -141,7 +142,8 @@ static inline int gl_tcp_connect(const char * _Nonnull host, const char * _Nonnu
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     struct addrinfo *res = NULL;
-    if (getaddrinfo(host, port, &hints, &res) != 0 || !res) return -1;
+    int lookup = getaddrinfo(host, port, &hints, &res);
+    if (lookup != 0 || !res) return lookup == EAI_NONAME ? -2 : -3;
 
     int fd = -1;
     for (struct addrinfo *ai = res; ai; ai = ai->ai_next) {

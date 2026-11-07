@@ -54,7 +54,8 @@ extension StreamSession {
         keepAwakeProvider: @escaping @MainActor () -> KeepAwakePolicy = { .always },
         quitAppOnStopProvider: @escaping @MainActor () -> Bool = { false },
         onPictureInPictureChanged: (@MainActor (Bool) -> Void)? = nil,
-        pipPointerProvider: @escaping @MainActor () -> Bool = { true }
+        pipPointerProvider: @escaping @MainActor () -> Bool = { true },
+        reconnectAddresses: [String] = []
     ) async throws -> AsyncStream<StreamEvent> {
         guard !isStreaming else {
             throw StreamError.sessionFailed(-1)
@@ -65,6 +66,7 @@ extension StreamSession {
         // in place (see StreamSession+Reconnect.swift): the original server (for
         // a fresh NetworkClient + handshake), the requested mode, and the app id.
         self.reconnectServer = server
+        self.reconnectAddresses = reconnectAddresses
         self.reconnectConfig = config
         self.reconnectAppID = appID
 

@@ -62,14 +62,12 @@ struct VideoPane: View {
                 Toggle("Brighter highlights, deeper colour", isOn: $model.customHDR)
             }
 
-            SettingsRule()
-
             SettingsField("Wi-Fi") {
                 Toggle("Smooth out Wi-Fi stutter while streaming",
                        isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
+                SettingsHelp("Temporarily pauses AirDrop and related Wi-Fi activity during a stream.")
                 if case .requiresApproval = awdl.state {
-                    SettingsNotice(icon: "exclamationmark.triangle.fill",
-                                   message: "macOS needs you to approve the Shimmer network helper.") {
+                    SettingsNotice(message: "macOS needs you to approve the Shimmer network helper.") {
                         Button("Open Login Items…") { awdl.openSystemSettings() }
                     }
                 }

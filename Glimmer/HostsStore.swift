@@ -377,6 +377,28 @@ extension AppModel {
         restartHostStatusPolling()
     }
 
+    /// Refresh only the saved app list, preserving pairing, names and routes.
+    func refreshApps(for host: Host) async throws {
+        guard !isStreaming else { throw CancellationError() }
+        let client = NetworkClient(server: nativeServerInfo(for: host))
+        do {
+            let fetched = try await client.appList()
+            await client.shutdown()
+            try Task.checkCancellation()
+            let defaults = UserDefaults.standard
+            let slot = hostSlot(for: host.id, defaults: defaults)
+            guard slot > 0 else { return }
+            let apps = fetched.map {
+                PairedApp(id: $0.id, name: $0.name, hdr: $0.hdrCapable, hidden: $0.hidden)
+            }
+            writeApps(apps, prefix: "hosts.\(slot)", defaults: defaults)
+            loadHosts()
+        } catch {
+            await client.shutdown()
+            throw error
+        }
+    }
+
     // MARK: - Unpair / cert recovery
 
     /// Drop a paired host from local storage. This is the user-visible

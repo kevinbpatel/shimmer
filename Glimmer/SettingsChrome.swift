@@ -14,7 +14,19 @@
 //  without any box - which is why a dense pane still scans.
 //
 
+import AppKit
 import SwiftUI
+
+/// Opaque chrome: behind-window vibrancy picks up wallpaper and can make this
+/// header much brighter than the reference. Keep the light header white and
+/// use the system's slightly lighter charcoal surface in dark appearance.
+struct SettingsHeaderBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Color(nsColor: colorScheme == .dark ? .underPageBackgroundColor : .windowBackgroundColor)
+    }
+}
 
 // MARK: - Tabs
 
@@ -50,20 +62,19 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Window height for this tab, matching the reference app's behaviour of
-    /// resizing itself to the page rather than being dragged.
-    /// CONTENT height for this tab. The reference app's windows are 528 / 588
-    /// / 540; macOS adds its 32pt title bar on top of whatever the content
-    /// asks for, even with `.fullSizeContentView`, so subtract it here.
+    /// Each tab sizes its window to its content. macOS adds a 32pt title bar
+    /// even with `.fullSizeContentView`, so these are content heights. For the
+    /// scrolling pages (Stream, General) this is the CEILING: the window
+    /// shrinks to fit the rows actually showing, and scrolls past this.
     var windowHeight: CGFloat {
         switch self {
         // Match Tailscale's Accounts window. The apps scroll independently
         // while the latency panel stays anchored above the bottom bar.
         case .computers: return 528 - 32
-        // Stream carries eleven fields (two of them two rows tall); General
-        // seven. Sized so neither page scrolls.
-        case .stream: return 660 - 32
-        case .general: return 588 - 32
+        // Allow room for the descriptions and CLI row. Unusual expanded
+        // controls and diagnostics can still scroll within the page.
+        case .stream: return 750 - 32
+        case .general: return 744 - 32
         case .about: return 540 - 32
         }
     }
@@ -132,7 +143,7 @@ struct SettingsTabBar: View {
     private var plateFill: Color {
         colorScheme == .dark
             ? Color.white.opacity(isActive ? 0.13 : 0.08)
-            : Color.white.opacity(isActive ? 0.94 : 0.65)
+            : (isActive ? Color.white.opacity(0.94) : Color.primary.opacity(0.055))
     }
 }
 
@@ -149,18 +160,26 @@ enum SettingsMetrics {
     /// Measured off Tailscale's own Settings window (600x588 points, captured
     /// and sampled pixel by pixel):
     ///   * gutter labels right-align at x=168, controls start at x=180 (gap 12)
-    ///   * the checkbox is 18pt; its label starts 7pt after it, at x=204
-    ///   * checkbox rows sit on a 25pt rhythm (18pt control + 7pt)
-    ///   * trailing buttons right-align 41pt from the window edge
+    ///   * the checkbox slot is 16pt, centred on the control column; its label
+    ///     starts 6pt later, 22pt from the column (x=202 on the 600pt window)
+    ///   * the status dot is 10pt and centred in that same slot
+    ///   * trailing buttons right-align 20pt from the window edge
     static let labelGutter: CGFloat = 168
     static let labelGap: CGFloat = 12
-    static let rowSpacing: CGFloat = 18
+    /// Between labelled groups. Tailscale separates them with space alone -
+    /// no rules - at a ~38pt baseline-to-baseline pitch; 22pt gives that here.
+    static let rowSpacing: CGFloat = 22
     static let contentSpacing: CGFloat = 6
-    /// The settings column is a FIXED width, centred in whatever the window
-    /// is: 168 + 12 + 380. Tailscale's window is only 600pt wide so its two
-    /// columns fill it; letting ours stretch across a library-sized window
-    /// left the gutter stranded with an acre of dead space to the right.
-    static let columnWidth: CGFloat = 560
+    /// Checkbox column shared by toggles, help lines, and status dots.
+    static let checkboxSlot: CGFloat = 16
+    static let checkboxLabelInset: CGFloat = 22
+    static let statusDot: CGFloat = 10
+    /// The settings column fills Tailscale's 600pt window from the leading
+    /// edge, stopping 20pt short of the trailing edge so Open Settings and
+    /// the other trailing buttons land on the reference's button edge.
+    /// Centring a shorter column left the buttons stranded in the middle of
+    /// the control column, which is what made the status row look unpadded.
+    static let columnWidth: CGFloat = 580
     /// The reference window's exact width, and its per-tab heights. It is not
     /// resizable - the zoom and minimise buttons are disabled - and the height
     /// changes with the tab rather than the user dragging it.
@@ -192,6 +211,23 @@ extension View {
         frame(width: width, alignment: .leading)
     }
 
+    /// A regular push button at the trailing end of a text row (Open
+    /// Settings, Show Me How). Regular size, like Tailscale's Manage… - the
+    /// small size read as a different control family. macOS 26 draws it 24pt
+    /// tall against a 16pt text line, which pushed the rows around it ~4pt
+    /// further apart than Tailscale's; laying it out at the text's height and
+    /// letting it overhang into the row spacing keeps the text rhythm intact.
+    func settingsTrailingButton() -> some View {
+        padding(.vertical, -4)
+    }
+
+    /// A checkbox directly under another checkbox (no help line between).
+    /// Tailscale stacks those at a 25pt pitch; the shared 6pt content spacing
+    /// gave 22pt, which read as cramped next to the rows around it.
+    func settingsStackedToggle() -> some View {
+        padding(.top, 3)
+    }
+
     /// The same flush-left rule for a control that should grow to a ceiling
     /// rather than sit in a fixed box.
     func settingsControl(maxWidth: CGFloat) -> some View {
@@ -220,37 +256,71 @@ struct SettingsField<Content: View>: View {
             VStack(alignment: .leading, spacing: SettingsMetrics.contentSpacing) {
                 content
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
 
-/// An inline "macOS needs your approval" caption for the control it sits under:
-/// a small warning glyph and a short line of secondary text, with the action as
-/// an inline blue link right after the sentence - the way macOS itself writes
-/// permission help under a setting. No tinted box, no border, no button pinned
-/// to the far edge; the glyph + message flow as one line (concatenated Text, so
-/// the icon shares the text baseline) and the link hugs left beside it. Every
-/// permission prompt on the Settings pages uses it, so they match.
+/// A permission status row: plain status dot, message, and trailing native action.
 struct SettingsNotice<Action: View>: View {
-    let icon: String
     let message: String
-    var tint: Color = .orange
+    var tint: Color = .red
     @ViewBuilder var action: () -> Action
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            // Interpolating Text into Text keeps each segment's own colour and
-            // shares one baseline; `Text + Text` is deprecated since macOS 26.
-            Text("\(Text(Image(systemName: icon)).foregroundColor(tint))  \(Text(message).foregroundColor(.secondary))")
-                .font(.system(size: 11))
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .center, spacing: SettingsMetrics.labelGap) {
+            HStack(spacing: 0) {
+                Circle().fill(tint)
+                    .frame(width: SettingsMetrics.statusDot, height: SettingsMetrics.statusDot)
+                    .frame(width: SettingsMetrics.checkboxSlot)
+                    .accessibilityHidden(true)
+                Text(message)
+                    .font(.system(size: 13))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, SettingsMetrics.checkboxLabelInset - SettingsMetrics.checkboxSlot)
+            }
+            Spacer(minLength: SettingsMetrics.labelGap)
             action()
-                .buttonStyle(.link)
-                .font(.system(size: 11))
-            Spacer(minLength: 0)
+                .settingsTrailingButton()
+                .layoutPriority(1)
         }
-        .frame(maxWidth: 460, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // A notice sits INSIDE a group, only `contentSpacing` under the line
+        // above, so the button's 4pt top overhang nearly touched that help
+        // text. Give the overhang back on top; it still saves 4pt below.
+        .padding(.top, 4)
+    }
+}
+
+/// Short explanatory copy aligned beneath a control's text, past its checkbox.
+struct SettingsHelp: View {
+    let text: String
+    var checkbox = true
+
+    init(_ text: String, checkbox: Bool = true) {
+        self.text = text
+        self.checkbox = checkbox
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.leading, checkbox ? SettingsMetrics.checkboxLabelInset : 0)
+            // Tailscale sets its grey copy 18.7pt baseline-to-baseline under
+            // the control's text; the shared 6pt content spacing gave 20pt.
+            .padding(.top, -1.5)
+    }
+}
+
+/// The natural height of a `SettingsPageBody`'s content, reported up so the
+/// window can end ~28pt under the last row the way Tailscale's does, instead
+/// of leaving a fixed-height window half empty when few rows are showing.
+struct SettingsPageHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = nextValue() ?? value
     }
 }
 
@@ -265,16 +335,15 @@ struct SettingsPageBody<Content: View>: View {
                 content
             }
             .frame(width: SettingsMetrics.columnWidth, alignment: .leading)
-            .padding(.top, 20)
+            .padding(.top, 27)
             .padding(.bottom, 28)
-            .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: SettingsPageHeightKey.self,
+                                           value: proxy.size.height)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-}
-
-/// A hairline rule between groups, as Tailscale uses above its update block.
-struct SettingsRule: View {
-    var body: some View {
-        Divider().padding(.vertical, 4)
     }
 }

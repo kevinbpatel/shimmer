@@ -38,7 +38,7 @@ extension AppModel {
     /// `GLIMMER_DEBUG_<NAME>` from the environment, else `--debug-<name>=value`
     /// from the command line. Only used to decide whether automation is armed;
     /// nothing here runs on a normal launch.
-    private static func debugKnob(_ name: String) -> String? {
+    static func debugKnob(_ name: String) -> String? {
         let env = ProcessInfo.processInfo.environment
         if let v = env["GLIMMER_DEBUG_\(name.uppercased().replacingOccurrences(of: "-", with: "_"))"],
            !v.isEmpty { return v }
@@ -47,6 +47,23 @@ extension AppModel {
             .first { $0.hasPrefix(prefix) }
             .map { String($0.dropFirst(prefix.count)) }
             .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Render the main window's frame view (title bar included) at 2x.
+    private static func snapshotMainWindow(to url: URL) {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && $0.level == .normal }),
+              let view = window.contentView?.superview ?? window.contentView else { return }
+        window.makeKeyAndOrderFront(nil)
+        let size = view.bounds.size
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        rep.size = size
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? rep.representation(using: .png, properties: [:])?.write(to: url)
     }
 
     /// `NSApp.terminate` from the RUN LOOP, never from inside a GCD main-queue
@@ -80,6 +97,12 @@ extension AppModel {
         // on each pane in turn, 3s apart (a screenshot loop for UI work), then
         // quit after --debug-quit-after seconds if given.
         if let panes = Self.debugKnob("open-settings") {
+            // Per-process appearance for live window screenshots; never changes
+            // the user's system appearance or persists a preference.
+            if let appearance = Self.debugKnob("appearance") {
+                if appearance == "light" { NSApp.appearance = NSAppearance(named: .aqua) }
+                if appearance == "dark" { NSApp.appearance = NSAppearance(named: .darkAqua) }
+            }
             let list = panes.split(separator: ",").compactMap { SettingsTab(rawValue: String($0)) }
             log.notice("DEBUG automation: opening Settings on \(list.map(\.rawValue), privacy: .public)")
             for (i, pane) in list.enumerated() {
@@ -88,6 +111,17 @@ extension AppModel {
                     AppDelegate.openMainWindow?()
                     NSApp.activate()
                     self?.settingsTab = pane
+                }
+            }
+            // `--debug-snapshot=<dir>`: after each pane opens, save the window
+            // at 2x as <dir>/<pane>.png. The dev Mac's 1x display made screen
+            // captures look far softer than the Retina laptop the app runs on.
+            if let dir = Self.debugKnob("snapshot") {
+                for (i, pane) in list.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0 + Double(i) * 3.0) {
+                        Self.snapshotMainWindow(to: URL(fileURLWithPath: dir)
+                            .appendingPathComponent("\(pane.rawValue).png"))
+                    }
                 }
             }
             if let quitAfter = Self.debugKnob("quit-after").flatMap(Double.init) {

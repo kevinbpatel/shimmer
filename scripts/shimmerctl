@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Diagnose and exercise the installed Shimmer app, locally or over SSH."""
+import argparse
+import datetime
+import json
+from pathlib import Path
+import shlex
+import socket
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+
+
+def default_app_path():
+    source = Path(__file__).resolve()
+    if source.parent.name == "Resources" and source.parent.parent.name == "Contents":
+        bundle = source.parent.parent.parent
+        if bundle.suffix == ".app":
+            return str(bundle)
+    return "/Applications/Shimmer.app"
+
+
+def run(args, timeout=20):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+
+
+def app_status(app):
+    bundle = Path(app)
+    executable = str(bundle / "Contents/MacOS/Shimmer")
+    probe = run(["pgrep", "-x", "Shimmer"])
+    pids = []
+    for value in probe.stdout.splitlines():
+        if value.isdigit() and run(["ps", "-p", value, "-o", "comm="]).stdout.strip() == executable:
+            pids.append(int(value))
+    signature = run(["codesign", "--verify", "--deep", "--strict", str(bundle)]) if bundle.exists() else None
+    return {"app": app, "installed": bundle.is_dir(), "running_pids": pids,
+            "signature_valid": signature is not None and signature.returncode == 0}
+
+
+def tcp_probe(host, port, timeout=3):
+    started = time.monotonic()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
+        return {"port": port, "reachable": True,
+                "connect_ms": round((time.monotonic() - started) * 1000, 1)}
+    except OSError as error:
+        return {"port": port, "reachable": False, "error": str(error)}
+
+
+def diagnosis(http, https, permission_denied=False):
+    if permission_denied:
+        return "macos_local_network_denied"
+    if http["reachable"] and not https["reachable"]:
+        return "secure_port_unreachable"
+    if not http["reachable"] and not https["reachable"]:
+        return "host_unreachable"
+    if not http["reachable"]:
+        return "http_port_unreachable"
+    return "ports_reachable"
+
+
+def log_entries(last="10m", start=None):
+    args = ["/usr/bin/log", "show", "--style", "ndjson", "--info",
+            "--predicate", 'subsystem == "io.ugfugl.Glimmer" OR '
+            '(process == "Shimmer" AND (eventMessage CONTAINS[c] "Local network prohibited" '
+            'OR eventMessage CONTAINS[c] "PolicyDenied"))']
+    args += ["--start", start] if start else ["--last", last]
+    result = run(args, timeout=30)
+    if result.returncode:
+        raise RuntimeError("Cannot read Shimmer logs: " + result.stderr.strip())
+    entries = []
+    for line in result.stdout.splitlines():
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        message = item.get("eventMessage", "")
+        if not message:
+            continue
+        # Logs already redact protocol secrets; exclude credential diagnostics too.
+        if any(word in message.lower() for word in
+               ["private key", "client-cert", "client-key", "-----begin", "clientuniqueid"]):
+            continue
+        entries.append({"time": item.get("timestamp"), "pid": item.get("processID"),
+                        "category": item.get("category"), "message": message})
+    return entries
+
+
+def doctor(args):
+    result = {"client": app_status(args.app), "host": args.host}
+    result["ports"] = {"http": tcp_probe(args.host, args.http_port),
+                       "https": tcp_probe(args.host, args.https_port)}
+    try:
+        entries = log_entries(last=args.last)
+        result["recent_errors"] = [entry for entry in entries if any(
+            word in entry["message"].lower() for word in
+            ["failed", "prohibited", "policydenied", "never reached"])][-15:]
+        pids = result["client"]["running_pids"]
+        permission_denied = any(entry["pid"] in pids and any(
+            word in entry["message"].lower() for word in
+            ["local network prohibited", "policydenied"]) for entry in entries)
+    except (RuntimeError, subprocess.TimeoutExpired) as error:
+        result["logs_error"] = str(error)
+        permission_denied = False
+    result["diagnosis"] = diagnosis(result["ports"]["http"], result["ports"]["https"], permission_denied)
+    result["guidance"] = {
+        "macos_local_network_denied": "Allow Shimmer in macOS Privacy & Security > Local Network.",
+        "secure_port_unreachable": "The PC answers on HTTP but not HTTPS. Check Sunshine's HTTPS listener and firewall. An exhausted accept queue requires restarting Sunshine; re-pairing does not repair that listener.",
+        "host_unreachable": "Check the PC's power, address, route, and Sunshine service.",
+        "http_port_unreachable": "Check Sunshine's HTTP listener and firewall.",
+        "ports_reachable": "TCP ports answer. This alone does not prove pairing, TLS, or video works; use test-stream for an app-level test."
+    }[result["diagnosis"]]
+    return result, 0 if result["diagnosis"] == "ports_reachable" else 1
+
+
+def test_stream(args):
+    status = app_status(args.app)
+    if not status["installed"] or not status["signature_valid"]:
+        raise RuntimeError("The installed app is missing or fails signature verification.")
+    if status["running_pids"]:
+        raise RuntimeError("Shimmer is already running. The launch-only test will not interrupt it; close it before using test-stream. Doctor and logs work while it runs.")
+    start = (datetime.datetime.now() - datetime.timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+    launched = run(["open", args.app, "--args", "--debug-stream=" + args.host,
+                    "--debug-quit-after=" + str(args.seconds)])
+    if launched.returncode:
+        raise RuntimeError("Could not launch Shimmer: " + launched.stderr.strip())
+    pid = None
+    entries = []
+    deadline = time.monotonic() + 45 + args.seconds
+    while time.monotonic() < deadline:
+        status = app_status(args.app)
+        if pid is None and status["running_pids"]:
+            pid = status["running_pids"][0]
+        entries = [entry for entry in log_entries(start=start) if entry["pid"] == pid] if pid else []
+        live = any("DEBUG automation: stream is live" in entry["message"] for entry in entries)
+        failed = any("Stream start failed" in entry["message"] or
+                     "stream never reached" in entry["message"] or
+                     "no host matching" in entry["message"] for entry in entries)
+        if failed or (pid is not None and pid not in status["running_pids"]):
+            return {"host": args.host, "pid": pid, "reached_streaming": live,
+                    "app_exited": pid not in status["running_pids"],
+                    "events": entries[-40:]}, 0 if live and not failed else 1
+        time.sleep(2)
+    return {"host": args.host, "pid": pid, "error": "Stream test timed out; the app was left open for inspection.",
+            "events": entries[-40:]}, 1
+
+
+def main():
+    # Run this exact script remotely; no pre-existing CLI installation is required.
+    if len(sys.argv) > 2 and sys.argv[1] == "--on":
+        host = sys.argv[2]
+        if host.startswith("-"):
+            raise ValueError("Invalid SSH destination")
+        command = "python3 - " + shlex.join(sys.argv[3:])
+        remote = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                                 "-o", "StrictHostKeyChecking=yes", host, command],
+                                input=Path(__file__).read_bytes())
+        return remote.returncode
+    parser = argparse.ArgumentParser(description=__doc__,
+        epilog="Remote: shimmerctl --on user@tailscale-address doctor --host PC-address")
+    parser.add_argument("--app", default=default_app_path())
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("status", help="Installed app, signature, and running process IDs")
+    logs = commands.add_parser("logs", help="Structured Shimmer unified logs")
+    logs.add_argument("--last", default="10m")
+    check = commands.add_parser("doctor", help="Check client installation, host ports, and recent failures")
+    check.add_argument("--host", required=True)
+    check.add_argument("--http-port", type=int, default=47989)
+    check.add_argument("--https-port", type=int, default=47984)
+    check.add_argument("--last", default="10m")
+    stream = commands.add_parser("test-stream", help="Launch the real client, stream its saved default app, then quit")
+    stream.add_argument("--host", required=True, help="Saved host name or address match")
+    stream.add_argument("--seconds", type=int, choices=range(3, 61), default=12, metavar="3-60")
+    args = parser.parse_args()
+    if args.command == "doctor":
+        result, code = doctor(args)
+    elif args.command == "test-stream":
+        result, code = test_stream(args)
+    elif args.command == "logs":
+        result, code = {"entries": log_entries(args.last)}, 0
+    else:
+        result = app_status(args.app)
+        code = 0 if result["installed"] and result["signature_valid"] else 1
+    print(json.dumps(result, indent=2))
+    return code
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
+        print(json.dumps({"error": str(error)}), file=sys.stderr)
+        sys.exit(2)

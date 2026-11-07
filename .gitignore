@@ -110,3 +110,7 @@ scripts/telem-client.sh
 
 # Python bytecode
 __pycache__/
+
+## Local working files
+output/
+__pycache__/

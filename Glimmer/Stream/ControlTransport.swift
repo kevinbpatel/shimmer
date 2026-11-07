@@ -136,6 +136,8 @@ enum ControlTransport {
         if cancellation.isCancelled { throw CancellationError() }
         let timeoutMs = Int32(max(1, timeout) * 1000)
         let fd = gl_tcp_connect(host, String(port), timeoutMs)
+        if fd == -2 { throw StreamError.hostUnreachable("address not found: \(host)") }
+        if fd == -3 { throw StreamError.hostUnreachable("name lookup failed: \(host)") }
         guard fd >= 0 else {
             throw StreamError.hostUnreachable("connect to \(host):\(port) failed or timed out")
         }

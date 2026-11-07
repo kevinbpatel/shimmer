@@ -22,8 +22,69 @@
 //
 
 import Foundation
+import Network
 import SwiftUI
 import os
+
+/// Sleep is not a failed retry. A wake starts a fresh bounded recovery window;
+/// without this, Date-based deadlines expire while the laptop is in a bag.
+/// Likewise no network is not a failed retry: right after a wake Wi-Fi is still
+/// rejoining, and every attempt in that gap fails in ~2 ms - five of them used
+/// to burn the whole budget before the radio was even back.
+struct StreamReconnectBudget {
+    enum Step: Equatable {
+        case waitingForWake
+        case waitingForNetwork
+        case attempt(Int)
+        case exhausted
+    }
+    /// How long to hold the frozen frame waiting for ANY network after a wake
+    /// (or the drop) before giving up. The retry window starts once one is up.
+    static let networkWaitSeconds: TimeInterval = 60
+    private var deadline: Date
+    private var networkWaitDeadline: Date
+    private var wakeRevision: UInt64
+    private var attempts = 0
+    private var waitedForNetwork = false
+
+    init(now: Date, wakeRevision: UInt64) {
+        deadline = now.addingTimeInterval(StreamSession.reconnectWindowSeconds)
+        networkWaitDeadline = now.addingTimeInterval(Self.networkWaitSeconds)
+        self.wakeRevision = wakeRevision
+    }
+
+    mutating func nextStep(now: Date, sleeping: Bool, networkAvailable: Bool = true,
+                           wakeRevision: UInt64) -> Step {
+        if sleeping { return .waitingForWake }
+        if self.wakeRevision != wakeRevision {
+            self.wakeRevision = wakeRevision
+            attempts = 0
+            deadline = now.addingTimeInterval(StreamSession.reconnectWindowSeconds)
+            networkWaitDeadline = now.addingTimeInterval(Self.networkWaitSeconds)
+        }
+        if !networkAvailable {
+            guard now < networkWaitDeadline else { return .exhausted }
+            waitedForNetwork = true
+            return .waitingForNetwork
+        }
+        if waitedForNetwork {
+            // The retry window starts when there's a network to retry on.
+            waitedForNetwork = false
+            deadline = max(deadline, now.addingTimeInterval(StreamSession.reconnectWindowSeconds))
+        }
+        guard attempts < StreamSession.reconnectAttemptCap, now < deadline else { return .exhausted }
+        attempts += 1
+        return .attempt(attempts)
+    }
+
+    /// The host didn't answer at any saved address, so no handshake was tried:
+    /// hand the attempt back, and keep looking until the network-wait limit -
+    /// Tailscale can take 10-20s to come back after a wake.
+    mutating func refundAttempt() {
+        attempts = max(0, attempts - 1)
+        deadline = max(deadline, networkWaitDeadline)
+    }
+}
 
 extension StreamSession {
 
@@ -97,7 +158,7 @@ extension StreamSession {
     private func runReconnectEpisode(code: Int32, bannerText: String = "Reconnecting…") async {
         isReconnecting = true
         reconnectAttempts = 0
-        let deadline = Date().addingTimeInterval(Self.reconnectWindowSeconds)
+        var budget = StreamReconnectBudget(now: Date(), wakeRevision: reconnectWakeRevision)
         bridge?.eventContinuation?.yield(.reconnecting)
         // Surface the hold over the frozen frame - the launcher's phase chip is
         // occluded by the fullscreen window, so this banner is the only in-stream
@@ -116,9 +177,33 @@ extension StreamSession {
             + "across a lock/desktop transition).",
             "Stream")
 
-        while isStreaming, !stopInProgress,
-              reconnectAttempts < Self.reconnectAttemptCap, Date() < deadline {
-            reconnectAttempts += 1
+        startReconnectPathMonitor()
+        defer { stopReconnectPathMonitor() }
+        var waitingForNetwork = false
+
+        recovery: while isStreaming, !stopInProgress {
+            switch budget.nextStep(now: Date(), sleeping: systemSleeping,
+                                   networkAvailable: reconnectNetworkAvailable,
+                                   wakeRevision: reconnectWakeRevision) {
+            case .waitingForWake:
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                continue
+            case .waitingForNetwork:
+                if !waitingForNetwork {
+                    waitingForNetwork = true
+                    Diag.notice("reconnect: no network yet - waiting before retrying", "Stream")
+                    await setReconnectBanner("Waiting for network…")
+                }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                continue
+            case .exhausted: break recovery
+            case .attempt(let number): reconnectAttempts = number
+            }
+            if waitingForNetwork {
+                waitingForNetwork = false
+                await setReconnectBanner(bannerText)
+            }
+            let wakeRevision = reconnectWakeRevision
             // Backoff: the host (Sunshine) is mid-restart and its HTTPS endpoint
             // may not answer for ~3s. A short ramp (0.8s, 1.6s, then 2.4s) keeps
             // the first resume snappy; launchWithBusyRecovery's own
@@ -126,6 +211,18 @@ extension StreamSession {
             let delayMs = UInt64(min(reconnectAttempts, 3)) * 800
             try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
             if !isStreaming || stopInProgress { break }
+            if systemSleeping || wakeRevision != reconnectWakeRevision { continue }
+            // Find the host before spending an attempt on a handshake: home
+            // first, then the manual address (Tailscale) for when the laptop
+            // woke up somewhere else.
+            guard let address = await reachableReconnectAddress() else {
+                budget.refundAttempt()
+                continue
+            }
+            if reconnectServer?.address != address {
+                Diag.notice("reconnect: host answers at \(address) - switching to it", "Stream")
+                reconnectServer?.address = address
+            }
             Diag.notice("reconnect attempt \(reconnectAttempts)/\(Self.reconnectAttemptCap)...", "Stream")
             if await reconnectInPlace() {
                 isReconnecting = false
@@ -160,6 +257,51 @@ extension StreamSession {
             "Stream")
         bridge?.eventContinuation?.yield(.connectionTerminated(errorCode: code))
         await stop(cause: .hostError)
+    }
+
+    /// The first saved host address answering on the HTTP port, or nil if none
+    /// does yet. The session's current address is the fallback list when the
+    /// caller passed none.
+    private func reachableReconnectAddress() async -> String? {
+        guard let server = reconnectServer else { return nil }
+        let candidates = reconnectAddresses.isEmpty ? [server.address] : reconnectAddresses
+        for address in candidates {
+            if case .reachable = await HostReachability.measureRTT(
+                host: address, port: server.httpPort, timeoutMs: 1_500) {
+                return address
+            }
+            if !isStreaming || stopInProgress { return nil }
+        }
+        return nil
+    }
+
+    private func setReconnectBanner(_ text: String) async {
+        let win = window
+        await MainActor.run { win?.reconnectBanner.setText(text) }
+    }
+
+    /// Track whether the Mac has any usable network while an episode runs.
+    private func startReconnectPathMonitor() {
+        stopReconnectPathMonitor()
+        reconnectNetworkAvailable = true
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            let available = path.status == .satisfied
+            Task { await self?.setReconnectNetworkAvailable(available) }
+        }
+        monitor.start(queue: DispatchQueue(label: "shimmer.reconnect.path"))
+        reconnectPathMonitor = monitor
+    }
+
+    private func stopReconnectPathMonitor() {
+        reconnectPathMonitor?.cancel()
+        reconnectPathMonitor = nil
+        reconnectNetworkAvailable = true
+    }
+
+    private func setReconnectNetworkAvailable(_ available: Bool) {
+        guard reconnectPathMonitor != nil else { return }
+        reconnectNetworkAvailable = available
     }
 
     /// One reconnect attempt: tear down ONLY the dead connection, swap in a fresh

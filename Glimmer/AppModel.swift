@@ -94,6 +94,10 @@ final class AppModel {
     /// Active native session, retained while streaming.
     @ObservationIgnored var nativeSession: StreamSession?
 
+    /// The app requested for this session. Observable so the menu bar updates
+    /// without relying on last-played defaults or a paused host-status poller.
+    var activeStreamApp: LibraryApp?
+
     // Quality
     // Default `.matchDisplay` (panel-native resolution + refresh) - the option
     // shown at the top of the preset list. An explicit choice is persisted by
@@ -215,7 +219,15 @@ final class AppModel {
             await self?.nativeSession?.resumeWindow()
         }
     }
-    var nativeStreamError: String?
+    var nativeStreamError: String? {
+        // A newer failure must never inherit an older one's "just a dropped
+        // connection" label - each failure re-earns it via markStreamInterruption.
+        didSet { interruptedStreamHost = nil }
+    }
+    /// Set when `nativeStreamError` describes a dropped connection (sleep, a
+    /// Wi-Fi change, the host going away) rather than something the user must
+    /// fix. Observed: it decides whether the menu bar shows the warning triangle.
+    var interruptedStreamHost: (id: String, failedAt: Date)?
 
     /// Effective HDR-active state from the native engine. True only when the
     /// host signalled HDR mode AND the bitstream is 10-bit AND the Metal

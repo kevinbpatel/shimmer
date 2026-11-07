@@ -44,10 +44,26 @@ struct HostActivityTests {
         model.selectedHost = host
         model.hostLiveStatus = HostLiveStatus(hostID: host.id, state: .reachable, capturedAt: Self.now)
         #expect(model.hostStatusLine(for: host.id, at: Self.now) == "Online · status unavailable")
-        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .neutral)
+        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .attention)
         #expect(model.runningAppName == nil)
         #expect(!HostLiveStatus.State.reachable.hasSessionInformation)
         #expect(HostLiveStatus.State.idle.hasSessionInformation)
+    }
+
+    @Test @MainActor func hostBadgesDistinguishOfflineTrustFailuresAndUnrelatedHosts() {
+        let model = AppModel()
+        let host = Self.host("badge-host")
+        model.selectedHost = host
+        model.hostLiveStatus = HostLiveStatus(hostID: host.id, state: .asleep, capturedAt: Self.now)
+        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .offline)
+        model.hostLiveStatus?.state = .certMismatch
+        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .error)
+        #expect(model.hostStatusLine(for: host.id, at: Self.now).contains("Trust needed"))
+        model.nativeStreamError = "Decoder failed"
+        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .error)
+        #expect(model.hostStatusIndicator(for: "other-host", at: Self.now) == .neutral)
+        model.markStreamInterruption(hostID: host.id, at: Self.now)
+        #expect(model.hostStatusIndicator(for: host.id, at: Self.now) == .offline)
     }
 
     @Test @MainActor func connectionProgressIsNotAStreamingClaimAndBelongsToOneHost() {

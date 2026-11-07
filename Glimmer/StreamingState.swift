@@ -41,6 +41,33 @@ enum PairingAttemptFailure: Error, Equatable {
     }
 }
 
+/// Explain only what the failed pre-pairing probe actually established.
+/// PIN and signature failures continue to share their existing generic message.
+enum PairingConnectionMessage {
+    static func message(for error: Error) -> String {
+        if let error = error as? StreamError {
+            switch error {
+            case .hostUnreachable(let detail):
+                if detail.hasPrefix("address not found:") {
+                    return "Address not found. Check the IP address or hostname."
+                }
+                if detail.hasPrefix("name lookup failed:") {
+                    return "Couldn’t look up this address. Check your network connection and try again."
+                }
+                if detail.hasPrefix("malformed HTTP") || detail.hasPrefix("unparseable HTTP") || detail == "empty HTTP response" {
+                    return "This address didn’t return a streaming server. Check the address and Sunshine."
+                }
+            case .launchFailed:
+                return "This PC returned an unexpected response. Check that Sunshine is running."
+            case .crypto:
+                return "Couldn’t prepare a secure connection. Restart Shimmer and try again."
+            default: break
+            }
+        }
+        return "Couldn’t reach this PC. Make sure it’s on and Sunshine is running."
+    }
+}
+
 // MARK: - StreamPhase
 
 /// Lifecycle of a live stream session. Backed by connection events from the

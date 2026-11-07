@@ -21,15 +21,13 @@ struct ShortcutsPane: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
-            SettingsField("macOS keys") {
+            // One "Input:" group, the way Tailscale's "General:" owns several
+            // checkboxes - a label per single row read as a stack of forms.
+            SettingsField("Input") {
                 Toggle("Use ⌘ shortcuts inside the game", isOn: $model.captureSysKeys)
-            }
-
-            SettingsField("Mouse") {
+                SettingsHelp("Sends Command-key shortcuts to the PC during a stream.")
                 Toggle("Disable mouse input", isOn: $model.mouseInputDisabled)
             }
-
-            SettingsRule()
 
             SettingsField("Controller quit") {
                 Picker("", selection: $model.controllerQuitChord) {
@@ -39,6 +37,7 @@ struct ShortcutsPane: View {
                 }
                 .labelsHidden()
                 .settingsControl()
+                SettingsHelp("Hold this combination to leave the stream.", checkbox: false)
                 if model.controllerQuitChord == .custom {
                     HStack(spacing: 8) {
                         Text(model.customControllerChord.isEmpty

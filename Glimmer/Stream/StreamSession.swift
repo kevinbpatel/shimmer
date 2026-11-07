@@ -30,6 +30,7 @@
 //   thread to dereference a freed Swift object.
 
 import Foundation
+import Network
 import AppKit
 import os
 public actor StreamSession {
@@ -297,6 +298,12 @@ public actor StreamSession {
     /// `start()`: the original server (for a fresh NetworkClient), the requested
     /// StreamConfig, and the app id. Nil before a session starts.
     var reconnectServer: ServerInfo?
+    /// Every saved address for the host, home first. A reconnect dials the first
+    /// one that answers, so waking up away from home falls back to Tailscale.
+    var reconnectAddresses: [String] = []
+    /// Live only during a reconnect episode: whether the Mac has any network.
+    var reconnectPathMonitor: NWPathMonitor?
+    var reconnectNetworkAvailable = true
     var reconnectConfig: StreamConfig?
     var reconnectAppID: Int?
 
@@ -323,6 +330,10 @@ public actor StreamSession {
     /// completes, on stop, and before a new wake re-arms it. Actor-isolated: every
     /// access (arm/cancel/nil) is on the session actor.
     var wakeProbeTask: Task<Void, Never>?
+    var systemSleeping = false
+    /// Changes on wake even during a reconnect, so that episode gets a fresh
+    /// bounded retry window after Wi-Fi has had a chance to come back.
+    var reconnectWakeRevision: UInt64 = 0
     /// Probe budget multiple of RTT, clamped: budget = clamp(N·RTT, 750ms, 2.5s).
     static let wakeProbeRttMultiple = 4
     static let wakeProbeFloorMs: UInt64 = 750

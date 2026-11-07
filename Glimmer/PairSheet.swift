@@ -71,72 +71,149 @@ final class PCPairingFlow {
 struct PCPairingPane: View {
     @Environment(AppModel.self) private var model
     let target: PCPairingTarget
+    let failed: ((String, String) -> Void)?
     let paired: (String) -> Void
     @State private var flow = PCPairingFlow()
+    @State private var address: String
+
+    init(target: PCPairingTarget, failed: ((String, String) -> Void)? = nil,
+         paired: @escaping (String) -> Void) {
+        self.target = target
+        self.failed = failed
+        self.paired = paired
+        _address = State(initialValue: target.address)
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(target.name).font(.system(size: 18, weight: .semibold))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(target.address).font(.system(size: 12)).foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                if let error = flow.error {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack {
-                        Button("Cancel") { flow.reset() }
-                            .keyboardShortcut(.cancelAction)
-                        Spacer()
-                        Button("Try Again", action: begin)
-                            .buttonStyle(.borderedProminent)
-                            .disabled(model.pairingInFlight)
+        Group {
+            if let error = flow.error {
+                recoveryForm(error: error)
+            } else {
+                pairingBody
+            }
+        }
+        .task { if target.startImmediately { begin() } }
+        .onChange(of: flow.error) { _, error in
+            if let error { failed?(address, error) }
+        }
+        .onDisappear { flow.reset() }
+    }
+
+    private var pairingBody: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 20) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "desktopcomputer")
+                            .font(.system(size: 28, weight: .regular))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 64, height: 64)
+                            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+                            .padding(.bottom, 4)
+                        Text(address == target.address ? target.name : address)
+                            .font(.system(size: 18, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(address).font(.system(size: 12)).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
-                } else if let pin = flow.pin {
-                    Text("Enter this code in the pairing prompt on your PC.")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(pin)
-                        .id(pin)
-                        .font(.system(size: 34, weight: .medium, design: .monospaced))
-                        .tracking(8)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-                    if flow.isRunning {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text(flow.isCancelling ? "Cancelling…" : "Waiting for your PC…")
-                                .foregroundStyle(.secondary)
+                    if let pin = flow.pin {
+                        Text("Enter this code in the pairing prompt on your PC.")
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(pin)
+                            .id(pin)
+                            .font(.system(size: 34, weight: .medium, design: .monospaced))
+                            .tracking(8)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                        if flow.isRunning {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text(flow.isCancelling ? "Cancelling…" : "Waiting for your PC…")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                    }
-                    HStack {
                         Button("Cancel") { flow.cancel() }
                             .keyboardShortcut(.cancelAction)
                             .disabled(flow.isCancelling)
-                        Spacer()
+                    } else {
+                        VStack(spacing: 16) {
+                            Text("Pair with this PC to stream its apps to your Mac.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Pair PC", action: begin)
+                                .buttonStyle(.borderedProminent)
+                                .disabled(model.pairingInFlight)
+                        }
                     }
-                } else {
-                    Button("Pair PC", action: begin)
-                        .buttonStyle(.borderedProminent)
-                        .disabled(model.pairingInFlight)
                 }
+                .font(.system(size: 13))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
+                .padding(24)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: geometry.size.height)
             }
-            .font(.system(size: 13))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(24)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .task { if target.startImmediately { begin() } }
-        .onDisappear { flow.reset() }
+    }
+
+    private func recoveryForm(error: String) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 28) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "desktopcomputer")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 64, height: 64)
+                            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+                            .accessibilityHidden(true)
+                        Text(target.name)
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(address)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 8) {
+                        PCConnectionErrorBanner(message: error)
+                        HStack(spacing: 10) {
+                            TextField("IP address or hostname", text: $address)
+                                .textFieldStyle(.roundedBorder)
+                                .controlSize(.large)
+                                .disableAutocorrection(true)
+                                .accessibilityLabel("PC IP address or hostname")
+                                .onSubmit(begin)
+                            Button("Try Again", action: begin)
+                                .buttonStyle(.borderedProminent)
+                                .buttonBorderShape(.roundedRectangle(radius: 5))
+                                .controlSize(.large)
+                                .keyboardShortcut(.defaultAction)
+                                .disabled(model.pairingInFlight || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                }
+                .font(.system(size: 14))
+                .frame(maxWidth: 400)
+                .padding(.horizontal, 28)
+                .padding(.top, 68)
+                .padding(.bottom, 28)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: geometry.size.height, alignment: .top)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
     }
 
     private func begin() {
         guard !model.pairingInFlight else { return }
+        let pairingAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pairingAddress.isEmpty else { return }
+        address = pairingAddress
         flow.start(pin: model.generatePairingPIN()) { pin in
-            if let id = await model.pair(hostnameOrIP: target.address, pin: pin) {
+            if let id = await model.pair(hostnameOrIP: pairingAddress, pin: pin) {
                 if model.hosts.contains(where: { $0.id == id }) { return .paired(id) }
                 return .failed("Pairing finished, but this PC couldn't be added. Try again.")
             }

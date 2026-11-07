@@ -1,7 +1,7 @@
 import Foundation
 
 enum HostStatusIndicator {
-    case neutral, online, attention, offline
+    case neutral, online, attention, offline, error
 }
 
 extension AppModel {
@@ -27,6 +27,9 @@ extension AppModel {
             case .error: return "Stream interrupted"
             }
         }
+        if nativeStreamError != nil, selectedHost?.id == hostID {
+            return interruptedStreamHost?.id == hostID ? "Connection interrupted" : "Connection needs attention"
+        }
         guard let live = liveStatus(for: hostID, at: now) else { return "Checking…" }
         switch live.state {
         case .idle: return "Online"
@@ -43,16 +46,21 @@ extension AppModel {
         if isStreaming, activeStreamHostID == hostID {
             switch streamPhase {
             case .streaming: return .online
-            case .connecting, .error: return .attention
+            case .connecting: return .attention
+            case .error: return .error
             case .idle, .disconnecting: return .neutral
             }
+        }
+        if nativeStreamError != nil, selectedHost?.id == hostID {
+            return interruptedStreamHost?.id == hostID ? .offline : .error
         }
         guard let live = liveStatus(for: hostID, at: now) else { return .neutral }
         switch live.state {
         case .idle, .streamingApp, .streamingUnknownApp: return .online
-        case .reachable, .unknown: return .neutral
+        case .reachable: return .attention
+        case .unknown: return .neutral
         case .asleep: return .offline
-        case .certMismatch: return .attention
+        case .certMismatch: return .error
         }
     }
 

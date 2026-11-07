@@ -429,6 +429,12 @@ extension AppModel {
         return hostRoute.physicalLink.label
     }
 
+    var macConnectionLabel: String? {
+        guard let address = selectedHostRouteAddress, hostRoute.address == address,
+              hostRoute.physicalLink != .unknown else { return nil }
+        return hostRoute.physicalLink.label
+    }
+
     func currentLatencyReading(liveReading: HostLatencyReading?, at now: Date) -> HostLatencyReading? {
         guard let host = selectedHost, let address = selectedHostRouteAddress else { return nil }
         let reading: HostLatencyReading?

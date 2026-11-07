@@ -50,9 +50,6 @@ struct AboutPane: View {
                             TapGesture()
                                 .modifiers(.option)
                                 .onEnded { model.showDiagnostics.toggle() })
-                    Text("A fork of glimmer that pops the game out into Picture in Picture")
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                 }
 
                 VStack(spacing: 6) {
@@ -69,7 +66,9 @@ struct AboutPane: View {
                         + "additions are Copyright © 2026 Kevin Patel.")
                     Text("The transport is ported from moonlight-common-c and moonlight-qt.")
                     if let url = URL(string: AboutLink.donate) {
-                        Link("Sponsor glimmer's author", destination: url).padding(.top, 2)
+                        Link("Support glimmer’s author", destination: url)
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.top, 2)
                     }
                 }
                 .font(.system(size: 12))

@@ -47,7 +47,7 @@ struct AppSymbolTests {
         #expect(LibraryApp.symbol(forName: "Steam Big Picture") == "gamecontroller.fill")
         #expect(LibraryApp.symbol(forName: "Steam") == "gamecontroller.fill")
         // A low-res desktop IS a desktop: same glyph, the name distinguishes it.
-        #expect(LibraryApp.symbol(forName: "Desktop") == "desktopcomputer")
+        #expect(LibraryApp.symbol(forName: "Desktop") == "display")
         #expect(LibraryApp.symbol(forName: "Low Res Desktop")
                 == LibraryApp.symbol(forName: "Desktop"))
         #expect(LibraryApp.symbol(forName: "SteamVR") == "visionpro")

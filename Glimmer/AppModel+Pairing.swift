@@ -93,7 +93,7 @@ extension AppModel {
         guard hostnameOrIP.range(of: pattern, options: .regularExpression) != nil,
               hostnameOrIP.count <= 253,
               !hostnameOrIP.hasPrefix("-") else {
-            pairingPhase = .failure("Hostname looks invalid. Use a name like tower.local or an IP.")
+            pairingPhase = .failure("Enter an IP address or hostname, such as gaming-pc.local.")
             return nil
         }
         guard pin.count == 4, pin.allSatisfy({ $0.isNumber }) else {
@@ -129,7 +129,7 @@ extension AppModel {
         } catch {
             if Task.isCancelled { pairingPhase = .idle; return nil }
             log.error("Pairing: unreachable \(hostnameOrIP, privacy: .private) - \(error.localizedDescription, privacy: .private)")
-            pairingPhase = .failure("Couldn't reach \(hostnameOrIP). Make sure it's on and on this network.")
+            pairingPhase = .failure(PairingConnectionMessage.message(for: error))
             Diag.error("Pairing: host unreachable", "Pairing")
             return nil
         }
@@ -185,7 +185,7 @@ extension AppModel {
             // The detailed cause goes to the log at `.private` so a real
             // bug report can still pull the cause via `log show`.
             log.error("Pairing failed for host=\(hostnameOrIP, privacy: .private(mask: .hash)): \(err.description, privacy: .private)")
-            pairingPhase = .failure("Pairing failed - try again.")
+            pairingPhase = .failure("Pairing failed. Try again and approve the PIN on your PC.")
             Diag.error("Pairing failed", "Pairing")
         } catch {
             if Task.isCancelled { pairingPhase = .idle; return nil }
@@ -195,7 +195,7 @@ extension AppModel {
                 \(error.localizedDescription, privacy: .private)
                 """
             )
-            pairingPhase = .failure("Pairing failed - try again.")
+            pairingPhase = .failure("Pairing failed. Try again and approve the PIN on your PC.")
             Diag.error("Pairing failed", "Pairing")
         }
         return nil
@@ -215,9 +215,23 @@ extension AppModel {
     /// SF Symbol overrides for actionable errors and active streams. Idle
     /// has no menu-bar item; only meaningful status is shown.
     var menuBarSystemImageName: String? {
-        if nativeStreamError != nil { return "exclamationmark.triangle.fill" }
+        if menuBarShowsStreamError { return "exclamationmark.triangle.fill" }
         if isStreaming { return "play.fill" }
         return nil
+    }
+
+    /// The triangle is for problems only the user can fix (pair again, a
+    /// certificate mismatch, a decoder failure). A dropped connection - lid
+    /// closed, Wi-Fi changed, the host went away - needs nothing from them, so
+    /// it never raises it; its explanation still sits in the menu.
+    var menuBarShowsStreamError: Bool {
+        nativeStreamError != nil && interruptedStreamHost == nil
+    }
+
+    /// Label the current `nativeStreamError` as a dropped connection. Call it
+    /// AFTER setting the error (setting the error clears the label).
+    func markStreamInterruption(hostID: String, at failedAt: Date = Date()) {
+        interruptedStreamHost = (hostID, failedAt)
     }
 
     /// Battery of the first connected game controller that reports one, for

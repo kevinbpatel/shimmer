@@ -167,6 +167,7 @@ struct StreamPane: View {
 
             SettingsField("Picture in Picture") {
                 Toggle("Pop out when you switch away", isOn: $model.autoPictureInPicture)
+                SettingsHelp("Moves the stream into a floating window when you switch apps.")
             }
 
             // Off, ending a stream just disconnects: the game stays up on the
@@ -174,6 +175,7 @@ struct StreamPane: View {
             // menu bar ends it deliberately. On, every stop ends it.
             SettingsField("When the stream ends") {
                 Toggle("Quit the game on the PC", isOn: $model.quitAppWhenStreamEnds)
+                SettingsHelp("When off, the game keeps running so you can resume later.")
             }
 
             // The cushion that rides out Wi-Fi hiccups can sit at 100+ ms for
@@ -181,6 +183,7 @@ struct StreamPane: View {
             // the occasional blip instead.
             SettingsField("Audio") {
                 Toggle("Prefer low latency over smoothness", isOn: $model.preferLowAudioLatency)
+                SettingsHelp("Reduces audio buffering, but unstable connections may sound less smooth.")
             }
 
             // A pad doesn't reset the Mac's idle timer, so a stream being
