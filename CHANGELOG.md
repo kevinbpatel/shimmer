@@ -43,6 +43,19 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 
 ### Ported from later glimmer releases
 - Identity storage never reads or deletes Keychain items (glimmer 8aaaaa5).
+- AV1 from AMD encoders, which pad 1080p to 1082 rows, decodes instead of
+  failing (glimmer #223 / #224). AV1 sequence headers that carry
+  decoder-model info are read correctly.
+- A DualSense is announced to the PC before any of its input, so Sunshine
+  creates a PlayStation pad with a working touchpad, not an Xbox 360 pad
+  (glimmer #217).
+- Video and audio are accepted only from the paired PC's address.
+- Logs you copy or share, and `shimmerctl`'s view of them, hide PC names,
+  addresses and error details; telemetry names machines by a per-install
+  pseudonym.
+- The Wi-Fi helper accepts connections only from the Shimmer build it ships
+  with and runs with hardened-process protections. It previously required
+  glimmer's signing team, so Shimmer builds could never use it.
 
 ## 2026.9.0 - 2026-09-10
 
