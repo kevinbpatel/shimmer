@@ -32,6 +32,23 @@ struct AV1SequenceHeaderTests {
         #expect(result?.subsamplingY == 0)
     }
 
+    /// decoder_model_info is 5 + 32 + 5 + 5 bits and each operating point's
+    /// delays are buffer_delay_length bits wide (AV1 §5.5.4-5.5.5). Reading
+    /// them with the wrong widths shifted every later field, including the
+    /// coded size the padding fix depends on.
+    @Test func parsesSequenceHeaderWithDecoderModel() {
+        let decoder = VideoDecoder()
+        let result = decoder.parseAV1SequenceHeader(
+            Self.sequenceHeader(decoderModel: true, width: 1920, height: 1082))
+
+        #expect(result?.seqProfile == 1)
+        #expect(result?.bitDepth == 10)
+        #expect(result?.subsamplingX == 0)
+        #expect(result?.subsamplingY == 0)
+        #expect(result?.codedWidth == 1920)
+        #expect(result?.codedHeight == 1082)
+    }
+
     @Test func parsesPaddedCodedDimensions() throws {
         // Issue #223 reports 1920x1082 for a negotiated 1920x1080 stream.
         let decoder = VideoDecoder()
