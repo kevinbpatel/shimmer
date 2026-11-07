@@ -277,6 +277,8 @@
 		B4F0AC720000000000000001 /* HostActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F0AC720000000000000002 /* HostActivityTests.swift */; };
 		B4F0A1C20000000000000001 /* SleepRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */; };
 		5E1D1A600000000000000001 /* LogPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D1A600000000000000002 /* LogPrivacyTests.swift */; };
+		5E1D1A610000000000000001 /* AWDLHelperAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D1A610000000000000002 /* AWDLHelperAuthorizationTests.swift */; };
+		5E1D1A620000000000000001 /* HelperAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D1A620000000000000002 /* HelperAuthorization.swift */; };
 		B9E351AA8D864ACAB1563301 /* HostConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */; };
 		A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */; };
 		A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */; };
@@ -609,6 +611,8 @@
 		B4F0AC720000000000000002 /* HostActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HostActivityTests.swift"; sourceTree = "<group>"; };
 		B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepRecoveryTests.swift; sourceTree = "<group>"; };
 		5E1D1A600000000000000002 /* LogPrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogPrivacyTests.swift; sourceTree = "<group>"; };
+		5E1D1A610000000000000002 /* AWDLHelperAuthorizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AWDLHelperAuthorizationTests.swift; sourceTree = "<group>"; };
+		5E1D1A620000000000000002 /* HelperAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HelperAuthorization.swift; path = ../helper/HelperAuthorization.swift; sourceTree = "<group>"; };
 		B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostConnectionTests.swift; sourceTree = "<group>"; };
 		A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarBatteryGlyphTests.swift"; sourceTree = "<group>"; };
 		A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FrameRateRangeTests.swift"; sourceTree = "<group>"; };
@@ -996,6 +1000,8 @@
 				B4F0AC720000000000000002 /* HostActivityTests.swift */,
 				B4F0A1C20000000000000002 /* SleepRecoveryTests.swift */,
 				B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */,
+				5E1D1A620000000000000002 /* HelperAuthorization.swift */,
+				5E1D1A610000000000000002 /* AWDLHelperAuthorizationTests.swift */,
 				5E1D1A600000000000000002 /* LogPrivacyTests.swift */,
 				A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
@@ -1423,6 +1429,8 @@
 				B4F0AC720000000000000001 /* HostActivityTests.swift in Sources */,
 				B4F0A1C20000000000000001 /* SleepRecoveryTests.swift in Sources */,
 				B9E351AA8D864ACAB1563301 /* HostConnectionTests.swift in Sources */,
+				5E1D1A620000000000000001 /* HelperAuthorization.swift in Sources */,
+				5E1D1A610000000000000001 /* AWDLHelperAuthorizationTests.swift in Sources */,
 				5E1D1A600000000000000001 /* LogPrivacyTests.swift in Sources */,
 				A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,

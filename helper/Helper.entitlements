@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Memory protections for the root AWDL helper (hardened heap, read-only dyld
+	     state, platform restrictions), the set upstream Glimmer 2026.10.6 enables.
+	     None is a restricted entitlement, so ad hoc builds keep launching; the
+	     build runs the signed helper with check-launch to prove it. Integer keys
+	     cover macOS 26.0; string keys cover macOS 26.4 and later.
+	     Upstream's com.apple.developer.networking.topology-observation is left out:
+	     it needs a Developer ID provisioning profile, and an ad hoc binary
+	     carrying it is killed at launch. -->
+	<key>com.apple.security.hardened-process</key>
+	<true/>
+	<key>com.apple.security.hardened-process.enhanced-security-version</key>
+	<integer>1</integer>
+	<key>com.apple.security.hardened-process.enhanced-security-version-string</key>
+	<string>1</string>
+	<key>com.apple.security.hardened-process.hardened-heap</key>
+	<true/>
+	<key>com.apple.security.hardened-process.platform-restrictions</key>
+	<integer>2</integer>
+	<key>com.apple.security.hardened-process.platform-restrictions-string</key>
+	<string>2</string>
+	<key>com.apple.security.hardened-process.dyld-ro</key>
+	<true/>
+</dict>
+</plist>

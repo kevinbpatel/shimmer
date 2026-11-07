@@ -64,9 +64,14 @@ if [ -d "$HELPER" ]; then
 fi
 
 DAEMON="$APP/Contents/MacOS/io.ugfugl.glimmer.helper"
+DAEMON_ENT="helper/Helper.entitlements"
 if [ -f "$DAEMON" ]; then
-	echo "Signing the AWDL network helper (root LaunchDaemon, hardened runtime, no entitlements)"
-	codesign --force --options runtime $TS $KCF --sign "$ID" --identifier "io.ugfugl.glimmer.helper" "$DAEMON"
+	echo "Signing the AWDL network helper (root LaunchDaemon, hardened runtime + memory protections)"
+	codesign --force --options runtime $TS $KCF --sign "$ID" --identifier "io.ugfugl.glimmer.helper" \
+		--entitlements "$DAEMON_ENT" "$DAEMON"
+	# AMFI kills a binary whose entitlements its signature can't carry; catch that
+	# here rather than as a helper that silently never starts.
+	"$DAEMON" --check-launch || { echo "ERR: the signed AWDL helper does not launch" >&2; exit 1; }
 fi
 
 echo "Signing the app bundle (app entitlements, no --deep)"

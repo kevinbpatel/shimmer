@@ -100,13 +100,16 @@ export SPARKLE_VERSION
 # --- Privileged AWDL network helper (root LaunchDaemon) ---------------------
 # A tiny daemon that parks awdl0 (the AirDrop/Continuity radio) while streaming,
 # to kill the multi-second Wi-Fi delivery gaps AWDL contention causes. Built
-# with swiftc (no Xcode target - it's 4 system-framework-only files) and
+# with swiftc (no Xcode target - it's a few system-framework-only files) and
 # embedded: binary at Contents/MacOS/, launchd plist at
 # Contents/Library/LaunchDaemons/, where SMAppService.daemon loads it. Signed
-# inside-out (its own block in scripts/sign-bundle.sh, hardened runtime, no
-# entitlements) before the app's outer seal.
+# inside-out (its own block in scripts/sign-bundle.sh, hardened runtime plus the
+# memory protections in helper/Helper.entitlements, then a --check-launch run)
+# before the app's outer seal. It accepts XPC only from the Shimmer.app it ships
+# in (helper/HelperAuthorization.swift), ad hoc builds included.
 HELPER_LABEL  := io.ugfugl.glimmer.helper
-HELPER_SRCS   := helper/Protocol.swift helper/AWDLSuppressor.swift helper/HelperService.swift helper/main.swift
+HELPER_SRCS   := helper/Protocol.swift helper/AWDLSuppressor.swift helper/HelperAuthorization.swift \
+                 helper/HelperService.swift helper/main.swift
 HELPER_PLIST  := helper/$(HELPER_LABEL).plist
 HELPER_BIN    := $(DERIVED)/$(HELPER_LABEL)
 HELPER_SDK    := $(shell xcrun --sdk macosx --show-sdk-path)

@@ -242,10 +242,20 @@ up.
   methods (`helper/Protocol.swift`), and exactly one of them changes anything:
   `setAWDLDown(_:reason:)`. The other three (`currentStatus`, `ping`,
   `reSuppressCount`) are read-only. It is not a run-anything-as-root backdoor.
-  It accepts a connection only from a caller whose code signature satisfies the
-  designated requirement in `helper/HelperService.swift`:
-  `identifier "io.ugfugl.Glimmer" and anchor apple generic and certificate leaf[subject.OU] = "5T7M4RH3F8"`
-  - the signed Glimmer app, not a process that merely claims the bundle id.
+  Each connection carries a code-signing requirement the OS checks against the
+  caller's audit token (`helper/HelperAuthorization.swift`), derived from the
+  helper's own signature. A Developer ID helper requires
+  `identifier "com.kevinbpatel.shimmer" and anchor apple generic and certificate leaf[subject.OU] = "<the helper's team>"`
+  - the signed Shimmer app, not a process that merely claims the bundle id. An ad
+  hoc helper (local builds) has no team to pin, so it requires the exact cdhash
+  of the Shimmer.app it ships in, read per connection; there, write access to
+  that app bundle is the trust boundary. No requirement means no connection.
+  Only the connection that parked awdl0 can restore it by disconnecting, so a
+  second client that connects and leaves can't end a stream's suppression.
+- **Helper memory protections.** The helper is signed with the hardened-process
+  entitlements in `helper/Helper.entitlements` (hardened heap, read-only dyld
+  state, platform restrictions), and the build runs it with `--check-launch`
+  after signing to prove it still launches.
 
 **The defense-in-depth the sandbox used to provide** was containment of a
 memory-safety exploit in the streaming-protocol parsers reachable from a
