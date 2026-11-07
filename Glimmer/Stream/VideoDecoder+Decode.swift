@@ -106,6 +106,10 @@ extension VideoDecoder {
             self.spsData = nil
             self.ppsData = nil
             self.vpsData = nil
+            // The AV1 configuration and padding contract restart with the
+            // next stream.
+            self.av1SequenceHeader = nil
+            self.av1PaddingBox.withLock { $0 = nil }
             // Reset the backlog counter: the session is gone, so no further VT
             // output callbacks will fire to drain whatever was in flight. This
             // runs on the serial decodeQueue after any already-queued async

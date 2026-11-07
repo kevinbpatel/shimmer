@@ -118,13 +118,17 @@ extension VideoDecoder {
         // re-derives the truth from the OBU at decode time, so a mis-tagged
         // av1C is recoverable for Main; the parser fail-safe just keeps the
         // pre-fix behavior on edge-case bitstreams.
+        //
+        // Headerless rebuilds (e.g. a stall-recreate IDR without a sequence
+        // header OBU) retain the active configuration, including any encoder
+        // padding; only a cold start falls back to the negotiated hints.
         guard !obuData.isEmpty else { return false }
 
-        let parsed = parseAV1SequenceHeader(obuData)
+        let parsed = parseAV1SequenceHeader(obuData) ?? av1SequenceHeader
         if let parsed {
             log.info(
                 """
-                AV1 seq header parsed: profile=\(parsed.seqProfile, privacy: .public) \
+                AV1 seq configuration: profile=\(parsed.seqProfile, privacy: .public) \
                 bitDepth=\(parsed.bitDepth, privacy: .public) \
                 mono=\(parsed.monochrome, privacy: .public) \
                 ssx=\(parsed.subsamplingX, privacy: .public) \
@@ -143,6 +147,20 @@ extension VideoDecoder {
         let subsamplingY: UInt8 = parsed?.subsamplingY ?? 1
         let seqTier: UInt8 = parsed?.seqTier ?? 0
         let level: UInt8 = 0  // 2.0; auto-negotiated by the decoder anyway
+
+        // Decode at the coded size. AMD AMF pads AV1 to its block size (e.g.
+        // 1920x1082 for a negotiated 1920x1080, issue #223); a format
+        // description at the negotiated size makes VT fail with -12909.
+        // Sequence maxima are not necessarily the current frame size, so only
+        // accept small padding around the negotiated rect.
+        var codedWidth = Int(streamWidth)
+        var codedHeight = Int(streamHeight)
+        if let parsed, acceptsAV1Padding(width: parsed.codedWidth, height: parsed.codedHeight) {
+            codedWidth = parsed.codedWidth
+            codedHeight = parsed.codedHeight
+        } else if let parsed, parsed.codedWidth != codedWidth || parsed.codedHeight != codedHeight {
+            log.warning("AV1 sequence dimensions outside padding bounds; keeping negotiated geometry")
+        }
 
         var av1cBytes: [UInt8] = []
         // Marker bit + version (1), then seq_profile(3) + seq_level_idx_0(5)
@@ -173,17 +191,24 @@ extension VideoDecoder {
         let status = CMVideoFormatDescriptionCreate(
             allocator: kCFAllocatorDefault,
             codecType: kCMVideoCodecType_AV1,
-            width: streamWidth,
-            height: streamHeight,
+            width: Int32(codedWidth),
+            height: Int32(codedHeight),
             extensions: extensions,
             formatDescriptionOut: &newFormat)
         if status != noErr {
             log.error("CMVideoFormatDescriptionCreate (AV1) failed: \(status)")
             return false
         }
-        self.formatDescription = newFormat
-        self.cachedHDRFormatDescription = nil
+        // Retire the old session (and its output callbacks) before publishing
+        // the new geometry, so a stale callback never sees a mismatched box.
         self.tearDownDecompressionSession()
+        self.formatDescription = newFormat
+        self.av1SequenceHeader = parsed
+        let padded = codedWidth != Int(streamWidth) || codedHeight != Int(streamHeight)
+        self.av1PaddingBox.withLock { [codedWidth, codedHeight] in
+            $0 = padded ? (codedWidth, codedHeight) : nil
+        }
+        self.cachedHDRFormatDescription = nil
         return true
     }
 

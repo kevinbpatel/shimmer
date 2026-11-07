@@ -18,13 +18,17 @@ extension VideoDecoder {
     /// Subset of AV1 sequence header §5.5.1 fields that the av1C config record
     /// needs. Decoded straight off the bitstream; do not infer from the
     /// negotiated VIDEO_FORMAT_* hint.
-    struct AV1SeqHeader {
+    struct AV1SeqHeader: Equatable {
         let seqProfile: UInt8
         let seqTier: UInt8
         let bitDepth: UInt8      // 8, 10, or 12
         let monochrome: UInt8    // 0/1
         let subsamplingX: UInt8  // 0/1
         let subsamplingY: UInt8  // 0/1
+        // Sequence maxima from max_frame_{width,height}_minus_1 + 1 (§5.5.1).
+        // These may include encoder padding or exceed an overridden frame size.
+        let codedWidth: Int
+        let codedHeight: Int
     }
 
     /// Walk the OBU stream, locate the first SEQUENCE_HEADER_OBU (type=1),
@@ -104,8 +108,8 @@ extension VideoDecoder {
             guard let tier = parseTimingAndOperatingPoints(&reader) else { return nil }
             seqTier0 = tier
         }
-        guard skipFrameSizeAndFeatureFlags(&reader,
-                                           reducedStillPicture: reducedStillPicture) else {
+        guard let frame = parseFrameSizeAndFeatureFlags(
+            &reader, reducedStillPicture: reducedStillPicture) else {
             return nil
         }
         guard let color = parseColorConfig(&reader, seqProfile: seqProfile) else {
@@ -117,7 +121,9 @@ extension VideoDecoder {
             bitDepth: color.bitDepth,
             monochrome: color.monochrome,
             subsamplingX: color.subsamplingX,
-            subsamplingY: color.subsamplingY)
+            subsamplingY: color.subsamplingY,
+            codedWidth: frame.width,
+            codedHeight: frame.height)
     }
 
     /// §5.5.1 timing_info + decoder_model_info + operating_points loop (the
@@ -193,21 +199,24 @@ extension VideoDecoder {
         return seqTier0
     }
 
-    /// §5.5.1 frame-size bits, frame-id config, and the enable_* feature
-    /// flags that precede color_config. None of these fields feed av1C, so we
-    /// only need to consume them in the correct order. Returns false on a
-    /// parse error.
-    nonisolated private func skipFrameSizeAndFeatureFlags(
+    /// Read the sequence maxima (§5.5.1) and consume the frame-id config and
+    /// enable_* feature flags before color_config. The maxima feed the format
+    /// description (not av1C); the rest only need consuming in order. Returns
+    /// nil on a parse error.
+    nonisolated private func parseFrameSizeAndFeatureFlags(
         _ reader: inout BitReader,
-        reducedStillPicture: UInt32) -> Bool {
+        reducedStillPicture: UInt32) -> (width: Int, height: Int)? {
         // frame_width_bits_minus_1(4), frame_height_bits_minus_1(4)
-        guard let widthBitsM1 = reader.read(4) else { return false }
-        guard let heightBitsM1 = reader.read(4) else { return false }
-        _ = reader.read(Int(widthBitsM1) + 1)  // max_frame_width_minus_1
-        _ = reader.read(Int(heightBitsM1) + 1)  // max_frame_height_minus_1
+        guard let widthBitsM1 = reader.read(4) else { return nil }
+        guard let heightBitsM1 = reader.read(4) else { return nil }
+        guard let maxFrameWidthMinus1 = reader.read(Int(widthBitsM1) + 1),
+              let maxFrameHeightMinus1 = reader.read(Int(heightBitsM1) + 1)
+        else { return nil }
+        let codedWidth = Int(maxFrameWidthMinus1) + 1
+        let codedHeight = Int(maxFrameHeightMinus1) + 1
         var frameIdNumbersPresent: UInt32 = 0
         if reducedStillPicture == 0 {
-            guard let framePresent = reader.read(1) else { return false }
+            guard let framePresent = reader.read(1) else { return nil }
             frameIdNumbersPresent = framePresent
         }
         if frameIdNumbersPresent == 1 {
@@ -218,12 +227,12 @@ extension VideoDecoder {
         _ = reader.read(1)  // enable_filter_intra
         _ = reader.read(1)  // enable_intra_edge_filter
         if reducedStillPicture == 0 {
-            guard skipInterFeatureFlags(&reader) else { return false }
+            guard skipInterFeatureFlags(&reader) else { return nil }
         }
         _ = reader.read(1)  // enable_superres
         _ = reader.read(1)  // enable_cdef
         _ = reader.read(1)  // enable_restoration
-        return true
+        return (codedWidth, codedHeight)
     }
 
     /// §5.5.1 inter-prediction enable_* flags + screen-content-tools config

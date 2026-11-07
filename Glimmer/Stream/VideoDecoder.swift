@@ -299,6 +299,16 @@ public final class VideoDecoder {
     nonisolated(unsafe) var ppsData: Data?
     nonisolated(unsafe) var vpsData: Data?  // HEVC only
 
+    // The active AV1 sequence configuration. Only the serial decode queue
+    // reads or publishes it; headerless rebuilds reuse it (see
+    // `rebuildAV1FormatDescription`).
+    nonisolated(unsafe) var av1SequenceHeader: AV1SeqHeader?
+
+    // Coded AV1 size when the encoder pads beyond the negotiated rect (nil
+    // otherwise). Rebuilds publish it only after retiring VT callbacks; the
+    // lock also protects reads from output callbacks and teardown.
+    nonisolated let av1PaddingBox = OSAllocatedUnfairLock<(width: Int, height: Int)?>(initialState: nil)
+
     // The decode queue runs everything VideoToolbox-related serially. The
     // submit callback fires on the native backend's receive thread; we hop here
     // ASYNCHRONOUSLY (decodeQueue.async) so the receive thread hands the frame

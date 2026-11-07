@@ -271,6 +271,10 @@ extension VideoDecoder {
         // enqueue happens later in `presentFrame`, which re-reads displayLayer.
         guard displayLayer != nil else { return }
 
+        // Crop AV1 encoder padding before the colour attaches and the
+        // format-description rebuild below, so both see the clean aperture.
+        applyAV1CleanAperture(to: pixelBuffer)
+
         // `EnqueueFrame` interval: VT output callback → sample buffer built
         // and handed to the frame pacer's submit (the actual renderer.enqueue
         // now happens later, on the pacer's serial queue at the due vsync -
@@ -500,4 +504,39 @@ extension VideoDecoder {
     // drives through its `willPresent` hook) lives in VideoDecoder+Pacing.swift
     // alongside the pacer bring-up and the present-path self-heal, split out to
     // keep this file under the length limit.
+
+    // MARK: - AV1 padding
+
+    /// Whether AV1 sequence maxima of `width` x `height` are plausible encoder
+    /// padding around the negotiated rect. A conservative allowance, not an
+    /// encoder block-size claim.
+    nonisolated func acceptsAV1Padding(width: Int, height: Int) -> Bool {
+        let maximumPadding = 16
+        return streamWidth > 0 && streamHeight > 0
+            && width >= Int(streamWidth) && width <= Int(streamWidth) + maximumPadding
+            && height >= Int(streamHeight) && height <= Int(streamHeight) + maximumPadding
+    }
+
+    /// Crop AV1 encoder padding off a decoded buffer via a clean-aperture
+    /// attachment. No-op unless the stream is AV1, padding is active, and the
+    /// buffer is exactly the padded coded size.
+    nonisolated func applyAV1CleanAperture(to buffer: CVPixelBuffer) {
+        guard (streamVideoFormat & StreamProtocol.VIDEO_FORMAT_MASK_AV1) != 0,
+              let coded = av1PaddingBox.withLock({ $0 }),
+              CVPixelBufferGetWidth(buffer) == coded.width,
+              CVPixelBufferGetHeight(buffer) == coded.height
+        else { return }
+        // Preserve the decoded IOSurface and let the display layer crop. Offsets
+        // select the top-left negotiated rect instead of a centered crop.
+        let aperture: [CFString: Any] = [
+            kCVImageBufferCleanApertureWidthKey: Int(streamWidth),
+            kCVImageBufferCleanApertureHeightKey: Int(streamHeight),
+            kCVImageBufferCleanApertureHorizontalOffsetKey: Double(Int(streamWidth) - coded.width) / 2,
+            kCVImageBufferCleanApertureVerticalOffsetKey: Double(Int(streamHeight) - coded.height) / 2
+        ]
+        CVBufferRemoveAttachment(buffer, kCVImageBufferPreferredCleanApertureKey)
+        CVBufferRemoveAttachment(buffer, kCVImageBufferDisplayDimensionsKey)
+        CVBufferSetAttachment(buffer, kCVImageBufferCleanApertureKey,
+                              aperture as CFDictionary, .shouldPropagate)
+    }
 }
