@@ -344,12 +344,26 @@ public final class InputForwarder {
     /// `attach(to:)`.
     public func setBackend(_ backend: StreamingBackend) {
         self.backend = backend
+        // A new backend is a new host connection: nothing has been announced on it.
+        announcedControllerSlots.removeAll()
     }
 
     /// Track of which controllers have had their arrival event sent so we
     /// only do it once per connect. Keyed by GCController's hashable identity.
     /// Internal so the ControllerForwarder extension can read/write.
     var attachedControllers: [ObjectIdentifier: AttachedController] = [:]
+
+    /// Slots whose arrival (type + capabilities) the backend accepted on the
+    /// current connection. Sunshine creates the virtual pad on the FIRST packet
+    /// it sees for a slot; a state packet ahead of the arrival makes it fall
+    /// back to an Xbox 360 pad, losing a DualSense's touchpad (glimmer#217).
+    /// No controller state, touch or removal goes out for a slot not in here.
+    /// Cleared on every ready edge and backend swap.
+    var announcedControllerSlots: Set<UInt8> = []
+
+    /// False only in tests: skip GameController observers and the ready-edge
+    /// rescans so a controller connected to the machine can't join the fixture.
+    let observesGamepads: Bool
 
     /// Bitmask of slots currently in use; bit N == 1 means slot N is occupied.
     /// Sent to the host as `activeGamepadMask` on every controller event.
@@ -486,8 +500,13 @@ public final class InputForwarder {
     var didBecomeKeyObserver: NSObjectProtocol?
     var didResignKeyObserver: NSObjectProtocol?
 
-    public init() {
-        setupGamepadObservers()
+    public convenience init() {
+        self.init(observeGamepads: true)
+    }
+
+    init(observeGamepads: Bool) {
+        observesGamepads = observeGamepads
+        if observeGamepads { setupGamepadObservers() }
     }
 
     isolated deinit {

@@ -85,6 +85,10 @@ extension InputForwarder {
             cancelQuitChordDwell(reason: "released before the dwell elapsed", pad: pad)
         }
 
+        // Identity before state: if the host has not accepted this slot's
+        // arrival yet, send it now, and hold the state if it is still refused.
+        guard ensureControllerAnnounced(slot: slot) else { return false }
+
         let buttons = pressedButtonFlags(pad: pad)
 
         let lt = UInt8((pad.leftTrigger.value  * 255).rounded().clamped(to: 0...255))

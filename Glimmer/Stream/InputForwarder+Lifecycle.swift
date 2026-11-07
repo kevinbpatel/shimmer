@@ -176,9 +176,14 @@ extension InputForwarder {
         isReady = ready
         if ready != was {
             log.info("Input forwarding ready=\(ready, privacy: .public)")
+            // Either edge starts a new connection's identity bookkeeping: the
+            // host behind the next ready edge has seen none of our arrivals.
+            announcedControllerSlots.removeAll()
             if ready {
                 // Re-send arrival events for any already-attached controllers
                 // so the host learns about them now that the stream is up.
+                // These go out BEFORE any state below (resync), so the host
+                // creates each pad with its real type (glimmer#217).
                 for state in attachedControllers.values {
                     sendArrival(state)
                 }
@@ -190,6 +195,7 @@ extension InputForwarder {
                 // and so never hit the didBecomeKey resync).
                 resyncControllers()
                 installDiagnosticMonitors()
+                guard observesGamepads else { return }
                 // A pad can register with GameController a beat AFTER the stream
                 // connects (a sleepy DualSense waking - HID up, GameController
                 // not yet). The session-start enumeration and the didConnect

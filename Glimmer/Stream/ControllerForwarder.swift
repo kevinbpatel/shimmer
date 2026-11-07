@@ -293,7 +293,10 @@ extension InputForwarder {
             + "last_input_age_ms=\(inputAge) last_rumble_age_ms=\(rumbleAge) "
             + "rumble_events_total=\(counters.rumbleEventTotal.value)", "Controller")
 
-        if isReady {
+        // A slot the host was never told about has no pad to remove; a packet
+        // for it would only make the host create one first.
+        let announced = announcedControllerSlots.remove(state.slot) != nil
+        if isReady, announced {
             // Empty event with the slot bit cleared signals removal to the host.
             let rc = backend?.sendMultiController(
                 num: Int16(state.slot), mask: Int16(bitPattern: gamepadMask), buttons: 0,
@@ -335,11 +338,16 @@ extension InputForwarder {
             }
         }
         attachedControllers.removeAll()
+        announcedControllerSlots.removeAll()
         touchpadStates.removeAll()
         gamepadMask = 0
     }
 
-    func sendArrival(_ state: AttachedController) {
+    /// Announce a pad's type and capabilities. Returns whether the backend
+    /// accepted it; only then may state for the slot follow (see
+    /// `announcedControllerSlots`).
+    @discardableResult
+    func sendArrival(_ state: AttachedController) -> Bool {
         let rc = backend?.sendControllerArrival(
             num: state.slot,
             mask: gamepadMask,
@@ -353,11 +361,27 @@ extension InputForwarder {
         // once per code). Arrivals replay once per pad per stream - bounded.
         Diag.info("controller \(state.slot) arrival sent: "
             + "caps=0x\(String(state.capabilities, radix: 16)) rc=\(rc)", "Controller")
+        guard rc == 0 else {
+            announcedControllerSlots.remove(state.slot)
+            return false
+        }
+        announcedControllerSlots.insert(state.slot)
         // Battery baseline rides right behind the arrival: the host learns
         // the pad exists, then what its battery holds (change reports follow
         // on the monitor's poll). Also (re)arms the uplink per session, since
         // setReady(true) replays arrivals at every stream start.
         ControllerBattery.shared.announce(slot: state.slot, backend: backend)
+        return true
+    }
+
+    /// True once the host knows `slot`'s identity on this connection, retrying
+    /// the arrival if an earlier one was refused. The first packet Sunshine
+    /// sees for a slot decides the virtual pad's type, so state must never go
+    /// first (glimmer#217).
+    func ensureControllerAnnounced(slot: UInt8) -> Bool {
+        if announcedControllerSlots.contains(slot) { return true }
+        guard let state = attachedControllers.values.first(where: { $0.slot == slot }) else { return false }
+        return sendArrival(state)
     }
 
     // MARK: - GCController -> moonlight type/flag derivation
