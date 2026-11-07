@@ -4,12 +4,14 @@
 //  Owns the video UDP flow for the Swift-native backend: ONE UNCONNECTED POSIX
 //  UDP socket (bind a wildcard ephemeral local port; NEVER connect()) used for
 //  BOTH the periodic ping (sendto host:VideoPortNumber - punches NAT + tells the
-//  host where to send video) and RTP receive (recvfrom from ANY source). A
-//  *connected* NWConnection silently drops video because Sunshine sources RTP
-//  from a port != VideoPortNumber and a connected UDP flow filters by the full
-//  4-tuple - that was the "no frames render" bug. Source: VideoStream.c +
-//  PlatformSockets.c (bindUdpSocket = bind only; recvUdpSocket = recvfrom NULL
-//  src).
+//  host where to send video) and RTP receive (from the PC's address on ANY
+//  source port). A *connected* NWConnection silently drops video because
+//  Sunshine sources RTP from a port != VideoPortNumber and a connected UDP flow
+//  filters by the full 4-tuple - that was the "no frames render" bug. Source:
+//  VideoStream.c + PlatformSockets.c (bindUdpSocket = bind only). Unlike
+//  moonlight's recvfrom-NULL-src, each datagram's sender address is checked
+//  against the resolved PC (UdpPinger.isExpectedPeer, ported from upstream
+//  Glimmer 30d5163e) so another machine can't inject video into the stream.
 //
 //  Transport ported from moonlight-common-c (GPLv3); see CREDITS.md.
 //
@@ -69,8 +71,8 @@ final class VideoRtpReceiver: VideoDepacketizerDelegate, @unchecked Sendable {
     private let recvQueue = DispatchQueue(
         label: "io.ugfugl.Glimmer.videortp", qos: .userInteractive)
     /// Unconnected bound UDP socket fd: bind to a wildcard ephemeral local port,
-    /// recvfrom from ANY source. A connected NWConnection would drop video that
-    /// Sunshine sources from a port != videoPort.
+    /// receive from the resolved PC on any source port. A connected socket would
+    /// drop video that Sunshine sources from a port != videoPort.
     private var fd: Int32 = -1
     /// Precomputed destination (host:videoPort) for the ping sendto.
     private var destAddr = sockaddr_storage()
@@ -260,7 +262,7 @@ final class VideoRtpReceiver: VideoDepacketizerDelegate, @unchecked Sendable {
         guard bound else { close(sock); throw EnetError.socketFailure("bind() errno \(errno)") }
 
         fd = sock
-        Diag.info("NativeVideo UDP socket ready (unconnected, recvfrom-any) → \(host):\(videoPort)",
+        Diag.info("NativeVideo UDP socket ready (peer IP filtered, any source port) → \(host):\(videoPort)",
                   Self.cat)
     }
 
@@ -282,6 +284,10 @@ final class VideoRtpReceiver: VideoDepacketizerDelegate, @unchecked Sendable {
     private func startReceiveLoop() {
         let sock = fd
         let bufSize = packetSize + 64
+        // The PC's resolved address (set by openSocket, fixed for the session):
+        // only its datagrams are video, whatever source port it sends from.
+        let expected = destAddr
+        let expectedLength = destAddrLen
         recvQueue.async { [weak self] in
             // Name the thread this loop OWNS for the session: the blocking
             // recv loop occupies one worker until teardown, so this is an
@@ -306,13 +312,27 @@ final class VideoRtpReceiver: VideoDepacketizerDelegate, @unchecked Sendable {
             let stride = bufSize
             let storage = UnsafeMutablePointer<UInt8>.allocate(capacity: cap * stride)
             let lengths = UnsafeMutablePointer<Int32>.allocate(capacity: cap)
-            defer { storage.deallocate(); lengths.deallocate() }
+            let sources = UnsafeMutablePointer<sockaddr_storage>.allocate(capacity: cap)
+            sources.initialize(repeating: sockaddr_storage(), count: cap)
+            let sourceLengths = UnsafeMutablePointer<socklen_t>.allocate(capacity: cap)
+            sourceLengths.initialize(repeating: 0, count: cap)
+            defer {
+                storage.deallocate(); lengths.deallocate()
+                sources.deallocate(); sourceLengths.deallocate()
+            }
             var batched = true
+            var foreignPeerNoted = false
             while let self, !self.interrupted.isSet {
                 if batched {
-                    let n = gl_recvmsg_x_batch(sock, storage, Int32(stride), Int32(cap), lengths)
+                    let n = gl_recvmsg_x_batch(sock, storage, Int32(stride), Int32(cap), lengths,
+                                               sources, sourceLengths)
                     if n > 0 {
                         for i in 0..<Int(n) {
+                            guard UdpPinger.isExpectedPeer(sources[i], length: sourceLengths[i],
+                                                           expected: expected, expectedLength: expectedLength) else {
+                                UdpPinger.noteForeignPeer(&foreignPeerNoted, stream: "Video", category: Self.cat)
+                                continue
+                            }
                             // Clamp to stride: a bad length (never observed, but a
                             // private-API misread would be) must not read OOB.
                             let len = min(Int(lengths[i]), stride)
@@ -334,7 +354,13 @@ final class VideoRtpReceiver: VideoDepacketizerDelegate, @unchecked Sendable {
                 } else {
                     // Fallback: one recvfrom per datagram. Same SO_RCVTIMEO-driven
                     // EAGAIN cancellation as the batched path; close(fd) unblocks it.
-                    let len = recvfrom(sock, storage, stride, 0, nil, nil)
+                    let len = UdpPinger.receive(from: sock, into: storage, capacity: stride,
+                                                source: &sources[0], sourceLength: &sourceLengths[0])
+                    if len >= 0, !UdpPinger.isExpectedPeer(sources[0], length: sourceLengths[0],
+                                                          expected: expected, expectedLength: expectedLength) {
+                        UdpPinger.noteForeignPeer(&foreignPeerNoted, stream: "Video", category: Self.cat)
+                        continue
+                    }
                     if len > 0 {
                         self.handleDatagram(Array(UnsafeBufferPointer(start: storage, count: min(len, stride))))
                     } else if len < 0 {

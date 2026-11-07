@@ -25,14 +25,29 @@ extension RtpAudioReceiver {
     func startReceiveLoop() {
         let sock = fd
         let bufSize = Self.maxPacketSize
+        // The PC's resolved address, set by openSocket and fixed for the session.
+        let expected = destAddr
+        let expectedLength = destAddrLen
         recvQueue.async { [weak self] in
             // Session-long owned loop: name it so the per-thread CPU telemetry
             // resolves it (cleared at exit; same medicine as the video loop).
             pthread_setname_np("Glimmer.audioRecv")
             defer { pthread_setname_np("") }
             var buf = [UInt8](repeating: 0, count: bufSize)
+            var source = sockaddr_storage()
+            var sourceLength: socklen_t = 0
+            var foreignPeerNoted = false
             while let self, !self.interrupted.isSet {
-                let received = recvfrom(sock, &buf, bufSize, 0, nil, nil)
+                let received = buf.withUnsafeMutableBytes { bytes in
+                    UdpPinger.receive(from: sock, into: bytes.baseAddress!, capacity: bufSize,
+                                      source: &source, sourceLength: &sourceLength)
+                }
+                // Only the PC's address is audio, whatever source port it uses.
+                if received >= 0, !UdpPinger.isExpectedPeer(source, length: sourceLength,
+                                                            expected: expected, expectedLength: expectedLength) {
+                    UdpPinger.noteForeignPeer(&foreignPeerNoted, stream: "Audio", category: Self.cat)
+                    continue
+                }
                 if received > 0 {
                     self.handleDatagram(buf, count: received)
                 } else if received == 0 {

@@ -3,8 +3,9 @@
 //
 //  Owns the audio UDP flow for the Swift-native backend: ONE UNCONNECTED POSIX
 //  UDP socket (bind a wildcard ephemeral local port; NEVER connect()) used for
-//  BOTH the periodic ping (sendto host:audioPort) and RTP receive (recvfrom from
-//  ANY source). The host sources audio RTP from a port != audioPort and aims it
+//  BOTH the periodic ping (sendto host:audioPort) and RTP receive (from the PC's
+//  address on ANY source port; UdpPinger.isExpectedPeer drops other senders). The
+//  host sources audio RTP from a port != audioPort and aims it
 //  at the ping's UDP source port, so a *connected* NWConnection would silently
 //  drop audio - exactly the bug VideoRtpReceiver was built to avoid. This MIRRORS
 //  VideoRtpReceiver's socket/ping pattern. Source: AudioStream.c
@@ -115,7 +116,7 @@ final class RtpAudioReceiver: @unchecked Sendable {
     /// catch-up clump into the playout trim gates (audible crackle).
     let recvQueue = DispatchQueue(
         label: "io.ugfugl.Glimmer.audiortp", qos: .userInteractive)
-    /// Unconnected bound UDP socket fd (bind wildcard ephemeral; recvfrom any).
+    /// Unconnected bound UDP socket fd (bind wildcard ephemeral; PC address, any port).
     var fd: Int32 = -1
     /// Precomputed destination (host:audioPort) for the ping sendto.
     var destAddr = sockaddr_storage()

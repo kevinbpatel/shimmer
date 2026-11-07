@@ -49,24 +49,32 @@ extern ssize_t recvmsg_x(int s, const struct gl_msghdr_x * _Nonnull msgp, unsign
 
 /// Read up to `count` (<=64) datagrams from `fd` in one `recvmsg_x` syscall into
 /// `storage` (count * stride bytes), writing each datagram's length into
-/// `lengths[i]`. Returns the number of datagrams received, or -1 with errno set
-/// (EAGAIN/EWOULDBLOCK on timeout, like recvfrom). All `msghdr_x` plumbing stays
-/// in C so the layout is correct by construction; Swift sees a flat API.
+/// `lengths[i]` and its sender into `sources[i]` / `sourceLengths[i]` (the
+/// receive loops pin the PC's address with it). Returns the number of
+/// datagrams received, or -1 with errno set (EAGAIN/EWOULDBLOCK on timeout,
+/// like recvfrom). All `msghdr_x` plumbing stays in C so the layout is correct
+/// by construction; Swift sees a flat API.
 static inline int gl_recvmsg_x_batch(int fd, uint8_t * _Nonnull storage, int stride,
-                                     int count, int * _Nonnull lengths) {
+                                     int count, int * _Nonnull lengths,
+                                     struct sockaddr_storage * _Nonnull sources,
+                                     socklen_t * _Nonnull sourceLengths) {
     if (count > 64) count = 64;
     struct gl_msghdr_x msgs[64];
     struct iovec iovs[64];
     for (int i = 0; i < count; i++) {
         iovs[i].iov_base = storage + (size_t)i * (size_t)stride;
         iovs[i].iov_len = (size_t)stride;
-        msgs[i].msg_name = NULL;    msgs[i].msg_namelen = 0;
+        msgs[i].msg_name = &sources[i];
+        msgs[i].msg_namelen = (socklen_t)sizeof(struct sockaddr_storage);
         msgs[i].msg_iov = &iovs[i]; msgs[i].msg_iovlen = 1;
         msgs[i].msg_control = NULL; msgs[i].msg_controllen = 0;
         msgs[i].msg_flags = 0;      msgs[i].msg_datalen = 0;
     }
     int n = (int)recvmsg_x(fd, msgs, (unsigned int)count, 0);
-    for (int i = 0; i < n; i++) lengths[i] = (int)msgs[i].msg_datalen;
+    for (int i = 0; i < n; i++) {
+        lengths[i] = (int)msgs[i].msg_datalen;
+        sourceLengths[i] = msgs[i].msg_namelen;
+    }
     return n;
 }
 

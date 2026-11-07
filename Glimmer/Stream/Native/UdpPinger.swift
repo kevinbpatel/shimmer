@@ -255,6 +255,57 @@ final class UdpPinger: @unchecked Sendable {
         return nil
     }
 
+    /// Whether a received datagram came from the PC: the resolved address
+    /// (including the interface for scoped IPv6), on ANY source port. Sunshine
+    /// can send RTP from a different port than the ping destination, so the
+    /// port must not be pinned - but a datagram from any other address is not
+    /// the PC's video or audio and is dropped (ported from upstream Glimmer
+    /// 6a2e4852 / 30d5163e).
+    static func isExpectedPeer(_ source: sockaddr_storage, length: socklen_t,
+                               expected: sockaddr_storage, expectedLength: socklen_t) -> Bool {
+        guard source.ss_family == expected.ss_family else { return false }
+        return withUnsafeBytes(of: source) { sourceBytes in
+            withUnsafeBytes(of: expected) { expectedBytes in
+                switch Int32(source.ss_family) {
+                case AF_INET:
+                    guard length >= MemoryLayout<sockaddr_in>.size,
+                          expectedLength >= MemoryLayout<sockaddr_in>.size else { return false }
+                    return sourceBytes[4..<8].elementsEqual(expectedBytes[4..<8])
+                case AF_INET6:
+                    guard length >= MemoryLayout<sockaddr_in6>.size,
+                          expectedLength >= MemoryLayout<sockaddr_in6>.size else { return false }
+                    let scope = expectedBytes.loadUnaligned(fromByteOffset: 24, as: UInt32.self)
+                    let sourceScope = sourceBytes.loadUnaligned(fromByteOffset: 24, as: UInt32.self)
+                    return sourceBytes[8..<24].elementsEqual(expectedBytes[8..<24])
+                        && (scope == 0 || scope == sourceScope)
+                default:
+                    return false
+                }
+            }
+        }
+    }
+
+    /// Notes the first datagram from an address other than the PC's, once per
+    /// receive loop: a PC replying from another address would otherwise stream
+    /// nothing, silently.
+    static func noteForeignPeer(_ noted: inout Bool, stream: String, category: String) {
+        guard !noted else { return }
+        noted = true
+        Diag.notice("\(stream) is ignoring datagrams from an address other than the PC's", category)
+    }
+
+    /// One `recvfrom` that also reports the sender for `isExpectedPeer`.
+    /// Returns recvfrom's result (-1 with errno set on timeout or error).
+    static func receive(from socket: Int32, into buffer: UnsafeMutableRawPointer, capacity: Int,
+                        source: inout sockaddr_storage, sourceLength: inout socklen_t) -> Int {
+        sourceLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
+        return withUnsafeMutablePointer(to: &source) { address in
+            address.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                recvfrom(socket, buffer, capacity, 0, $0, &sourceLength)
+            }
+        }
+    }
+
     /// Build a sockaddr for host:port. Only IP literals reach the native path -
     /// ENFORCED at the pipeline entry by `resolveHost` (issue #70), which
     /// resolves any hostname before the receivers exist; the nil return for
@@ -276,6 +327,9 @@ final class UdpPinger: @unchecked Sendable {
             sa.sin6_family = sa_family_t(AF_INET6)
             sa.sin6_port = port.bigEndian
             v6.rawValue.withUnsafeBytes { _ = memcpy(&sa.sin6_addr, $0.baseAddress, 16) }
+            // Carry a scoped (link-local) address's interface, so the peer
+            // check below pins it instead of treating the scope as a wildcard.
+            sa.sin6_scope_id = UInt32(v6.interface?.index ?? 0)
             withUnsafeBytes(of: &sa) { _ = memcpy(&storage, $0.baseAddress, MemoryLayout<sockaddr_in6>.size) }
             return (storage, socklen_t(MemoryLayout<sockaddr_in6>.size), AF_INET6)
         default:
