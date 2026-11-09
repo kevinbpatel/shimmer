@@ -155,6 +155,22 @@ struct RtpAudioReceiverTests {
         #expect(sink.cleanupCount() == 1)
     }
 
+    /// Only deinit closes the socket now, so a stopped receiver must be released once its
+    /// receive loop and ping thread notice the stop flag, or every reconnect leaks a socket.
+    @Test func aStoppedReceiverIsReleased() async throws {
+        weak var released: RtpAudioReceiver?
+        do {
+            let receiver = Self.audioReceiver(sink: NullAudioSink())
+            try receiver.start()
+            receiver.stop()
+            released = receiver
+        }
+        for _ in 0..<50 where released != nil {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(released == nil)
+    }
+
     /// Only audio sets the first block boundary: parity, or an audio packet with no payload, can't.
     @Test func onlyAudioWithAPayloadEstablishesTheSequence() {
         let receiver = Self.audioReceiver(sink: NullAudioSink())
