@@ -72,7 +72,8 @@ extension RtpAudioReceiver {
         }
     }
 
-    private func handleDatagram(_ buf: [UInt8], count: Int) {
+    // Internal so tests can drive the datagram path without a socket.
+    func handleDatagram(_ buf: [UInt8], count: Int) {
         // Per-socket GAP-EVENT accumulation first (before the runt check - a runt
         // is still a socket arrival, and the counters measure the ARRIVAL process).
         noteAudioArrivalGap()
@@ -164,39 +165,45 @@ extension RtpAudioReceiver {
             } else {
                 decodePacket(packet)
             }
+            // A packet that fills a reorder gap arrives on this fast path, and the
+            // out-of-order packets queued behind it are ready now: drain them
+            // instead of holding them until the next datagram.
+            drainQueuedPackets(dropForStartup: dropForStartup)
         case .packetReady:
-            // Drain ready packets (and PLC placeholders) until none remain. The
-            // whole batch shares this datagram's startup-gate verdict: queue
-            // outputs lag the newest arrival by at most the small OOS window,
-            // so the verdict-boundary error is a packet or two of extra
-            // cushion - noise next to the decoder's trim machinery.
-            while let queued = queue.getQueuedPacket() {
-                switch queued {
-                case .bytes(let bytes):
-                    if dropForStartup {
-                        startupDroppedPackets += 1
-                    } else {
-                        decodePacket(bytes)
-                    }
-                case .lostPlaceholder:
-                    // P1 AUDIO: an unrecovered missing data shard. Count the
-                    // wire loss either way (it happened; a single integer add
-                    // on the receive thread, no lock) - but only conceal a gap
-                    // the user will actually hear: during a startup drain the
-                    // surrounding audio is being discarded, so PLC would just
-                    // synthesize filler into a timeline nobody plays. Dropped
-                    // placeholders still count toward dropped_ms because it
-                    // measures the TIMELINE removed, not just decodable audio.
-                    audioLostInWindow += 1
-                    if dropForStartup {
-                        startupDroppedPackets += 1
-                    } else {
-                        sink?.decodeAndPlayPLC()
-                    }
-                }
-            }
+            // Queue outputs lag the newest arrival by at most the small OOS
+            // window, so the whole batch shares this datagram's startup-gate
+            // verdict - the boundary error is a packet or two of extra cushion.
+            drainQueuedPackets(dropForStartup: dropForStartup)
         case .none:
             break
+        }
+    }
+
+    /// Drain ready packets (and PLC placeholders) until none remain.
+    private func drainQueuedPackets(dropForStartup: Bool) {
+        while let queued = queue.getQueuedPacket() {
+            switch queued {
+            case .bytes(let bytes):
+                if dropForStartup {
+                    startupDroppedPackets += 1
+                } else {
+                    decodePacket(bytes)
+                }
+            case .lostPlaceholder:
+                // P1 AUDIO: an unrecovered missing data shard. Count the wire
+                // loss either way (it happened; a single integer add on the
+                // receive thread, no lock) - but only conceal a gap the user
+                // will actually hear: during a startup drain the surrounding
+                // audio is being discarded, so PLC would just synthesize filler
+                // into a timeline nobody plays. Dropped placeholders still count
+                // toward dropped_ms because it measures the TIMELINE removed.
+                audioLostInWindow += 1
+                if dropForStartup {
+                    startupDroppedPackets += 1
+                } else {
+                    sink?.decodeAndPlayPLC()
+                }
+            }
         }
     }
 
