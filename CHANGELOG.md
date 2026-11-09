@@ -56,6 +56,21 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - The Wi-Fi helper accepts connections only from the Shimmer build it ships
   with and runs with hardened-process protections. It previously required
   glimmer's signing team, so Shimmer builds could never use it.
+- Audio: a packet that won't decode is concealed instead of dropped, the
+  playout cushion recovers from under-runs without over-growing (gaps no
+  cushion could bridge no longer count), audio FEC survives a misaligned
+  parity packet, and malformed datagrams are dropped before they can reorder
+  playback.
+- Video and pacing: key frames led by AUD/SEI units open the recovery gate,
+  frames lost after a dropped FEC block are reported, a failed FEC rebuild is
+  never sent as a frame with a hole in it, a frame standing above the pacer's
+  target is trimmed, a due frame is released straight from submit, and a
+  vsync is never claimed twice. Fewer allocations per packet.
+- Recovery: keyframe requests back off during a stall and are spaced by the
+  round trip, a stream that receives but never decodes rebuilds once after
+  30 s, every RTSP wait is bounded, quitting mid-reconnect still ends the game
+  on the PC, a game the PC deliberately ended isn't relaunched, a bitrate
+  downshift can step back up, and control messages are delivered in order.
 
 ## 2026.9.0 - 2026-09-10
 
