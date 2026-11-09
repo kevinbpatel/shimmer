@@ -78,10 +78,12 @@ extension RtpAudioReceiver {
         // is still a socket arrival, and the counters measure the ARRIVAL process).
         noteAudioArrivalGap()
 
-        // Runt check: must be at least a full 12-byte RTP header (AudioStream.c:290).
-        if count < RtpAudioQueue.fixedRtpHeaderSize {
-            return
-        }
+        // Runt check: a full 12-byte RTP header (AudioStream.c:290), RTP version 2
+        // with no padding/extension/CSRCs, and an audio or FEC payload type. An audio
+        // packet must carry a payload: an empty one can't establish or move the order.
+        guard count >= RtpAudioQueue.fixedRtpHeaderSize, count <= buf.count, buf[0] == 0x80,
+              buf[1] == RtpAudioQueue.payloadTypeAudio || buf[1] == RtpAudioQueue.payloadTypeFec else { return }
+        if buf[1] == RtpAudioQueue.payloadTypeAudio, count == RtpAudioQueue.fixedRtpHeaderSize { return }
 
         if !receivedDataFromPeer {
             receivedDataFromPeer = true

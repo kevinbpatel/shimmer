@@ -80,6 +80,7 @@ struct RtpAudioReceiverTests {
     @Test func filledAudioReorderGapDrainsReadyPackets() {
         let sink = RecordingAudioSink()
         let receiver = Self.audioReceiver(sink: sink)
+        Self.feed(receiver, dataSequences: [0])
         let fec = Self.parityDatagram(sequence: 0, base: 0)
         receiver.handleDatagram(fec, count: fec.count)
         Self.feed(receiver, dataSequences: [4, 6, 5])
@@ -93,6 +94,7 @@ struct RtpAudioReceiverTests {
     @Test func oneMisalignedParityPacketLeavesAudioFecOn() {
         let sink = RecordingAudioSink()
         let receiver = Self.audioReceiver(sink: sink)
+        Self.feed(receiver, dataSequences: [0])
         for parity in [Self.parityDatagram(sequence: 0, base: 0), Self.parityDatagram(sequence: 1, base: 6)] {
             receiver.handleDatagram(parity, count: parity.count)
         }
@@ -103,6 +105,7 @@ struct RtpAudioReceiverTests {
 
     @Test func aStreakOfMisalignedParityTurnsAudioFecOff() {
         let receiver = Self.audioReceiver(sink: NullAudioSink())
+        Self.feed(receiver, dataSequences: [0])
         let sync = Self.parityDatagram(sequence: 0, base: 0)
         receiver.handleDatagram(sync, count: sync.count)
         for index in 1...RtpAudioQueue.layoutMismatchStreakLimit {
@@ -116,6 +119,7 @@ struct RtpAudioReceiverTests {
     /// Blocks that each miss a packet, after out-of-order history, all wait out the give-up window.
     @Test func audioQueueNeverHoldsMoreThanItsCap() {
         let receiver = Self.audioReceiver(sink: NullAudioSink())
+        Self.feed(receiver, dataSequences: [0])
         let sync = Self.parityDatagram(sequence: 0, base: 0)
         receiver.handleDatagram(sync, count: sync.count)
         receiver.queue.receivedOosData = true
@@ -149,5 +153,47 @@ struct RtpAudioReceiverTests {
         #expect(receiver.initialized == false)
         #expect(fcntl(receiver.fd, F_GETFD) != -1)
         #expect(sink.cleanupCount() == 1)
+    }
+
+    /// Only audio sets the first block boundary: parity, or an audio packet with no payload, can't.
+    @Test func onlyAudioWithAPayloadEstablishesTheSequence() {
+        let receiver = Self.audioReceiver(sink: NullAudioSink())
+        let parity = Self.parityDatagram(sequence: 0, base: 0)
+        receiver.handleDatagram(parity, count: parity.count)
+        let empty = Self.audioDatagram(type: RtpAudioQueue.payloadTypeAudio, sequence: 0, timestamp: 0, payload: [])
+        receiver.handleDatagram(empty, count: empty.count)
+        #expect(!receiver.queue.hasSequenceBaseline)
+        Self.feed(receiver, dataSequences: [0])
+        #expect(receiver.queue.hasSequenceBaseline)
+        #expect(receiver.queue.nextRtpSequenceNumber == 4)
+    }
+
+    /// A datagram that isn't plain RTP version 2 never reaches the queue.
+    @Test func nonRtpDatagramIsDropped() {
+        let receiver = Self.audioReceiver(sink: NullAudioSink())
+        var packet = Self.audioDatagram(type: RtpAudioQueue.payloadTypeAudio, sequence: 0, timestamp: 0,
+                                        payload: [1, 2, 3])
+        packet[0] = 0x90
+        receiver.handleDatagram(packet, count: packet.count)
+        #expect(!receiver.queue.hasSequenceBaseline)
+    }
+
+    /// A jump past the reorder capacity needs two consecutive data packets; ordinary traffic
+    /// in between cancels a stray candidate, so one forged or corrupt sequence can't move the order.
+    @Test func aSequenceJumpNeedsTwoConsecutivePackets() {
+        let sink = RecordingAudioSink()
+        let receiver = Self.audioReceiver(sink: sink)
+        Self.feed(receiver, dataSequences: Array(0...7))
+        #expect(receiver.queue.nextRtpSequenceNumber == 8)
+        Self.feed(receiver, dataSequences: [20_000])
+        #expect(receiver.queue.pendingSequenceRestart == 20_001)
+        #expect(receiver.queue.nextRtpSequenceNumber == 8)
+        Self.feed(receiver, dataSequences: [8])
+        #expect(receiver.queue.pendingSequenceRestart == nil)
+        #expect(receiver.queue.nextRtpSequenceNumber == 9)
+        #expect(sink.recordedPackets().last == [UInt8](repeating: 8, count: 8))
+        Self.feed(receiver, dataSequences: [20_000, 20_001])
+        #expect(receiver.queue.pendingSequenceRestart == nil)
+        #expect(receiver.queue.oldestRtpBaseSequenceNumber == 20_000)
     }
 }

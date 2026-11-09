@@ -148,6 +148,11 @@ final class RtpAudioQueue {
     var lastOosSequenceNumber: UInt16 = 0
     var receivedOosData = false
     var synchronizing = true
+    /// Whether an audio packet has set the first block boundary yet (parity can't).
+    var hasSequenceBaseline = false
+    /// The sequence number that would confirm a jump past the reorder capacity as a
+    /// stream restart (see `acceptsSequence`); nil when no jump is pending.
+    var pendingSequenceRestart: UInt16?
     var incompatibleServer = false
     /// Layout mismatches since the last size-agreeing contact (see `noteLayoutMismatch`).
     var layoutMismatchStreak = 0
@@ -241,6 +246,7 @@ final class RtpAudioQueue {
     /// `packet` is the full datagram bytes; `rtp` is its already-byteswapped
     /// header. Returns how the receiver should dispatch (RtpaAddPacket, :564-658).
     func addPacket(_ packet: [UInt8], rtp: RtpHeader) -> RtpaResult {
+        guard packet.count >= Self.fixedRtpHeaderSize, rtp.header == 0x80 else { return .none }
         // incompatibleServer shortcut (:565-575): feed data straight through.
         if incompatibleServer {
             if rtp.packetType == Self.payloadTypeAudio {
