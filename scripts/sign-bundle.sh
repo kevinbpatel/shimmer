@@ -34,6 +34,20 @@ KCF=""; [ -n "$KC" ] && [ "$ID" != "-" ] && KCF="--keychain $KC"
 # timestamp; ad hoc and the local self-signed identity skip the round-trip.
 case "$ID" in "Developer ID Application:"*) TS="--timestamp" ;; *) TS="--timestamp=none" ;; esac
 
+# The two background items (the login helper and the AWDL LaunchDaemon) are
+# signed ad hoc unless the identity is a Developer ID. Background Task
+# Management pins each item's launch requirement to how it was signed when it
+# was registered, and can only re-pin a rebuilt item that is ad hoc (cdhash) or
+# Team-ID signed; a team-less certificate - the local self-signed identity -
+# fails the update (`Unable to update LWCR with smd: 22`) and launchd then
+# refuses to spawn the item at all. The app keeps the stable identity, which is
+# what privacy grants key on, and the AWDL helper authorizes its clients by the
+# app's own designated requirement, so nothing else changes.
+case "$ID" in
+	"Developer ID Application:"*) BG_ID="$ID"; BG_KCF="$KCF" ;;
+	*) BG_ID="-"; BG_KCF="" ;;
+esac
+
 # Re-sign preserving the target's OWN entitlements + identifier (for Sparkle's
 # nested code). Hardened runtime is set explicitly.
 sign_pres() { codesign --force --options runtime $TS $KCF --sign "$ID" \
@@ -58,10 +72,11 @@ HELPER="$APP/Contents/Library/LoginItems/Shimmer Login Helper.app"
 if [ -d "$HELPER" ]; then
 	echo "Signing Login Helper with its own entitlements"
 	if [ -f "$HELPER_ENT" ]; then
-		codesign --force --options runtime $TS $KCF --sign "$ID" --entitlements "$HELPER_ENT" "$HELPER"
+		codesign --force --options runtime $TS $BG_KCF --sign "$BG_ID" --entitlements "$HELPER_ENT" "$HELPER"
 	else
 		echo "  WARN: $HELPER_ENT not found - preserving the helper's existing entitlements" >&2
-		sign_pres "$HELPER"
+		codesign --force --options runtime $TS $BG_KCF --sign "$BG_ID" \
+			--preserve-metadata=entitlements,identifier "$HELPER"
 	fi
 fi
 
@@ -69,7 +84,7 @@ DAEMON="$APP/Contents/MacOS/io.ugfugl.glimmer.helper"
 DAEMON_ENT="helper/Helper.entitlements"
 if [ -f "$DAEMON" ]; then
 	echo "Signing the AWDL network helper (root LaunchDaemon, hardened runtime + memory protections)"
-	codesign --force --options runtime $TS $KCF --sign "$ID" --identifier "io.ugfugl.glimmer.helper" \
+	codesign --force --options runtime $TS $BG_KCF --sign "$BG_ID" --identifier "io.ugfugl.glimmer.helper" \
 		--entitlements "$DAEMON_ENT" "$DAEMON"
 	# AMFI kills a binary whose entitlements its signature can't carry; catch that
 	# here rather than as a helper that silently never starts.
