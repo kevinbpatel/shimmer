@@ -68,6 +68,7 @@ extension StreamSession {
         self.reconnectServer = server
         self.reconnectAddresses = reconnectAddresses
         self.reconnectConfig = config
+        self.launchBitrateKbps = config.bitrateKbps
         self.reconnectAppID = appID
 
         // Opt OUT of App Nap for the whole session, and keep the Mac (and its

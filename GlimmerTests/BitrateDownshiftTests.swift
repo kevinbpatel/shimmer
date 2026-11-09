@@ -98,7 +98,88 @@ struct BitrateDownshiftTests {
         let third = controller.evaluate(isRemote: true, decodeIdle: 600, receiveIdle: receiving,
                                currentKbps: kbps, nowUptime: 900)
         #expect(third == .budgetExhausted)
-        #expect(controller.downshiftCount == BitrateDownshiftController.maxDownshifts)
+        #expect(controller.downshiftCount(nowUptime: 900) == BitrateDownshiftController.maxDownshifts)
+    }
+
+    /// The budget is a window, not a session: a downshift stops counting after half an hour, so a
+    /// link that failed long ago is judged again rather than written off for the rest of the stream.
+    @Test func budgetRecoversOnceTheWindowPasses() {
+        var controller = BitrateDownshiftController()
+        controller.recordDownshift(atUptime: 100)
+        controller.recordDownshift(atUptime: 300)
+        let spent = controller.evaluate(isRemote: true, decodeIdle: stalled, receiveIdle: receiving,
+                                        currentKbps: 30_240, nowUptime: 900)
+        #expect(spent == .budgetExhausted)
+        let later = 300 + BitrateDownshiftController.budgetWindowSeconds + 1
+        let again = controller.evaluate(isRemote: true, decodeIdle: stalled, receiveIdle: receiving,
+                                        currentKbps: 30_240, nowUptime: later)
+        #expect(again == .downshift(toKbps: 18_144))
+        #expect(controller.downshiftCount(nowUptime: later) == 0)
+    }
+
+    // MARK: - The way back up
+
+    /// A downshift must not be for good. After a clean window at the lowered rate, one step back
+    /// toward the launch rate; a second step needs its own clean window.
+    @Test func cleanWindowEarnsOneStepBackUp() {
+        var controller = BitrateDownshiftController()
+        controller.recordDownshift(atUptime: 100)
+        controller.recordDownshift(atUptime: 300)
+        let clean = BitrateDownshiftController.stepUpCleanSeconds
+        #expect(controller.stepUp(currentKbps: 30_240, ceilingKbps: configuredKbps, nowUptime: 300 + clean - 1) == nil)
+        #expect(controller.stepUp(currentKbps: 30_240, ceilingKbps: configuredKbps, nowUptime: 300 + clean) == 50_400)
+        controller.recordStepUp(atUptime: 300 + clean, reachedCeiling: false)
+        #expect(controller.isDownshifted)
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: 300 + clean + 1) == nil)
+        let second = controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: 300 + 2 * clean)
+        #expect(second == configuredKbps)   // capped at the launch rate, never above it
+        controller.recordStepUp(atUptime: 300 + 2 * clean, reachedCeiling: true)
+        #expect(!controller.isDownshifted)
+        #expect(controller.stepUp(currentKbps: configuredKbps, ceilingKbps: configuredKbps, nowUptime: 9_000) == nil)
+    }
+
+    /// A stall at the lowered rate restarts the clean window; the step-up waits for a full one.
+    @Test func aStallRestartsTheCleanWindow() {
+        var controller = BitrateDownshiftController()
+        controller.recordDownshift(atUptime: 100)
+        controller.noteStall(atUptime: 350)
+        let clean = BitrateDownshiftController.stepUpCleanSeconds
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: 100 + clean) == nil)
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: 350 + clean) == configuredKbps)
+    }
+
+    /// A step-up that stalls again inside its own window doubles the next window, up to the cap; one
+    /// that outlives its window proves the link and the backoff starts over.
+    @Test func aStepUpThatStallsAgainWaitsTwiceAsLong() {
+        var controller = BitrateDownshiftController()
+        let clean = BitrateDownshiftController.stepUpCleanSeconds
+        controller.recordDownshift(atUptime: 0)
+        controller.recordStepUp(atUptime: clean, reachedCeiling: true)
+        controller.recordDownshift(atUptime: clean + 60)   // failed within its window
+        let base = clean + 60
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: base + clean) == nil)
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: base + 2 * clean) == configuredKbps)
+
+        controller.recordStepUp(atUptime: base + 2 * clean, reachedCeiling: true)
+        controller.recordDownshift(atUptime: base + 2 * clean + 3 * clean)   // outlived it
+        let proven = base + 5 * clean
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: proven + clean) == configuredKbps)
+    }
+
+    /// The window never grows past the cap however often a step-up fails.
+    @Test func stepUpBackoffStopsAtTheCap() {
+        var controller = BitrateDownshiftController()
+        var now = 0.0
+        for _ in 0..<8 {
+            controller.recordDownshift(atUptime: now)
+            now += 1
+            controller.recordStepUp(atUptime: now, reachedCeiling: true)
+            now += 1
+        }
+        controller.recordDownshift(atUptime: now)
+        let cap = BitrateDownshiftController.stepUpCleanCapSeconds
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: now + cap - 1) == nil)
+        #expect(controller.stepUp(currentKbps: 50_400, ceilingKbps: configuredKbps, nowUptime: now + cap) == configuredKbps)
     }
 
     // MARK: - The anti-thrash rails
@@ -161,7 +242,7 @@ struct BitrateDownshiftTests {
     /// failing would downshift forever.
     @Test func freshControllerStartsWithAFullBudget() {
         let controller = BitrateDownshiftController()
-        #expect(controller.downshiftCount == 0)
+        #expect(controller.downshiftCount(nowUptime: 400) == 0)
         let d = controller.evaluate(isRemote: true, decodeIdle: stalled, receiveIdle: receiving,
                                     currentKbps: configuredKbps, nowUptime: 400)
         #expect(d == .downshift(toKbps: 50_400))
@@ -173,7 +254,7 @@ struct BitrateDownshiftTests {
         let d = controller.evaluate(isRemote: true, decodeIdle: 0.01, receiveIdle: 0.01,
                            currentKbps: configuredKbps, nowUptime: 100)
         #expect(d == .tooEarly)
-        #expect(controller.downshiftCount == 0)
+        #expect(controller.downshiftCount(nowUptime: 100) == 0)
     }
 
     /// The threshold has to sit clear of the IDR-nudge tier so the cheap fix is

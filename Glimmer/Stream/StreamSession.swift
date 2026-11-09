@@ -314,8 +314,10 @@ public actor StreamSession {
     /// than inherited. Gates the downshift tier - a LAN that can't carry its own
     /// rate is a different fault.
     var isRemotePathSession = false
-    /// Per-session downshift budget + cooldown.
+    /// Per-session downshift budget, cooldown and step-up backoff.
     var downshift = BitrateDownshiftController()
+    /// The bitrate the session launched with: the ceiling a step-up climbs back toward.
+    var launchBitrateKbps: Int?
     /// Latched so the "why we did NOT downshift" reason logs once per stall
     /// episode rather than once a second. Cleared by `clearDecodeOnlyStallLatch`.
     var didLogDownshiftDecision = false

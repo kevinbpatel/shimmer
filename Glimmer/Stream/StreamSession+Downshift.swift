@@ -2,9 +2,9 @@
 //  StreamSession+Downshift.swift
 //
 //  The watchdog escalation tier that ends an unproductive HOLD by lowering the
-//  session bitrate. Split out of StreamSession+Watchdog.swift to keep that file
-//  focused on detection; the POLICY (remote-only, sustained, bounded, cooled
-//  down) lives in BitrateDownshiftController, and this owns the side effects.
+//  session bitrate, and the step back up once the lowered rate has run clean.
+//  The POLICY (remote-only, sustained, bounded, cooled down, clean window)
+//  lives in BitrateDownshiftController; this owns the side effects.
 //
 //  See BitrateDownshiftController for why a reconnect is the mechanism rather
 //  than a control message: bitrate is fixed per session and the SDP is the only
@@ -60,8 +60,7 @@ extension StreamSession {
         Diag.warn(
             "Link cannot carry \(current / 1000) Mbps - \(String(format: "%.0f", decodeIdle))s of "
             + "received-but-undecodable video on a remote path. Downshifting to \(toKbps / 1000) Mbps "
-            + "and reconnecting in place (step \(downshift.downshiftCount)/"
-            + "\(BitrateDownshiftController.maxDownshifts)).", "Stream")
+            + "and reconnecting in place (step \(downshift.stepsDown) down).", "Stream")
         log.error("""
             Bitrate downshift: \(current, privacy: .public) → \(toKbps, privacy: .public) kbps \
             after \(decodeIdle, privacy: .public)s decode-only stall on a remote path
@@ -70,5 +69,29 @@ extension StreamSession {
         await runSelfInitiatedReconnect(
             cause: "lowering the bitrate to \(toKbps / 1000) Mbps",
             bannerText: "Connection is weak - lowering quality to \(toKbps / 1000) Mbps…")
+    }
+
+    /// After a clean window at a lowered rate, one step back toward the rate the session launched
+    /// with, applied the way the downshift was: a reconnect in place under a banner that says why.
+    /// Called on healthy watchdog ticks.
+    func considerBitrateStepUp() async {
+        guard isStreaming, !stopInProgress, !isReconnecting, downshift.isDownshifted,
+              let current = reconnectConfig?.bitrateKbps, let ceiling = launchBitrateKbps else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let toKbps = downshift.stepUp(currentKbps: current, ceilingKbps: ceiling, nowUptime: now)
+        else { return }
+        let clean = downshift.cleanSeconds(nowUptime: now) ?? 0
+        downshift.recordStepUp(atUptime: now, reachedCeiling: toKbps >= ceiling)
+        reconnectConfig?.bitrateKbps = toKbps
+
+        Diag.notice("Link clean for \(Int(clean / 60)) min at \(current / 1000) Mbps - stepping back up to "
+            + "\(toKbps / 1000) Mbps and reconnecting in place.", "Stream")
+        log.notice("""
+            Bitrate step-up: \(current, privacy: .public) → \(toKbps, privacy: .public) kbps after \
+            \(clean, privacy: .public)s clean at the lowered rate
+            """)
+        await runSelfInitiatedReconnect(
+            cause: "raising the bitrate to \(toKbps / 1000) Mbps",
+            bannerText: "Connection improved - raising quality to \(toKbps / 1000) Mbps…")
     }
 }
