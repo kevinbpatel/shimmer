@@ -71,6 +71,11 @@ struct VideoPane: View {
                         Button("Open Login Items…") { awdl.openSystemSettings() }
                     }
                 }
+                if case .notRunning = awdl.state {
+                    SettingsNotice(message: "The network helper is approved, but macOS can't start it.") {
+                        Button("Repair") { awdl.repair() }
+                    }
+                }
                 if case .unavailable(let why) = awdl.state {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("Network helper unavailable: \(why)", systemImage: "xmark.octagon")

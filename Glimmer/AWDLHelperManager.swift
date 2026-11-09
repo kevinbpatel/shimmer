@@ -98,6 +98,25 @@ actor HelperClient {
         }
     }
 
+    /// The daemon's ping reply, or nil if it can't be reached within `timeout`.
+    /// A registration launchd can't spawn never replies (or fails the call), so
+    /// this is the ground truth SMAppService's `.enabled` status can't give.
+    func ping(timeout: Duration = .seconds(4)) async -> String? {
+        await withCheckedContinuation { (cont: CheckedContinuation<String?, Never>) in
+            let once = SingleResume(cont)
+            let proxy = connect().remoteObjectProxyWithErrorHandler { [weak self] _ in
+                Task { await self?.drop() }
+                once.resume(nil)
+            } as? GlimmerHelperProtocol
+            guard let proxy else { once.resume(nil); return }
+            proxy.ping { reply in once.resume(reply) }
+            Task {
+                try? await Task.sleep(for: timeout)
+                once.resume(nil)
+            }
+        }
+    }
+
     /// The daemon's whack-a-mole count (macOS re-raises of awdl0 this stream), or
     /// nil if unreachable. Read on the suppress heartbeat for the contention gauge.
     func reSuppressCount() async -> UInt64? {
@@ -123,6 +142,7 @@ final class AWDLHelperManager: ObservableObject {
         case notRegistered          // helper has never been enabled
         case requiresApproval       // registered; user must toggle it on in System Settings
         case enabled                // installed + approved + ready
+        case notRunning             // approved, but launchd can't start it
         case unavailable(String)    // SMAppService error / daemon not found in the bundle
 
         /// The state for Diag, the error text kept private.
@@ -187,7 +207,25 @@ final class AWDLHelperManager: ObservableObject {
         ns.domain == "SMAppServiceErrorDomain" && ns.code == 1
     }
 
-    private init() { refresh() }
+    private init() {
+        refresh()
+        // Approval happens in System Settings, so re-read the status when the
+        // user comes back to Shimmer instead of only when a page appears.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { AWDLHelperManager.shared.refresh() }
+        }
+    }
+
+    /// Polls while approval is pending, so the row turns green moments after
+    /// the user flips the switch in System Settings (Shimmer may not be the
+    /// active app then, so activation alone isn't enough).
+    private var approvalPoll: Task<Void, Never>?
+    /// Verifies an `.enabled` registration really launches.
+    private var verifyTask: Task<Void, Never>?
+    /// One automatic repair per launch; after that the user drives it.
+    private var repairedThisLaunch = false
 
     var isEnabled: Bool { state == .enabled }
 
@@ -196,7 +234,7 @@ final class AWDLHelperManager: ObservableObject {
     /// snap back while approval is pending.
     var isRegistered: Bool {
         switch state {
-        case .enabled, .requiresApproval: return true
+        case .enabled, .requiresApproval, .notRunning: return true
         case .notRegistered, .unavailable: return false
         }
     }
@@ -224,14 +262,73 @@ final class AWDLHelperManager: ObservableObject {
 
     func refresh() {
         let status = service.status
+        let previous = state
         switch status {
-        case .enabled:          state = .enabled
+        case .enabled:
+            // `.enabled` only means approved. Keep a known launch failure
+            // showing until a ping proves otherwise.
+            state = previous == .notRunning ? .notRunning : .enabled
         case .requiresApproval: state = .requiresApproval
         case .notRegistered:    state = .notRegistered
         case .notFound:         state = .unavailable(Self.notFoundMessage)
         @unknown default:       state = .unavailable("Unknown status")
         }
-        log.notice("AWDL daemon status raw=\(status.rawValue, privacy: .public) state=\(String(describing: self.state), privacy: .public)")
+        if state != previous {
+            log.notice("AWDL daemon status raw=\(status.rawValue, privacy: .public) state=\(String(describing: self.state), privacy: .public)")
+        }
+        updateApprovalPoll()
+        if status == .enabled { verifyRunning() }
+    }
+
+    private func updateApprovalPoll() {
+        guard state == .requiresApproval else {
+            approvalPoll?.cancel()
+            approvalPoll = nil
+            return
+        }
+        guard approvalPoll == nil else { return }
+        approvalPoll = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                self.approvalPoll = nil
+                self.refresh()
+                if self.approvalPoll == nil { return }  // no longer pending
+            }
+        }
+    }
+
+    /// Ping the daemon. launchd can keep a job whose background-item record is
+    /// gone (seen after an app bundle swap: `BTMErrorDomain -95 record not
+    /// found`, exit 78 every 10 s) while SMAppService still says `.enabled`;
+    /// the only cure is to unregister and register again, so do that once.
+    private func verifyRunning() {
+        guard verifyTask == nil else { return }
+        let client = self.client
+        verifyTask = Task { @MainActor in
+            defer { self.verifyTask = nil }
+            if let reply = await client.ping() {
+                if self.state == .notRunning || self.state == .enabled {
+                    if self.state != .enabled { self.log.notice("AWDL daemon running again (\(reply, privacy: .public))") }
+                    self.state = .enabled
+                }
+                return
+            }
+            guard self.service.status == .enabled else { return }
+            self.log.error("AWDL daemon approved but not answering - launchd can't start it")
+            self.state = .notRunning
+            if !self.repairedThisLaunch {
+                self.repairedThisLaunch = true
+                self.repair()
+            }
+        }
+    }
+
+    /// Re-register from scratch so launchd gets a fresh job for this build.
+    /// macOS may ask for approval again.
+    func repair() {
+        log.notice("AWDL daemon repair: unregister + register")
+        enable()
     }
 
     /// Register the daemon. The first time, macOS surfaces a one-time approval in
@@ -303,8 +400,8 @@ final class AWDLHelperManager: ObservableObject {
         if registered { UserDefaults.standard.set(true, forKey: Self.enabledIntentKey) }
         guard registered || UserDefaults.standard.bool(forKey: Self.enabledIntentKey) else { return }
         switch state {
-        case .enabled:
-            log.info("AWDL daemon enabled; new binary loads on the next stream (idle-exit)")
+        case .enabled, .notRunning:
+            log.info("AWDL daemon approved; verifying it launches")
         case .requiresApproval:
             log.notice("AWDL daemon awaiting approval in System Settings ▸ Login Items")
         case .notRegistered, .unavailable:
