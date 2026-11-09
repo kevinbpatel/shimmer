@@ -158,7 +158,8 @@ final class VideoDepacketizer {
     // MARK: - Packet metadata (one completed RTP/NV packet)
 
     /// A single completed packet handed down by RtpVideoQueue, in frame order.
-    /// `payload` is the bytes AFTER the 16-byte NV header.
+    /// `payload` is the bytes AFTER the 16-byte NV header, a slice of the queue's
+    /// packet that `process` copies into the frame before it returns.
     struct CompletedPacket {
         let frameIndex: UInt32
         let flags: UInt8
@@ -169,7 +170,7 @@ final class VideoDepacketizer {
         let rtpTimestamp: UInt32
         let presentationTimeUs: UInt64
         let receiveTimeUs: UInt64
-        let payload: [UInt8]
+        let payload: ArraySlice<UInt8>
     }
 
     // MARK: - Process one packet (processRtpPayload, AV1 subset)
@@ -224,7 +225,7 @@ final class VideoDepacketizer {
                 dropCorruptFrame(frameIndex)
                 return
             }
-            payload.removeFirst(frameHeaderSize)
+            payload = payload.dropFirst(frameHeaderSize)
         }
 
         if isAV1 {
@@ -233,7 +234,7 @@ final class VideoDepacketizer {
                 // length includes the frame header, so subtract it.
                 let plen = Int(lastPacketPayloadLength)
                 if plen > frameHeaderSize && (plen - frameHeaderSize) <= payload.count {
-                    payload = Array(payload.prefix(plen - frameHeaderSize))
+                    payload = payload.prefix(plen - frameHeaderSize)
                 } else {
                     Diag.warn("NativeVideo invalid last payload length frame \(frameIndex): "
                         + "plen=\(plen) hdr=\(frameHeaderSize) have=\(payload.count)", Self.cat)
@@ -241,18 +242,16 @@ final class VideoDepacketizer {
                     return
                 }
             }
-            nalChain.append(contentsOf: payload)
-        } else {
+        } else if firstPacket && Self.isIdrFrameStart(Array(payload), hevc: isHEVC) {
             // H.264/HEVC Annex-B path. IDR detection by NAL inspection, not
             // the header type byte (see file header). No last-packet
             // truncation: Annex-B tolerates the FEC trailing-zero padding.
-            if firstPacket && Self.isIdrFrameStart(payload, hevc: isHEVC) {
-                frameType = Self.FRAME_TYPE_IDR
-                waitingForIdrFrame = false
-                waitingForNextSuccessfulFrame = false
-            }
-            nalChain.append(contentsOf: payload)
+            frameType = Self.FRAME_TYPE_IDR
+            waitingForIdrFrame = false
+            waitingForNextSuccessfulFrame = false
         }
+        // The one copy of the packet's bytes: from the queue's datagram into the frame.
+        payload.withUnsafeBytes { nalChain.append(contentsOf: $0) }
 
         if lastPacket {
             finishFrame(pkt: pkt, frameIndex: frameIndex)
