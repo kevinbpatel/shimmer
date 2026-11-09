@@ -33,9 +33,9 @@
 //  (encEnabled=0) audio is PLAINTEXT - no AES-CBC decrypt. (Encryption support
 //  is deferred; see the host constraints.)
 //
-//  Teardown is bounded: recvfrom blocks with a 100ms SO_RCVTIMEO so the loop
-//  polls `interrupted` and exits within 100ms; stop() also close()s the fd, which
-//  unblocks any in-flight recvfrom immediately. The ping Task is cancellable.
+//  Teardown is bounded: stop() only raises the stop flag. The receive loop polls it every 100ms
+//  (SO_RCVTIMEO) and the ping thread every wake; each holds the receiver while it uses the fd,
+//  so deinit closes it once, after both have exited.
 //
 //  Code map (this type is split across same-module extension files)
 //  ----------------------------------------------------------------
@@ -214,7 +214,8 @@ final class RtpAudioReceiver: @unchecked Sendable {
     private var pingStarted = false
     private var receiveStarted = false
     var pingCount: UInt32 = 0
-    private var initialized = false
+    // Internal so tests can check teardown.
+    var initialized = false
 
     // --- Time-to-first-packet metric (Track B; logged via Diag since we don't
     // own StatsCollector). `pingStartTimeUs` is stamped by the ping thread when
@@ -410,11 +411,16 @@ final class RtpAudioReceiver: @unchecked Sendable {
         // last-writer-wins, so a repeated stop() harmlessly re-stamps.
         TelemetryCounters.shared.audioTtf.markStreamEnd()
         pingThread = nil // the dedicated ping thread exits on the interrupted flag
-        if fd >= 0 { close(fd); fd = -1 }  // unblocks the in-flight recvfrom
         if initialized {
             sink?.cleanup()
             initialized = false
         }
+    }
+
+    /// The only close: a close in stop() raced the loops, and a reconnect's new socket could
+    /// reuse the number. Both loops hold `self` while they use the fd, so this runs after both.
+    deinit {
+        if fd >= 0 { close(fd) }
     }
 
     // The receive loop and the per-datagram path (`startReceiveLoop`,

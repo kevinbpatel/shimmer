@@ -31,6 +31,18 @@ struct RtpAudioReceiverTests {
         func recordedPackets() -> [[UInt8]] { lock.lock(); defer { lock.unlock() }; return packets }
     }
 
+    final class CountingAudioSink: NativeAudioSink, @unchecked Sendable {
+        // Cleanup can come from any thread; the lock keeps the count exact.
+        private let lock = NSLock()
+        private var cleanups = 0
+
+        func initialize(audioConfig: Int32, opus: OpusConfig) -> Int32 { 0 }
+        func decodeAndPlay(_ opus: [UInt8]) {}
+        func decodeAndPlayPLC() {}
+        func cleanup() { lock.lock(); cleanups += 1; lock.unlock() }
+        func cleanupCount() -> Int { lock.lock(); defer { lock.unlock() }; return cleanups }
+    }
+
     static func audioReceiver(sink: NativeAudioSink) -> RtpAudioReceiver {
         // A Sunshine-shaped version, so the queue starts with FEC on.
         RtpAudioReceiver(
@@ -111,5 +123,22 @@ struct RtpAudioReceiverTests {
             Self.feed(receiver, dataSequences: [UInt16(block * RtpAudioQueue.dataShards + 1)])
             #expect(receiver.queue.blocks.count <= RtpAudioQueue.maxQueuedBlocks)
         }
+    }
+
+    /// Stop leaves the socket open for deinit, so a loop still in recvfrom or sendto can never
+    /// reach a descriptor number a reconnect has reused. A second stop is harmless.
+    @Test func stopLeavesTheSocketForDeinit() throws {
+        let sink = CountingAudioSink()
+        let receiver = Self.audioReceiver(sink: sink)
+        try receiver.start()
+        #expect(receiver.fd >= 0)
+        receiver.stop()
+        #expect(receiver.initialized == false)
+        #expect(fcntl(receiver.fd, F_GETFD) != -1)
+        #expect(sink.cleanupCount() == 1)
+        receiver.stop()
+        #expect(receiver.initialized == false)
+        #expect(fcntl(receiver.fd, F_GETFD) != -1)
+        #expect(sink.cleanupCount() == 1)
     }
 }
