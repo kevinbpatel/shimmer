@@ -43,10 +43,23 @@ enum MenuBarBatteryGlyph {
     /// Charging is ONE asset regardless of level: the track holds a solid bolt
     /// and nothing else. A level shown inside a 17pt bolt is a smudge, and the
     /// exact number is a click away in the dropdown.
-    static func assetName(forPercent percent: Int, charging: Bool) -> String {
-        if charging { return "ControllerBatteryCharging" }
+    ///
+    /// `kind` is Steam's glyph name for the pad (see `steamControllerKind`);
+    /// one the generator didn't bake falls back to the generic pad.
+    static func assetName(forPercent percent: Int, charging: Bool, kind: String = "ps5") -> String {
+        let kind = kinds.contains(kind) ? kind : "generic"
+        if charging { return "ControllerBattery-\(kind)-Charging" }
         let clamped = min(max(percent, 0), 100)
         let level = Int((Double(clamped) / Double(step)).rounded()) * step
-        return "ControllerBattery\(level)"
+        return "ControllerBattery-\(kind)-\(level)"
     }
+
+    /// The pad alone, for a controller that reports no battery.
+    static func glyphName(kind: String) -> String {
+        "ControllerGlyph-\(kinds.contains(kind) ? kind : "generic")"
+    }
+
+    /// The pads scripts/generate-controller-battery.swift bakes art for.
+    static let kinds = ["ps5", "ps4", "xbox", "switchpro", "8bitdo_pro", "8bitdo_sn30",
+                        "8bitdo_ultimate", "hori", "steam", "triton", "gamecube", "generic"]
 }

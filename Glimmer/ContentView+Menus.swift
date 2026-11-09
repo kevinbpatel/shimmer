@@ -2,36 +2,12 @@
 //  ContentView+Menus.swift
 //
 //  The shared per-host right-click menu (Rename / Codec / Unpair) that both
-//  the hero card and Settings' PCTile mount via `.hostContextMenu(host)`, and
-//  the controller glyph the dropdown and the library share. The menu bar
-//  dropdown itself is AppKit now - see MenuBarController.swift.
+//  the hero card and Settings' PCTile mount via `.hostContextMenu(host)`. The
+//  menu bar dropdown itself is AppKit - see MenuBarController.swift.
 //
 
 import AppKit
 import SwiftUI
-
-extension AppModel.ControllerGlyph {
-    /// The mark itself. The PlayStation body is bundled template art (see
-    /// `AppModel.menuBarControllerGlyph` for why it isn't an SF Symbol); it is
-    /// authored at 20x14pt, which is the menu bar's size, so the dropdown asks
-    /// for a smaller frame to sit level with the SF Symbols around it.
-    func image(height: CGFloat? = nil) -> some View {
-        Group {
-            switch self {
-            case .playStation:
-                if let height {
-                    Image("DualSenseGlyph").resizable().scaledToFit()
-                        .frame(height: height)
-                } else {
-                    Image("DualSenseGlyph")
-                }
-            case .generic:
-                Image(systemName: "gamecontroller.fill")
-            }
-        }
-    }
-}
-
 
 // MARK: - Shared per-host right-click menu
 

@@ -36,18 +36,21 @@ struct MenuBarPresentation: Equatable {
     let title: String
     let assetHeight: CGFloat?
 
-    init?(warning: Bool, battery: (percent: Int, charging: Bool)?,
-          playStation: Bool, appGlyph: LibraryApp.Glyph?) {
+    /// `controller` is the connected pad's Steam glyph name and its battery,
+    /// if it reports one; a pad without a battery reading still shows, as its
+    /// plain glyph.
+    init?(warning: Bool, controller: (kind: String, battery: (percent: Int, charging: Bool)?)?,
+          appGlyph: LibraryApp.Glyph?) {
         if warning {
             glyph = .symbol("exclamationmark.triangle.fill")
             title = ""
             assetHeight = nil
-        } else if let battery {
-            glyph = playStation
-                ? .asset(MenuBarBatteryGlyph.assetName(forPercent: battery.percent,
-                                                       charging: battery.charging))
-                : .symbol("gamecontroller.fill")
-            title = playStation ? "" : "\(battery.percent)%"
+        } else if let controller {
+            glyph = .asset(controller.battery.map {
+                MenuBarBatteryGlyph.assetName(forPercent: $0.percent, charging: $0.charging,
+                                              kind: controller.kind)
+            } ?? MenuBarBatteryGlyph.glyphName(kind: controller.kind))
+            title = ""
             assetHeight = nil
         } else if let appGlyph {
             glyph = appGlyph
@@ -66,8 +69,7 @@ extension AppModel {
             ? heroTargetApp?.glyph ?? .symbol("play.fill")
             : runningAppName != nil ? heroTargetApp?.glyph : nil
         return MenuBarPresentation(warning: menuBarShowsStreamError,
-                                   battery: menuBarControllerBattery,
-                                   playStation: menuBarControllerGlyph == .playStation,
+                                   controller: menuBarControllerKind.map { ($0, menuBarControllerBattery) },
                                    appGlyph: appGlyph)
     }
 

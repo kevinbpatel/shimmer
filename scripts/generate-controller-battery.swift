@@ -1,5 +1,5 @@
 #!/usr/bin/swift
-// Generates Assets.xcassets/ControllerBattery*.imageset - the menu-bar mark
+// Generates Assets.xcassets/ControllerBattery-*.imageset - the menu-bar mark
 // showing the pad AND its charge, built to Steam's Big Picture controller
 // indicator.
 //
@@ -58,12 +58,16 @@
 // pad floating - the pad hangs 1.8 units BELOW the battery rather than sitting
 // inside it.
 //
-// The battery is drawn from the numbers above rather than lifted. The PAD is
-// Steam's own DualSense glyph, taken verbatim from the same bundle (viewBox
-// 0 0 36 36, six paths, fill currentColor) - an explicit, informed call by the
-// repo's owner to match Big Picture exactly; Valve's client artwork carries no
-// redistribution grant, and CREDITS.md says so plainly. The CC0 alternative it
-// replaced (Kenney's) is still in scripts/assets/, so swapping back is one line.
+// The battery is drawn from the numbers above rather than lifted. The PADS are
+// Steam's own controller glyphs, taken verbatim from the same bundle by
+// scripts/extract-steam-controller-glyphs.py (one per `ControllerType`: ps5,
+// ps4, xbox, switchpro, 8BitDo, HORI, GameCube, Steam, generic) - an explicit,
+// informed call by the repo's owner to match Big Picture exactly; Valve's client
+// artwork carries no redistribution grant, and CREDITS.md says so plainly. Every
+// pad gets the eleven levels, a charging mark, and a plain glyph for a pad that
+// reports no battery: Assets.xcassets/ControllerBattery-<type>-<level|Charging>
+// and ControllerGlyph-<type>. The DualSense set is byte-identical to the one
+// this script produced when it drew that pad alone.
 //
 // Usage: swift scripts/generate-controller-battery.swift
 
@@ -71,7 +75,16 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-let padSource = URL(fileURLWithPath: "scripts/assets/steam-controller_dualsense.svg")
+/// The pads to bake, by Steam's own `type` name (scripts/assets/steam-controller_<type>.svg,
+/// extracted by scripts/extract-steam-controller-glyphs.py). Every one gets the
+/// eleven levels, a charging mark, and a plain glyph for a pad that reports no
+/// battery. Steam's other two types are left out on purpose: `steamframe` is a
+/// pair of VR motion controllers and `mobile_touch` is a phone's touch overlay.
+let kinds = ["ps5", "ps4", "xbox", "switchpro", "8bitdo_pro", "8bitdo_sn30",
+             "8bitdo_ultimate", "hori", "steam", "triton", "gamecube", "generic"]
+func padSource(_ kind: String) -> URL {
+    URL(fileURLWithPath: "scripts/assets/steam-controller_\(kind).svg")
+}
 let assetRoot = URL(fileURLWithPath: "Glimmer/Assets.xcassets")
 
 /// The eleven levels a DualSense actually reports - its HID status byte carries
@@ -123,6 +136,16 @@ let scales = [1, 2]
 
 // MARK: - Pad artwork
 
+/// Where an SVG is drawn inside the 64x64 render box: aspect-fit from the
+/// origin. Most of Steam's glyphs are 36x36, but GameCube's is 36x26 and HORI's
+/// 279x190, and a square box stretched those two tall.
+func renderBox(_ image: NSImage) -> NSRect {
+    let size = image.size
+    guard size.width > 0, size.height > 0 else { return NSRect(x: 0, y: 0, width: 64, height: 64) }
+    let k = 64 / max(size.width, size.height)
+    return NSRect(x: 0, y: 0, width: size.width * k, height: size.height * k)
+}
+
 func renderSVG(_ image: NSImage, size: CGSize, _ transform: (CGContext) -> Void) -> CGImage? {
     guard let ctx = CGContext(
         data: nil, width: Int(size.width.rounded()), height: Int(size.height.rounded()),
@@ -135,7 +158,7 @@ func renderSVG(_ image: NSImage, size: CGSize, _ transform: (CGContext) -> Void)
     NSGraphicsContext.current = graphics
     ctx.saveGState()
     transform(ctx)
-    image.draw(in: NSRect(x: 0, y: 0, width: 64, height: 64))
+    image.draw(in: renderBox(image))
     ctx.restoreGState()
     NSGraphicsContext.restoreGraphicsState()
     return ctx.makeImage()
@@ -166,27 +189,38 @@ func alphaBoundingBox(_ image: CGImage) -> CGRect? {
                   width: CGFloat(maxX - minX + 1), height: CGFloat(maxY - minY + 1))
 }
 
-guard let padSVG = NSImage(contentsOf: padSource) else {
-    FileHandle.standardError.write(Data("cannot read \(padSource.path)\n".utf8)); exit(1)
+struct Pad {
+    let svg: NSImage
+    let art: CGRect      // the drawn area inside the 64x64 render box
 }
-let measureDimension = 1024
-let measureScale = CGFloat(measureDimension) / 64.0
-guard let measured = renderSVG(padSVG, size: CGSize(width: measureDimension, height: measureDimension), {
-        $0.scaleBy(x: measureScale, y: measureScale) }),
-      let box = alphaBoundingBox(measured) else {
-    FileHandle.standardError.write(Data("pad measure pass failed\n".utf8)); exit(1)
-}
-let padArt = CGRect(x: box.minX / measureScale, y: box.minY / measureScale,
-                    width: box.width / measureScale, height: box.height / measureScale)
 
-// The pad's height is not set here - it follows from its own aspect once the
-// visible width is fixed. Check it against what Steam's glyph measured to in the
-// browser, so swapping the source in can't silently change the mark's shape.
-let padActualHeightUnits = padVisibleUnits * 2 * (padArt.height / padArt.width)
-if abs(padActualHeightUnits - padHeightUnits) > 0.5 {
-    let note = "warning: pad art is \(String(format: "%.2f", padActualHeightUnits)) units tall, "
-        + "Steam's is \(padHeightUnits) - the source's proportions differ\n"
-    FileHandle.standardError.write(Data(note.utf8))
+func loadPad(_ kind: String) -> Pad {
+    let source = padSource(kind)
+    guard let svg = NSImage(contentsOf: source) else {
+        FileHandle.standardError.write(Data("cannot read \(source.path)\n".utf8)); exit(1)
+    }
+    let measureDimension = 1024
+    let measureScale = CGFloat(measureDimension) / 64.0
+    guard let measured = renderSVG(svg, size: CGSize(width: measureDimension, height: measureDimension), {
+            $0.scaleBy(x: measureScale, y: measureScale) }),
+          let box = alphaBoundingBox(measured) else {
+        FileHandle.standardError.write(Data("\(kind): pad measure pass failed\n".utf8)); exit(1)
+    }
+    let art = CGRect(x: box.minX / measureScale, y: box.minY / measureScale,
+                     width: box.width / measureScale, height: box.height / measureScale)
+    // The pad's height is not set here - it follows from its own aspect once the
+    // visible width is fixed (and is capped to the mark's height for a tall pad).
+    // The DualSense was checked against what Steam's glyph measured to in the
+    // browser, so swapping its source in can't silently change the mark's shape.
+    if kind == "ps5" {
+        let padActualHeightUnits = padVisibleUnits * 2 * (art.height / art.width)
+        if abs(padActualHeightUnits - padHeightUnits) > 0.5 {
+            let note = "warning: pad art is \(String(format: "%.2f", padActualHeightUnits)) units tall, "
+                + "Steam's is \(padHeightUnits) - the source's proportions differ\n"
+            FileHandle.standardError.write(Data(note.utf8))
+        }
+    }
+    return Pad(svg: svg, art: art)
 }
 
 // MARK: - Drawing
@@ -296,7 +330,7 @@ struct BatteryPixels {
     }
 }
 
-func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
+func render(_ pad: Pad, level: Double, charging: Bool, scale: Int) -> CGImage? {
     let s = CGFloat(scale)
     let width = Int((markWidth * s).rounded()), height = Int((markHeight * s).rounded())
     guard let ctx = CGContext(
@@ -316,14 +350,16 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
     // The clip is a hard vertical cut in Steam too, so land it on a whole device
     // pixel rather than leaving a half-inked column down the pad's open side.
     ctx.clip(to: CGRect(x: 0, y: 0, width: padVisible.rounded(), height: CGFloat(height)))
-    let padFit = padFull / padArt.width
+    // Fit the pad's width to Steam's visible half; a pad taller than the mark
+    // (none of Steam's are) would be shrunk to fit instead of clipped.
+    let padFit = min(padFull / pad.art.width, CGFloat(height) / pad.art.height)
     let graphics = NSGraphicsContext(cgContext: ctx, flipped: false)
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = graphics
     ctx.saveGState()
     ctx.scaleBy(x: padFit, y: padFit)
-    ctx.translateBy(x: -padArt.minX, y: -padArt.minY)
-    padSVG.draw(in: NSRect(x: 0, y: 0, width: 64, height: 64))
+    ctx.translateBy(x: -pad.art.minX, y: -pad.art.minY)
+    pad.svg.draw(in: renderBox(pad.svg))
     ctx.restoreGState()
     NSGraphicsContext.restoreGraphicsState()
     ctx.restoreGState()
@@ -355,47 +391,90 @@ func render(level: Double, charging: Bool, scale: Int) -> CGImage? {
 
 // MARK: - Emit
 
-var written = 0
-// Eleven level marks plus the single charging mark (level is irrelevant there).
-let jobs: [(name: String, level: Int, charging: Bool)] =
-    levels.map { ("ControllerBattery\($0)", $0, false) } + [("ControllerBatteryCharging", 100, true)]
-for job in jobs {
-    do {
-        let (name, level, charging) = job
-        let dir = assetRoot.appendingPathComponent("\(name).imageset")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        var entries: [String] = []
-        for scale in scales {
-            guard let image = render(level: Double(level) / 100, charging: charging, scale: scale) else {
-                FileHandle.standardError.write(Data("render failed for \(name)@\(scale)x\n".utf8))
-                exit(1)
-            }
-            let file = scale == 1 ? "battery.png" : "battery@\(scale)x.png"
-            try! NSBitmapImageRep(cgImage: image)
-                .representation(using: .png, properties: [:])!
-                .write(to: dir.appendingPathComponent(file))
-            entries.append("""
-            {
-              "filename" : "\(file)",
-              "idiom" : "mac",
-              "scale" : "\(scale)x"
-            }
-            """.replacingOccurrences(of: "\n", with: "\n      "))
-            written += 1
-        }
-        let contents = """
-        {
-          "images" : [
-            \(entries.joined(separator: ",\n    "))
-          ],
-          "info" : { "author" : "xcode", "version" : 1 },
-          "properties" : { "template-rendering-intent" : "template" }
-        }
-
-        """
-        try! contents.write(to: dir.appendingPathComponent("Contents.json"),
-                            atomically: true, encoding: .utf8)
-    }
+/// The whole pad with no battery, for a controller that doesn't report one
+/// (an Xbox pad over Bluetooth often doesn't). Same scale as the battery mark,
+/// so switching between the two never makes the pad jump in size.
+func renderGlyph(_ pad: Pad, scale: Int) -> CGImage? {
+    let s = CGFloat(scale)
+    let fit = min(padVisibleUnits * unit * s * 2 / pad.art.width, markHeight * s / pad.art.height)
+    let width = Int((pad.art.width * fit).rounded()), height = Int((markHeight * s).rounded())
+    guard let ctx = CGContext(
+        data: nil, width: width, height: height,
+        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+    ctx.setAllowsAntialiasing(true)
+    ctx.interpolationQuality = .high
+    let graphics = NSGraphicsContext(cgContext: ctx, flipped: false)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = graphics
+    ctx.saveGState()
+    ctx.translateBy(x: 0, y: ((CGFloat(height) - pad.art.height * fit) / 2).rounded())
+    ctx.scaleBy(x: fit, y: fit)
+    ctx.translateBy(x: -pad.art.minX, y: -pad.art.minY)
+    pad.svg.draw(in: renderBox(pad.svg))
+    ctx.restoreGState()
+    NSGraphicsContext.restoreGraphicsState()
+    ctx.setBlendMode(.sourceIn)
+    ctx.setFillColor(NSColor.black.cgColor)
+    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    return ctx.makeImage()
 }
-print("wrote \(jobs.count) imagesets (\(written) PNGs) at "
+
+var written = 0, imagesets = 0
+
+func writeImageset(_ name: String, _ draw: (Int) -> CGImage?) {
+    let dir = assetRoot.appendingPathComponent("\(name).imageset")
+    try? FileManager.default.removeItem(at: dir)
+    try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    var entries: [String] = []
+    for scale in scales {
+        guard let image = draw(scale) else {
+            FileHandle.standardError.write(Data("render failed for \(name)@\(scale)x\n".utf8))
+            exit(1)
+        }
+        let file = scale == 1 ? "glyph.png" : "glyph@\(scale)x.png"
+        try! NSBitmapImageRep(cgImage: image)
+            .representation(using: .png, properties: [:])!
+            .write(to: dir.appendingPathComponent(file))
+        entries.append("""
+        {
+          "filename" : "\(file)",
+          "idiom" : "mac",
+          "scale" : "\(scale)x"
+        }
+        """.replacingOccurrences(of: "\n", with: "\n      "))
+        written += 1
+    }
+    let contents = """
+    {
+      "images" : [
+        \(entries.joined(separator: ",\n    "))
+      ],
+      "info" : { "author" : "xcode", "version" : 1 },
+      "properties" : { "template-rendering-intent" : "template" }
+    }
+
+    """
+    try! contents.write(to: dir.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8)
+    imagesets += 1
+}
+
+// Clear out every earlier generation (including the old DualSense-only names),
+// so a dropped kind or level can't leave a stale asset behind.
+let existing = (try? FileManager.default.contentsOfDirectory(atPath: assetRoot.path)) ?? []
+for entry in existing where entry.hasPrefix("ControllerBattery") || entry.hasPrefix("ControllerGlyph-") {
+    try? FileManager.default.removeItem(at: assetRoot.appendingPathComponent(entry))
+}
+
+for kind in kinds {
+    let pad = loadPad(kind)
+    for level in levels {
+        writeImageset("ControllerBattery-\(kind)-\(level)") {
+            render(pad, level: Double(level) / 100, charging: false, scale: $0)
+        }
+    }
+    writeImageset("ControllerBattery-\(kind)-Charging") { render(pad, level: 1, charging: true, scale: $0) }
+    writeImageset("ControllerGlyph-\(kind)") { renderGlyph(pad, scale: $0) }
+}
+print("wrote \(imagesets) imagesets (\(written) PNGs) for \(kinds.count) pads at "
       + String(format: "%.1fx%.1fpt", markWidth, markHeight))

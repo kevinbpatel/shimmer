@@ -10,6 +10,7 @@
 //
 
 import AppKit
+import GameController
 import Testing
 @testable import Glimmer
 
@@ -27,6 +28,42 @@ struct MenuBarBatteryGlyphTests {
                         "\(percent)% charging=\(charging) -> \(name), which is not in the catalog")
             }
         }
+    }
+
+    /// Every pad Steam has a glyph for has its full set: each level, charging,
+    /// and the plain glyph for a pad without a battery reading.
+    @Test func everyControllerKindHasItsArt() {
+        for kind in MenuBarBatteryGlyph.kinds {
+            for percent in stride(from: 0, through: 100, by: MenuBarBatteryGlyph.step) {
+                for charging in [false, true] {
+                    let name = MenuBarBatteryGlyph.assetName(forPercent: percent, charging: charging, kind: kind)
+                    #expect(NSImage(named: name)?.isTemplate == true, "\(name) missing or not a template")
+                }
+            }
+            let plain = MenuBarBatteryGlyph.glyphName(kind: kind)
+            #expect(NSImage(named: plain)?.isTemplate == true, "\(plain) missing or not a template")
+        }
+        // An unknown kind falls back to the generic pad rather than drawing nothing.
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 50, charging: false, kind: "nope")
+                == "ControllerBattery-generic-50")
+        #expect(MenuBarBatteryGlyph.glyphName(kind: "nope") == "ControllerGlyph-generic")
+    }
+
+    /// GameController's names map to the glyph Steam draws for that pad.
+    @Test func controllersMapToSteamsGlyphs() {
+        let kind = AppModel.steamControllerKind
+        #expect(kind(GCProductCategoryDualSense, "DualSense Wireless Controller") == "ps5")
+        #expect(kind(GCProductCategoryDualShock4, "DUALSHOCK 4 Wireless Controller") == "ps4")
+        #expect(kind(GCProductCategoryXboxOne, "Xbox Wireless Controller") == "xbox")
+        #expect(kind("Switch Pro Controller", "Pro Controller") == "switchpro")
+        #expect(kind("Nintendo Switch Joy-Con (L/R)", "Joy-Con (L/R)") == "switchpro")
+        #expect(kind(GCProductCategoryHID, "8BitDo Ultimate 2C Wireless") == "8bitdo_ultimate")
+        #expect(kind(GCProductCategoryHID, "8BitDo SN30 Pro") == "8bitdo_sn30")
+        #expect(kind(GCProductCategoryHID, "8BitDo Pro 2") == "8bitdo_pro")
+        #expect(kind(GCProductCategoryHID, "HORIPAD") == "hori")
+        #expect(kind(GCProductCategoryHID, "Steam Controller") == "triton")
+        #expect(kind(GCProductCategoryMFi, "SteelSeries Nimbus+") == "generic")
+        #expect(kind(GCProductCategoryHID, nil) == "generic")
     }
 
     /// And the art is template art, or the menu bar can't tint it for a dark bar.
@@ -47,7 +84,7 @@ struct MenuBarBatteryGlyphTests {
             #expect(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: true)
                     != MenuBarBatteryGlyph.assetName(forPercent: percent, charging: false))
             #expect(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: true)
-                    == "ControllerBatteryCharging")
+                    == "ControllerBattery-ps5-Charging")
         }
     }
 
@@ -56,22 +93,22 @@ struct MenuBarBatteryGlyphTests {
     @Test func exactLevelsMapToThemselves() {
         for level in stride(from: 0, through: 100, by: MenuBarBatteryGlyph.step) {
             #expect(MenuBarBatteryGlyph.assetName(forPercent: level, charging: false)
-                    == "ControllerBattery\(level)")
+                    == "ControllerBattery-ps5-\(level)")
         }
     }
 
     @Test func readingsRoundToTheNearestLevel() {
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: 4, charging: false) == "ControllerBattery0")
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: 5, charging: false) == "ControllerBattery10")
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: 74, charging: false) == "ControllerBattery70")
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: 75, charging: false) == "ControllerBattery80")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 4, charging: false) == "ControllerBattery-ps5-0")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 5, charging: false) == "ControllerBattery-ps5-10")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 74, charging: false) == "ControllerBattery-ps5-70")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 75, charging: false) == "ControllerBattery-ps5-80")
         #expect(MenuBarBatteryGlyph.assetName(forPercent: 96, charging: true)
-                == "ControllerBatteryCharging")
+                == "ControllerBattery-ps5-Charging")
     }
 
     @Test func outOfRangeReadingsClampRatherThanWrap() {
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: -90, charging: false) == "ControllerBattery0")
-        #expect(MenuBarBatteryGlyph.assetName(forPercent: 900, charging: false) == "ControllerBattery100")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: -90, charging: false) == "ControllerBattery-ps5-0")
+        #expect(MenuBarBatteryGlyph.assetName(forPercent: 900, charging: false) == "ControllerBattery-ps5-100")
     }
 
     /// A dying pad must never be drawn fuller than it is - that's the one
@@ -79,7 +116,7 @@ struct MenuBarBatteryGlyphTests {
     @Test func theGlyphNeverOverstatesByMoreThanHalfAStep() {
         for percent in 0...100 {
             let shown = Int(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: false)
-                .replacingOccurrences(of: "ControllerBattery", with: "")) ?? -1
+                .replacingOccurrences(of: "ControllerBattery-ps5-", with: "")) ?? -1
             #expect(shown - percent <= MenuBarBatteryGlyph.step / 2, "\(percent)% shown as \(shown)%")
         }
     }
@@ -87,7 +124,7 @@ struct MenuBarBatteryGlyphTests {
     @Test func theMappingIsMonotonic() {
         let shown = (0...100).map { percent -> Int in
             Int(MenuBarBatteryGlyph.assetName(forPercent: percent, charging: false)
-                .replacingOccurrences(of: "ControllerBattery", with: "")) ?? -1
+                .replacingOccurrences(of: "ControllerBattery-ps5-", with: "")) ?? -1
         }
         #expect(shown == shown.sorted())
     }
@@ -123,42 +160,42 @@ struct MenuBarVisibilityTests {
     }
 
     @Test func idleHasNoStatusItemAndKeepsDockAccess() {
-        let idle = MenuBarPresentation(warning: false, battery: nil,
-                                       playStation: false, appGlyph: nil)
+        let idle = MenuBarPresentation(warning: false, controller: nil, appGlyph: nil)
         #expect(idle == nil)
         #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
                                              menuBarVisible: idle != nil) == .regular)
     }
 
     @Test func steamStatusReturnsAndDisappearsWithoutAFallback() {
-        let steam = MenuBarPresentation(warning: false, battery: nil,
-                                        playStation: false, appGlyph: .asset("SteamGlyph"))
+        let steam = MenuBarPresentation(warning: false, controller: nil,
+                                        appGlyph: .asset("SteamGlyph"))
         #expect(steam?.glyph == .asset("SteamGlyph"))
         #expect(steam?.title == "")
         #expect(steam?.assetHeight == 15)
         #expect(AppDelegate.activationPolicy(mainOpen: false, streaming: false,
                                              menuBarVisible: steam != nil) == .accessory)
-        let ended = MenuBarPresentation(warning: false, battery: nil,
-                                        playStation: false, appGlyph: nil)
+        let ended = MenuBarPresentation(warning: false, controller: nil, appGlyph: nil)
         #expect(ended == nil)
     }
 
     @Test func warningsStillTakePrecedenceOverControllerAndAppStatus() {
-        let warning = MenuBarPresentation(warning: true, battery: (75, false),
-                                          playStation: false, appGlyph: .asset("SteamGlyph"))
+        let warning = MenuBarPresentation(warning: true, controller: ("xbox", (75, false)),
+                                          appGlyph: .asset("SteamGlyph"))
         #expect(warning?.glyph == .symbol("exclamationmark.triangle.fill"))
         #expect(warning?.title == "")
     }
 
-    @Test func controllerStatusPreservesTheBatteryGlyphAndPercentage() {
-        let generic = MenuBarPresentation(warning: false, battery: (75, false),
-                                          playStation: false, appGlyph: .asset("SteamGlyph"))
-        #expect(generic?.glyph == .symbol("gamecontroller.fill"))
-        #expect(generic?.title == "75%")
-        let playStation = MenuBarPresentation(warning: false, battery: (75, true),
-                                              playStation: true, appGlyph: .asset("SteamGlyph"))
-        #expect(playStation?.glyph == .asset(MenuBarBatteryGlyph.assetName(forPercent: 75,
-                                                                          charging: true)))
-        #expect(playStation?.title == "")
+    @Test func controllerStatusShowsThatPadsGlyphAndBattery() {
+        let xbox = MenuBarPresentation(warning: false, controller: ("xbox", (75, false)),
+                                       appGlyph: .asset("SteamGlyph"))
+        #expect(xbox?.glyph == .asset("ControllerBattery-xbox-80"))
+        #expect(xbox?.title == "")
+        let charging = MenuBarPresentation(warning: false, controller: ("ps5", (75, true)),
+                                           appGlyph: .asset("SteamGlyph"))
+        #expect(charging?.glyph == .asset("ControllerBattery-ps5-Charging"))
+        // A pad with no battery reading still names itself, without a battery.
+        let noBattery = MenuBarPresentation(warning: false, controller: ("switchpro", nil),
+                                            appGlyph: .asset("SteamGlyph"))
+        #expect(noBattery?.glyph == .asset("ControllerGlyph-switchpro"))
     }
 }

@@ -273,37 +273,45 @@ extension AppModel {
         return nil
     }
 
-    /// Which mark names the connected pad, for the menu-bar charm and its
-    /// battery readout. Rendered by `ControllerGlyph.image` (ContentView+Menus).
-    ///
-    /// There is no PlayStation-controller SF Symbol - the system catalog has
-    /// `playstation.logo` (the PS letters mark, and restricted: "may not be
-    /// modified and may only be used to refer to Sony's PlayStation") and
-    /// `gamecontroller.fill` (a generic pad), and nothing shaped like a
-    /// DualSense. So the DualSense body is bundled art, from Kenney's CC0
-    /// input-prompt set; see CREDITS.md and scripts/generate-dualsense-glyph.swift.
-    ///
-    /// It is used ONLY when the pad genuinely is a PlayStation one - a DualSense
-    /// (the raw HID reader opens nothing else) or a DualShock 4. That's
-    /// referential use: it says "this is your PlayStation controller", never
-    /// "this app is a Sony product". CC0 waives Kenney's copyright but cannot
-    /// waive Sony's trade dress, and referential is the whole basis for showing
-    /// it - so it must never become an app icon or a piece of branding.
-    enum ControllerGlyph { case playStation, generic }
-
-    var menuBarControllerGlyph: ControllerGlyph {
+    /// Which pad is connected, by Steam's own glyph name (`ps5`, `xbox`,
+    /// `switchpro`, ...), so the menu bar draws the same controller Big Picture
+    /// does. nil when no gamepad is connected. The art is generated from
+    /// Steam's glyphs by scripts/generate-controller-battery.swift.
+    var menuBarControllerKind: String? {
         _ = controllerConnected
         // A live raw-HID battery decode means a DualSense by construction:
         // DualSenseHID opens nothing else.
-        if DualSenseHID.shared.battery != nil { return .playStation }
-        for controller in GCController.controllers() {
-            switch controller.productCategory {
-            case GCProductCategoryDualSense, GCProductCategoryDualShock4:
-                return .playStation
-            default:
-                continue
-            }
+        if DualSenseHID.shared.battery != nil { return "ps5" }
+        let pads = GCController.controllers().filter { $0.extendedGamepad != nil }
+        // Prefer the pad whose battery the charm is showing.
+        let pad = pads.first { $0.battery.flatMap(ControllerBattery.uiReading) != nil } ?? pads.first
+        return pad.map { Self.steamControllerKind(productCategory: $0.productCategory,
+                                                  vendorName: $0.vendorName) }
+    }
+
+    /// GameController's description of a pad, mapped to the glyph Steam would
+    /// draw for it. macOS names Sony and Xbox pads by category; Nintendo,
+    /// 8BitDo, HORI and Valve pads only by their vendor string, so those are
+    /// matched by name. Anything unrecognised gets Steam's generic pad.
+    nonisolated static func steamControllerKind(productCategory: String, vendorName: String?) -> String {
+        if productCategory == GCProductCategoryDualSense { return "ps5" }
+        if productCategory == GCProductCategoryDualShock4 { return "ps4" }
+        if productCategory == GCProductCategoryXboxOne { return "xbox" }
+        let name = "\(productCategory) \(vendorName ?? "")".lowercased()
+        if name.contains("8bitdo") {
+            if name.contains("ultimate") { return "8bitdo_ultimate" }
+            if name.contains("sn30") || name.contains("sf30") { return "8bitdo_sn30" }
+            return "8bitdo_pro"
         }
-        return .generic
+        if name.contains("hori") { return "hori" }
+        if name.contains("gamecube") { return "gamecube" }
+        if name.contains("steam") { return "triton" }
+        if name.contains("xbox") { return "xbox" }
+        if name.contains("dualsense") { return "ps5" }
+        if name.contains("dualshock") || name.contains("playstation") { return "ps4" }
+        if name.contains("switch pro") || name.contains("pro controller") || name.contains("joy-con") {
+            return "switchpro"
+        }
+        return "generic"
     }
 }
