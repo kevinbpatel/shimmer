@@ -282,6 +282,7 @@
 		B9E351AA8D864ACAB1563301 /* HostConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */; };
 		A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */; };
 		A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */; };
+		5E1DE0A10000000000000008 /* TelemetryGaugeRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1DE0A10000000000000009 /* TelemetryGaugeRenderTests.swift */; };
 		5E1DE0A10000000000000006 /* FramePacerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1DE0A10000000000000007 /* FramePacerTests.swift */; };
 		5E1DE0A10000000000000004 /* RtpVideoQueueLossTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1DE0A10000000000000005 /* RtpVideoQueueLossTests.swift */; };
 		5E1DE0A10000000000000002 /* VideoDepacketizerRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1DE0A10000000000000003 /* VideoDepacketizerRecoveryTests.swift */; };
@@ -623,6 +624,7 @@
 		B9E351AA8D864ACAB1563302 /* HostConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostConnectionTests.swift; sourceTree = "<group>"; };
 		A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarBatteryGlyphTests.swift"; sourceTree = "<group>"; };
 		A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FrameRateRangeTests.swift"; sourceTree = "<group>"; };
+		5E1DE0A10000000000000009 /* TelemetryGaugeRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TelemetryGaugeRenderTests.swift"; sourceTree = "<group>"; };
 		5E1DE0A10000000000000007 /* FramePacerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FramePacerTests.swift"; sourceTree = "<group>"; };
 		5E1DE0A10000000000000005 /* RtpVideoQueueLossTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RtpVideoQueueLossTests.swift"; sourceTree = "<group>"; };
 		5E1DE0A10000000000000003 /* VideoDepacketizerRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VideoDepacketizerRecoveryTests.swift"; sourceTree = "<group>"; };
@@ -1019,6 +1021,7 @@
 				5E1D1A600000000000000002 /* LogPrivacyTests.swift */,
 				A1C0DEMBBATTST2000000000 /* MenuBarBatteryGlyphTests.swift */,
 				A1C0DEF17A20000000000000 /* FrameRateRangeTests.swift */,
+				5E1DE0A10000000000000009 /* TelemetryGaugeRenderTests.swift */,
 				5E1DE0A10000000000000007 /* FramePacerTests.swift */,
 				5E1DE0A10000000000000005 /* RtpVideoQueueLossTests.swift */,
 				5E1DE0A10000000000000003 /* VideoDepacketizerRecoveryTests.swift */,
@@ -1455,6 +1458,7 @@
 				5E1D1A600000000000000001 /* LogPrivacyTests.swift in Sources */,
 				A1C0DEMBBATTST1000000000 /* MenuBarBatteryGlyphTests.swift in Sources */,
 				A1C0DEF17A10000000000000 /* FrameRateRangeTests.swift in Sources */,
+				5E1DE0A10000000000000008 /* TelemetryGaugeRenderTests.swift in Sources */,
 				5E1DE0A10000000000000006 /* FramePacerTests.swift in Sources */,
 				5E1DE0A10000000000000004 /* RtpVideoQueueLossTests.swift in Sources */,
 				5E1DE0A10000000000000002 /* VideoDepacketizerRecoveryTests.swift in Sources */,

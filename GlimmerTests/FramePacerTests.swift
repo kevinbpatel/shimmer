@@ -198,6 +198,16 @@ struct FramePacerTests {
         #expect(pacer.queue.count == 1)
     }
 
+    /// A tick that trims to the slack and then backs off still counts every discarded frame once.
+    @Test func backoffTickCountsTheFramesItsTrimDropped() throws {
+        let (pacer, presents) = try makeCountingPacer(queued: 5)
+        pacer.lastPresentMediaTime = 0
+        pacer.releaseDueFrame(targetTimestamp: 1, vsyncInterval: 1.0 / 120, tickScanout: 1)
+        #expect(presents.withLock { $0 } == 1)
+        #expect(pacer.queue.isEmpty)
+        #expect(pacer.stats.presentationLateDropCount() == 4)
+    }
+
     @Test func nextScanoutFollowsTheTickGrid() {
         #expect(FramePacer.nextScanout(now: 10.0, lastTickTarget: 10.004, vsync: 0.004) == 10.004)
         #expect(abs(FramePacer.nextScanout(now: 10.005, lastTickTarget: 10.004, vsync: 0.004) - 10.008) < 1e-9)
