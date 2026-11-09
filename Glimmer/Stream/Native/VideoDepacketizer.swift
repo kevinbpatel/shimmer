@@ -200,14 +200,7 @@ final class VideoDepacketizer {
             // reach VT without this guard). Cheap integer add at the already-rare
             // corrupt-frame site; no per-pixel scan.
             TelemetryCounters.shared.corruptionHeuristicTotal.increment()
-            decodingFrame = false
-            nextFrameNumber = frameIndex &+ 1
-            dropFrameState()
-            if waitingForIdrFrame {
-                delegate?.depacketizerNeedsIdr()
-            } else {
-                delegate?.depacketizerDetectedFrameLoss(from: Int(startFrameNumber), to: Int(frameIndex))
-            }
+            dropCorruptFrame(frameIndex)
             return
         }
 
@@ -221,18 +214,17 @@ final class VideoDepacketizer {
         var frameHeaderSize = 0
 
         if firstPacket && !payload.isEmpty {
-            frameHeaderSize = parseFrameHeader(&payload, frameIndex: frameIndex)
-            if frameHeaderSize < 0 {
-                // Header parse failed; drop the frame.
-                decodingFrame = false
-                nextFrameNumber = frameIndex &+ 1
-                dropFrameState()
+            frameHeaderSize = payload.withUnsafeBytes { parseFrameHeader($0, frameIndex: frameIndex) }
+            // A payload shorter than its header has no bitstream in it: never feed
+            // the header bytes to the decoder as video. Drop the frame and ask for
+            // recovery now rather than after VideoToolbox rejects the garbage.
+            guard frameHeaderSize >= 0 else {
+                Diag.warn("NativeVideo frame \(frameIndex) first packet is shorter than its header "
+                    + "(\(payload.count) bytes)", Self.cat)
+                dropCorruptFrame(frameIndex)
                 return
             }
-            // Skip past the frame header.
-            if payload.count >= frameHeaderSize {
-                payload.removeFirst(frameHeaderSize)
-            }
+            payload.removeFirst(frameHeaderSize)
         }
 
         if isAV1 {
@@ -245,14 +237,7 @@ final class VideoDepacketizer {
                 } else {
                     Diag.warn("NativeVideo invalid last payload length frame \(frameIndex): "
                         + "plen=\(plen) hdr=\(frameHeaderSize) have=\(payload.count)", Self.cat)
-                    decodingFrame = false
-                    nextFrameNumber = frameIndex &+ 1
-                    dropFrameState()
-                    if waitingForIdrFrame {
-                        delegate?.depacketizerNeedsIdr()
-                    } else {
-                        delegate?.depacketizerDetectedFrameLoss(from: Int(startFrameNumber), to: Int(frameIndex))
-                    }
+                    dropCorruptFrame(frameIndex)
                     return
                 }
             }
@@ -271,6 +256,19 @@ final class VideoDepacketizer {
 
         if lastPacket {
             finishFrame(pkt: pkt, frameIndex: frameIndex)
+        }
+    }
+
+    /// Drop a frame the parser can't trust and ask for the recovery the gate
+    /// allows: an IDR while waiting for one, otherwise an RFI (c:785-798).
+    private func dropCorruptFrame(_ frameIndex: UInt32) {
+        decodingFrame = false
+        nextFrameNumber = frameIndex &+ 1
+        dropFrameState()
+        if waitingForIdrFrame {
+            delegate?.depacketizerNeedsIdr()
+        } else {
+            delegate?.depacketizerDetectedFrameLoss(from: Int(startFrameNumber), to: Int(frameIndex))
         }
     }
 

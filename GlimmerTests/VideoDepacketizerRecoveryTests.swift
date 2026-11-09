@@ -61,6 +61,44 @@ struct VideoDepacketizerRecoveryTests {
         #expect(recorder.idrRequests == 0)
     }
 
+    @Test func oversizedLastPayloadIsDroppedAndReported() {
+        let recorder = RecordingDepacketizerDelegate()
+        let dp = depacketizer(recorder)
+        dp.process(packet(frame: 1, spi: 0, type: 2))
+        dp.process(packet(frame: 2, spi: 1, type: 1, length: 20))
+        #expect(recorder.units.map(\.frameNumber) == [1])
+        #expect(recorder.losses.map(\.to) == [2])
+    }
+
+    /// A first packet shorter than its frame header carries no bitstream: it is dropped
+    /// at the parser and recovery is requested, not fed to the decoder as video.
+    @Test(arguments: [[1, 0, 0, 1, 5], [0, 0, 0, 1, 0, 0, 0, 0, 0, 0]] as [[UInt8]])
+    func firstPacketShorterThanItsHeaderIsCorrupt(payload: [UInt8]) {
+        let recorder = RecordingDepacketizerDelegate()
+        let dp = depacketizer(recorder)
+        dp.process(packet(frame: 1, spi: 0, type: 2))
+        dp.process(VideoDepacketizer.CompletedPacket(
+            frameIndex: 2, flags: 0x07, extraFlags: 0, fecCurrentBlock: 0, fecLastBlock: 0,
+            streamPacketIndex: 1 << 8, rtpTimestamp: 2, presentationTimeUs: 2_000,
+            receiveTimeUs: 2_000, payload: payload))
+        #expect(recorder.units.map(\.frameNumber) == [1])
+        #expect(recorder.losses.map(\.to) == [2])
+    }
+
+    /// Sunshine's short header (0x01) is 8 bytes; any other first byte takes its 7.1.431
+    /// length, 24. A payload shorter than its own header is refused.
+    @Test func frameHeaderLengthFollowsSunshinesVersion() {
+        func headerSize(_ payload: [UInt8]) -> Int {
+            let dp = depacketizer(RecordingDepacketizerDelegate(), format: StreamProtocol.VIDEO_FORMAT_H265)
+            return payload.withUnsafeBytes { dp.parseFrameHeader($0, frameIndex: 1) }
+        }
+        #expect(headerSize([0x01, 0, 0, 1] + [UInt8](repeating: 0, count: 60)) == 8)
+        #expect(headerSize([0x81, 0, 0, 1] + [UInt8](repeating: 0, count: 60)) == 24)
+        #expect(headerSize([0x01, 0, 0]) == -1)
+        #expect(headerSize([0x01, 0, 0, 1, 0, 0, 0]) == -1)
+        #expect(headerSize([0x81, 0, 0, 1] + [UInt8](repeating: 0, count: 19)) == -1)
+    }
+
     @Test func spiGapRequestsIdrBeforeFirstKeyFrameAndRfiAfterIt() {
         let before = RecordingDepacketizerDelegate()
         let first = depacketizer(before)

@@ -19,9 +19,12 @@ extension VideoDepacketizer {
 
     // Internal (not private) so `process(_:)` in VideoDepacketizer.swift can call
     // across the split.
-    /// Returns the frame header size to skip, or -1 on parse failure.
-    func parseFrameHeader(_ payload: inout [UInt8], frameIndex: UInt32) -> Int {
+    /// Returns the frame header size to skip, or -1 when the payload is shorter
+    /// than its own header (which carries no bitstream to decode).
+    func parseFrameHeader(_ payload: UnsafeRawBufferPointer, frameIndex: UInt32) -> Int {
         guard payload.count >= 4 else { return -1 }
+        let headerSize = frameHeaderSize(byte0: payload[0])
+        guard payload.count >= headerSize else { return -1 }
 
         // Frame type from data[offset+3] (offset==0 here) (c:857-887).
         let typeByte = payload[3]
@@ -65,7 +68,7 @@ extension VideoDepacketizer {
             lastPacketPayloadLength = UInt16(payload[4]) | (UInt16(payload[5]) << 8)
         }
 
-        return frameHeaderSize(byte0: payload[0])
+        return headerSize
     }
 
     /// Version + byte0 dependent header length (c:914-965).
