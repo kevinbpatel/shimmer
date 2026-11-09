@@ -110,7 +110,7 @@ extension AudioPlayoutStallTests {
         #expect(decoder.cushionQuietAdjustLocked(now: now) == nil)
         #expect(decoder.playoutTargetMs == 54)
 
-        decoder.lastUnderrunNanos = now &- AudioDecoder.cushionFloorDecayQuietNanos
+        decoder.lastUnderrunNanos = now &- AudioDecoder.recentFailureHoldNanos
         #expect(decoder.cushionQuietAdjustLocked(now: now) != nil)
         #expect(decoder.playoutTargetMs == 44)
     }
@@ -134,7 +134,7 @@ extension AudioPlayoutStallTests {
         #expect(decoder.cushionQuietAdjustLocked(now: now) == nil)
         #expect(decoder.playoutTargetMs == 70)
 
-        decoder.lastUnderrunNanos = now &- AudioDecoder.cushionFloorDecayQuietNanos
+        decoder.lastUnderrunNanos = now &- AudioDecoder.recentFailureHoldNanos
         #expect(decoder.cushionQuietAdjustLocked(now: now) != nil)
         #expect(decoder.playoutTargetMs == 60)
     }
