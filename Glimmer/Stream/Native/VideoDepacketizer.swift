@@ -31,8 +31,9 @@
 //     accepts (same as moonlight-ios).
 //   - IDR detection does NOT trust the frame-header type byte (c:861-868 takes
 //     the header's word only for non-H.264/HEVC): a frame is IDR iff its first
-//     payload starts with the 4-byte start code + SPS (H.264) / VPS (HEVC) -
-//     the isIdrFrameStart port. Sunshine rides the param sets on every IDR.
+//     payload reaches SPS (H.264) / VPS (HEVC) past any leading AUD and SEI
+//     NALs, behind either start-code length - the isIdrFrameStart port.
+//     Sunshine rides the param sets on every IDR.
 //   - On IDR reassembly the leading VPS/SPS/PPS NALs are split into their own
 //     DecodeBuffers (the C slow path's getBufferFlags routing); everything
 //     else stays picture data in arrival order. P-frames skip the scan.

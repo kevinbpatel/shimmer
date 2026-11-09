@@ -10,7 +10,8 @@
 //  Genuinely-pure parser helpers widened from `private` to `internal` (with a
 //  `// internal for testability` note at each declaration) and covered below:
 //    - VideoDepacketizer.isIdrFrameStart  (pure static; Annex-B start-code +
-//      SPS/VPS sniff on untrusted host input - the memory-safety surface)
+//      AUD/SEI-skipping SPS/VPS sniff on untrusted host input - the
+//      memory-safety surface)
 //    - VideoDepacketizer.splitAnnexBParamSets (transform of one AU; reads only
 //      the init-time-immutable codec flag, no queue/clock/mutable state)
 //    - RtpAudioQueue.padShard       (pure pad/clamp of a byte buffer)
@@ -136,13 +137,11 @@ struct ParserHelperTests {
 
     // MARK: - VideoDepacketizer.isIdrFrameStart (untrusted Annex-B sniff)
     //
-    // Definition (VideoDepacketizer.swift): true iff payload.count >= 5 AND the
-    // first four bytes are the 4-byte start code 00 00 00 01 (NV's frame-start
-    // marker; a 3-byte start code means mid-frame), AND the NAL header at [4] is
-    // SPS for H.264 (type 7, byte & 0x1F == 7) or VPS for HEVC (type 32,
-    // (byte >> 1) & 0x3F == 32). Everything else - including malformed/truncated
-    // input - returns false WITHOUT crashing. This is the highest-value surface
-    // (untrusted host bytes), so the edge cases are fuzz-shaped.
+    // Sunshine's IDRs carry SPS (H.264, type 7) or VPS (HEVC, type 32) after
+    // optional AUD/SEI NALs, behind either Annex-B start-code length. Malformed
+    // prefixes must not open the key-frame recovery gate, and nothing may read
+    // past the payload. This is the highest-value surface (untrusted host
+    // bytes), so the edge cases are fuzz-shaped.
 
     @Test func isIdrFrameStartH264AcceptsSpsAfter4ByteStart() {
         // 00 00 00 01 | 0x67 (NAL header: type = 0x67 & 0x1F = 7 = SPS).
@@ -169,24 +168,38 @@ struct ParserHelperTests {
         #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 0, 1, 0x67], hevc: true))
     }
 
-    @Test func isIdrFrameStartRejects3ByteStartCode() {
-        // 3-byte start code 00 00 01 means MID-frame, never a frame start: with
-        // payload[2] == 1 the payload[3] == 1 check fails (payload[3] is the NAL
-        // header byte, here 0x67).
-        #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0x67, 0x00], hevc: false))
-        #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0x40, 0x01], hevc: true))
+    @Test func isIdrFrameStartAccepts3ByteStartCode() {
+        // Moonlight's getAnnexBStartSequence takes either start-code length.
+        #expect(VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0x67, 0x42], hevc: false))
+        #expect(VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0x40, 0x01], hevc: true))
+    }
+
+    @Test func isIdrFrameStartSkipsAudAndSeiBeforeParameterSets() {
+        let h264: [UInt8] = [0, 0, 0, 1, 0x09, 0xF0, 0, 0, 1, 0x06, 0x80, 0, 0, 0, 1, 0x67, 0x42]
+        #expect(VideoDepacketizer.isIdrFrameStart(h264, hevc: false))
+        let hevc: [UInt8] = [0, 0, 0, 1, 0x46, 0x01, 0x50, 0, 0, 1, 0x4E, 0x01, 0x80, 0, 0, 0, 1, 0x40, 0x01]
+        #expect(VideoDepacketizer.isIdrFrameStart(hevc, hevc: true))
+    }
+
+    @Test func isIdrFrameStartNeedsParameterSetsAfterMetadata() {
+        // SEI before an ordinary slice is not a key frame.
+        let seiThenSlice: [UInt8] = [0, 0, 0, 1, 0x06, 0x80, 0, 0, 1, 0x41, 0x9A]
+        #expect(!VideoDepacketizer.isIdrFrameStart(seiThenSlice, hevc: false))
+        // Only HEVC's prefix SEI (39) is skipped, as in Moonlight; a suffix SEI (40) ends the scan.
+        let suffixSeiThenVps: [UInt8] = [0, 0, 0, 1, 0x50, 0x01, 0x80, 0, 0, 0, 1, 0x40, 0x01]
+        #expect(!VideoDepacketizer.isIdrFrameStart(suffixSeiThenVps, hevc: true))
     }
 
     @Test func isIdrFrameStartMalformedInputsReturnFalseNoCrash() {
-        // Empty and sub-minimum lengths (< 5 bytes) -> false, no out-of-bounds.
+        // Truncated prefixes must not read beyond the payload.
         #expect(!VideoDepacketizer.isIdrFrameStart([], hevc: false))
         #expect(!VideoDepacketizer.isIdrFrameStart([], hevc: true))
         #expect(!VideoDepacketizer.isIdrFrameStart([0], hevc: false))
         #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 0, 1], hevc: false))   // lone 4-byte start code, no NAL byte
-        // A truncated/garbage prefix that is not the 4-byte start code.
+        // A truncated/garbage prefix that is not a start code.
         #expect(!VideoDepacketizer.isIdrFrameStart([0xFF, 0xFF, 0xFF, 0xFF, 0x67], hevc: false))
         #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 0, 0, 0x67], hevc: false))   // 00 00 00 00 - not a start code
-        #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0, 0x67], hevc: false))   // 4th byte not 1
+        #expect(!VideoDepacketizer.isIdrFrameStart([0, 0, 1, 0, 0x67], hevc: false))   // 3-byte start, NAL type 0
     }
 
     // MARK: - VideoDepacketizer.splitAnnexBParamSets (IDR AU NAL routing)
