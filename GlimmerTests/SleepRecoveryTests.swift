@@ -165,7 +165,7 @@ struct SleepRecoveryTests {
 
 // MARK: - Session ownership (ported from upstream's SessionLaunchTests)
 
-struct SessionLaunchTests {
+struct SessionOwnershipTests {
 
     /// A pipeline's events go to the session it started for, whichever is current when they fire,
     /// so a late callback from a timed-out pipeline can't land in the next session (3b8c219a).
@@ -216,7 +216,7 @@ private extension StreamSession {
 
 // MARK: - Frame watchdog (ported from upstream's StreamReconnectTests)
 
-struct StreamReconnectTests {
+struct FrameWatchdogRecoveryTests {
 
     @Test func staleGateLiftDoesNotCountAsDecodeProgress() {
         #expect(StreamSession.watchdogDecodeIdle(

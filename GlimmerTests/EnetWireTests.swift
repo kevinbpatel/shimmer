@@ -160,7 +160,7 @@ struct EnetWireTests {
 /// The control channel driven with no socket: sends drop on the nil connection,
 /// and callbacks and stored state expose the results. Ported from upstream's
 /// EnetControlChannelTests (286d5382, 920bb644).
-struct EnetControlChannelTests {
+struct EnetInboundOrderTests {
 
     static let key: [UInt8] = Array(0..<16).map { UInt8($0) }
     /// SERVER_TERMINATED_CLOSED, a code the host really sends.

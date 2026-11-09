@@ -225,7 +225,7 @@ struct SdpCodecTests {
 
 /// The RTSP client against a real loopback socket. Ported from upstream's
 /// RtspClientTests (42e564ba).
-struct RtspClientTests {
+struct RtspResponseDeadlineTests {
 
     private static let key: [UInt8] = Array(0..<16).map { UInt8($0) }
 
@@ -253,7 +253,7 @@ struct RtspClientTests {
     private static func silentListener() async throws -> (listener: NWListener, accepted: Accepted, port: UInt16) {
         let listener = try NWListener(using: .tcp, on: .any)
         let accepted = Accepted()
-        let queue = DispatchQueue(label: "RtspClientTests.listener")
+        let queue = DispatchQueue(label: "RtspResponseDeadlineTests.listener")
         listener.newConnectionHandler = { conn in
             accepted.keep(conn)
             conn.start(queue: queue)
