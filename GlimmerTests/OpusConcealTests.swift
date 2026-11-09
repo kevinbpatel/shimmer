@@ -25,7 +25,7 @@ struct OpusConcealTests {
         var index = hex.startIndex
         while index < hex.endIndex {
             let next = hex.index(index, offsetBy: 2)
-            out.append(UInt8(hex[index..<next], radix: 16)!)
+            out.append(UInt8(hex[index..<next], radix: 16) ?? 0)
             index = next
         }
         return out
@@ -43,9 +43,10 @@ struct OpusConcealTests {
         return packets.map { hex in
             let packet = bytes(hex)
             let (frames, rejected) = packet.withUnsafeBufferPointer { input in
-                pcm.withUnsafeMutableBufferPointer { out in
-                    AudioDecoder.decodeOrConceal(decoder, input: input.baseAddress, length: Int32(input.count),
-                                                 into: out.baseAddress!, frameSize: 240, decodeFec: 0)
+                pcm.withUnsafeMutableBufferPointer { out -> (frames: Int32, rejected: Int32?) in
+                    guard let base = out.baseAddress else { return (0, nil) }
+                    return AudioDecoder.decodeOrConceal(decoder, input: input.baseAddress, length: Int32(input.count),
+                                                        into: base, frameSize: 240, decodeFec: 0)
                 }
             }
             let rms = (0..<2).map { channel -> Float in
