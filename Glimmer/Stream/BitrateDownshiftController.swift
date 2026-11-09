@@ -47,7 +47,8 @@
 //      the session launched with, as a reconnect in place. A step-up that
 //      stalls again inside its own clean window doubles the next window, up to
 //      `stepUpCleanCapSeconds`, so a failing link is probed less and less; one
-//      that outlives it resets the backoff.
+//      that outlives it resets the backoff. A step-up gives back one downshift
+//      slot, so a failed probe can always drop back to the rate that worked.
 //   4. COOLDOWN. After a downshift, `cooldownSeconds` must pass before another
 //      is considered - long enough for the reconnect to complete and the new
 //      rate to actually be exercised, so we never stack two downshifts on one
@@ -211,5 +212,7 @@ struct BitrateDownshiftController: Sendable {
     mutating func recordStepUp(atUptime now: Double, reachedCeiling: Bool) {
         lastStepUpUptime = now
         stepsDown = reachedCeiling ? 0 : max(0, stepsDown - 1)
+        // A probe up must always be able to come back down; the step-up backoff bounds the cycling.
+        if !downshiftUptimes.isEmpty { downshiftUptimes.removeLast() }
     }
 }
