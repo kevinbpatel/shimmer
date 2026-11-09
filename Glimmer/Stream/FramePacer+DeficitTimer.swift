@@ -49,15 +49,21 @@ extension FramePacer {
     /// - when real ticks resume mid-deficit their targetTimestamps slot onto
     /// the same grid and the due gate just keeps pacing (releases stay capped
     /// at one per stream interval no matter how the two sources interleave).
+    /// A beat before the panel vsync a tick's frame scans out on skips its
+    /// release: it would hand the renderer a second frame inside that vsync.
     func deficitTimerFired() {
+        let mediaNow = CACurrentMediaTime()
         lock.lock()
         let active = (tickDeficit.deficitModeActive || tickDeficit.floorAssistActive)
             && running && !presentSuppressed
         let interval = streamFrameIntervalSeconds
+        let tickOwnsVsync = Self.tickOwnsScanout(
+            now: mediaNow, scanout: tickDeficit.tickScanoutMediaTime)
         lock.unlock()
         guard active else { return }
-        releaseDueFrame(
-            targetTimestamp: CACurrentMediaTime(), vsyncInterval: interval)
+        if !tickOwnsVsync {
+            releaseDueFrame(targetTimestamp: mediaNow, vsyncInterval: interval, tickScanout: .nan)
+        }
         maybeRepaintForGovernor(interval: interval)
         // Keep the rate window rolling from here too: with ticks FULLY stopped
         // and the watchdog mid-teardown there may be no other caller, and the
@@ -67,6 +73,14 @@ extension FramePacer {
         let events = serviceTickDeficitLocked(now: now)
         lock.unlock()
         handleTickDeficitEvents(events)
+    }
+
+    /// True when a real tick's released frame has not yet scanned out at `now`
+    /// (a beat there would present twice in one panel vsync). A lead past 1s
+    /// is a timebase jump, left to the due gate's discontinuity clamp.
+    static func tickOwnsScanout(now: CFTimeInterval, scanout: CFTimeInterval) -> Bool {
+        let lead = scanout - now
+        return lead > 0 && lead <= 1.0
     }
 
     /// Re-commit the most recently presented frame so the governor sees a live

@@ -69,7 +69,53 @@ struct FramePacerTests {
         #expect(pacer.liveness.overTargetSince.isNaN)
     }
 
+    /// A timer beat before the tick's frame scans out must not hand the
+    /// renderer a second frame inside that panel vsync.
+    @Test func assistBeatBeforeTickScanoutPresentsOnce() throws {
+        let (pacer, presents) = try makeAssistPacer()
+        releaseOnHalfRateTick(pacer, linkTimestamp: CACurrentMediaTime())
+        pacer.deficitTimerFired()
+        #expect(presents.withLock { $0 } == 1)
+        #expect(pacer.queue.count == 1)
+    }
+
+    /// The tick's target leads by two panel vsyncs, but its frame scans out on
+    /// the first; a beat past that lands on a later vsync and still releases.
+    @Test func assistBeatAfterFirstPanelVsyncReleases() throws {
+        let (pacer, presents) = try makeAssistPacer()
+        releaseOnHalfRateTick(pacer, linkTimestamp: CACurrentMediaTime() - 1.5 * panelVsync)
+        pacer.deficitTimerFired()
+        #expect(presents.withLock { $0 } == 2)
+    }
+
+    /// Only a plausible lead counts as a tick's pending scanout; a lead past 1s
+    /// is a timebase jump the due gate's clamp must still recover.
+    @Test func tickScanoutLeadBounds() {
+        #expect(FramePacer.tickOwnsScanout(now: 100, scanout: 100.008))
+        #expect(!FramePacer.tickOwnsScanout(now: 100, scanout: 99.99))
+        #expect(!FramePacer.tickOwnsScanout(now: 100, scanout: 105))
+        #expect(!FramePacer.tickOwnsScanout(now: 100, scanout: .nan))
+    }
+
     // MARK: - Helpers
+
+    /// A long panel vsync keeps the scanout and target 50-100 ms from `now`, so a
+    /// scheduling delay between the test's clock read and the beat's can't flip either test.
+    private let panelVsync = 0.1
+
+    /// A tick release as `handleTick` makes it with the link at half the panel's
+    /// rate: the target two panel vsyncs out, the scanout on the first.
+    private func releaseOnHalfRateTick(_ pacer: FramePacer, linkTimestamp: CFTimeInterval) {
+        pacer.releaseDueFrame(
+            targetTimestamp: linkTimestamp + 2 * panelVsync, vsyncInterval: panelVsync,
+            tickScanout: linkTimestamp + panelVsync)
+    }
+
+    private func makeAssistPacer() throws -> (FramePacer, OSAllocatedUnfairLock<Int>) {
+        let (pacer, presents) = try makeCountingPacer(queued: 2)
+        pacer.tickDeficit.floorAssistActive = true
+        return (pacer, presents)
+    }
 
     private func makePacer(fps: Int32, queued: Int) throws -> FramePacer {
         let pacer = FramePacer(stats: StatsCollector(), configuredFps: fps)
