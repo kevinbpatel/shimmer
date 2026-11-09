@@ -348,7 +348,7 @@ struct FecHeadroomController {
     /// LOSS AXIS. Feed one window's direct-loss evidence and step the
     /// SEPARATE `lossLevel` (combined with the jitter axis via `max` in
     /// `holdWindowUs`). Returns true iff `lossLevel` changed, so the caller can log
-    /// it. Called every window REGARDLESS of `reconcilerEnabled` - the loss axis is
+    /// it. Called every window alongside the reconciled jitter axis - the loss axis is
     /// orthogonal to the jitter→headroom decision and drives ONLY the reorder-hold.
     ///
     /// - Parameters:

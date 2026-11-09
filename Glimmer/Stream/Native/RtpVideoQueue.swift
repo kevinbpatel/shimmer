@@ -502,18 +502,11 @@ final class RtpVideoQueue {
         // FramePacer adaptive depth walk off ONE shared level. The HARD FLOORS are
         // unchanged: the live `reorderWindowUs` still caps at `maxHoldUs` (48ms),
         // and the queue's `isFecRecoveryStillPossible()` gate in the add path is a
-        // separate floor the reconciler can't reach. When the reconciler is off
-        // (the kill-switch A/B), the controller self-decides exactly as today.
-        let jitterChanged: Bool
-        if EnvSignalController.reconcilerEnabled {
-            let decision = EnvSignalController.shared.decision
-            jitterChanged = fecHeadroom.reconcile(headroomLevel: decision.headroomLevel,
+        // separate floor the reconciler can't reach. The session's own 2 s tick
+        // feeds the controller, so the decision is live with telemetry on or off.
+        let decision = EnvSignalController.shared.decision
+        let jitterChanged = fecHeadroom.reconcile(headroomLevel: decision.headroomLevel,
                                                   smoothedJitterMs: decision.smoothedJitterMs)
-        } else {
-            jitterChanged = fecHeadroom.observeWindow(recvJitterMs: jitterUs / 1000.0,
-                                                      outOfOrder: windowOutOfOrder,
-                                                      retransmits: retransmitDelta)
-        }
         // LOSS AXIS: drive the SEPARATE loss accumulator off this window's
         // direct loss evidence - frames the host's parity recovered
         // (`fecRecoveredFramesInWindow`) and frames that went unrecoverable (a

@@ -131,8 +131,7 @@ extension StreamSession {
             self.frameWatchdogTimer = nil
             self.presentWatchdogTimer?.invalidate()
             self.presentWatchdogTimer = nil
-            self.presentMetricTimer?.invalidate()
-            self.presentMetricTimer = nil
+            self.stopPresentMetricTimer()
             winForOverlay?.statsOverlay.setVisible(false)
         }
 

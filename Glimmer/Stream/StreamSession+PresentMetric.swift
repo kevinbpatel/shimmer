@@ -15,14 +15,17 @@ import os
 
 extension StreamSession {
 
-    /// Install the 2 Hz NOTICE-level present/decode-path instrumentation. Logs
-    /// the numbers that would have pinpointed this freeze instantly: pacer tick
-    /// rate, last-release age, queue depth, decode-output rate. NOTICE privacy
-    /// so it lands in `log show` without --info and in the in-app log.
+    /// Install the two-second session tick: it feeds the env-signal windows, grows
+    /// the pacer depth toward the published level, and logs the NOTICE-level
+    /// present/decode-path instrumentation - the numbers that would have pinpointed
+    /// a freeze instantly: pacer tick rate, last-release age, queue depth,
+    /// decode-output rate. NOTICE privacy so it lands in `log show` without --info
+    /// and in the in-app log.
     func startPresentMetricTimer() async {
         let dec = videoDecoder
         await MainActor.run {
             self.presentMetricTimer?.invalidate()
+            EnvSignalController.shared.beginSession()
             self.prevMetricTotalTicks = 0
             self.prevMetricTotalReleases = 0
             self.prevMetricTime = CFAbsoluteTimeGetCurrent()
@@ -30,6 +33,7 @@ extension StreamSession {
                 withTimeInterval: 2.0, repeats: true
             ) { [weak self, weak dec] _ in
                 MainActor.assumeIsolated {
+                    EnvSignalController.shared.observeStreamTick()
                     guard let self, let dec else { return }
                     self.emitPresentMetric(dec: dec)
                 }
@@ -37,6 +41,14 @@ extension StreamSession {
             timer.tolerance = 0.2
             self.presentMetricTimer = timer
         }
+    }
+
+    /// Stop the tick and end the env-signal session. Main actor, from `stop()`.
+    @MainActor
+    func stopPresentMetricTimer() {
+        presentMetricTimer?.invalidate()
+        presentMetricTimer = nil
+        EnvSignalController.shared.endSession()
     }
 
     @MainActor
@@ -47,11 +59,9 @@ extension StreamSession {
         // window doesn't spam the log.
         guard decodeIdle.isFinite else { return }
 
-        // Forward the latest SMOOTHED RFC-3550 reorder jitter to the pacer on this
-        // ~2s cadence (the same cadence the RTP receive path refreshes the shared
-        // gauge on), so the adaptive buffer grows ONLY for SUSTAINED MEASURED
-        // jitter (lossy wifi) and rests at depth 1 on a clean link (0.09ms wired).
-        dec.pacingNoteMeasuredJitter(TelemetryCounters.shared.recvJitterMs)
+        // The pacer's only grow step: one frame per window toward the level the env-signal
+        // controller published, so depth grows only on sustained evidence.
+        dec.pacingGrowDepthTowardTarget()
         // sincePresent is the MODE-AGNOSTIC present clock - meaningful in BOTH
         // paced and direct mode, so the metric line shows how long since a frame
         // reached the screen even when the pacer is down.
