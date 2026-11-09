@@ -40,11 +40,24 @@ extension RtpVideoQueue {
         if fecPercentage == 0 {
             return -1
         }
+        // A failed rebuild is retried only once a late data shard changes the gap
+        // set: more parity over the same gaps decodes to the same garbage.
+        if receivedDataPackets == fecFailedDataCount {
+            return -1
+        }
+        func failed() -> Int {
+            fecFailedDataCount = receivedDataPackets
+            return -1
+        }
 
         let receiveSize = packetSize + Self.MAX_RTP_HEADER_SIZE
         guard let rs = decoder(dataShards: bufferDataPackets, parityShards: bufferParityPackets) else {
-            Diag.error("NativeVideo reed_solomon_new failed (ds=\(bufferDataPackets) ps=\(bufferParityPackets))", Self.cat)
-            return -1
+            if !loggedBadFecGeometry {
+                loggedBadFecGeometry = true
+                Diag.error("NativeVideo FEC geometry rejected (ds=\(bufferDataPackets) "
+                    + "ps=\(bufferParityPackets)); logged once per stream", Self.cat)
+            }
+            return failed()
         }
 
         var (shards, marks) = buildShards(totalPackets: totalPackets, receiveSize: receiveSize)
@@ -53,7 +66,7 @@ extension RtpVideoQueue {
         if !ok {
             Diag.error("NativeVideo FEC unrecoverable frame \(currentFrameNumber): "
                 + "have \(pending.count) need \(neededPackets)", Self.cat)
-            return -1
+            return failed()
         }
 
         // Rebuild and validate every recovered DATA shard (i < bufferDataPackets)
@@ -64,7 +77,7 @@ extension RtpVideoQueue {
         var recovered: [Entry] = []
         for i in 0..<bufferDataPackets where marks[i] {
             guard let entry = rebuildRecoveredShard(shards[i], index: i, headEntry: headEntry) else {
-                return -1
+                return failed()
             }
             recovered.append(entry)
         }
@@ -75,11 +88,15 @@ extension RtpVideoQueue {
 
     /// Memoized Cauchy decoder per (ds,ps) shape. Safe to cache: `ReedSolomon` is an
     /// immutable value type whose `decode` mutates only caller-supplied shards. nil
-    /// for invalid geometry (not cached).
+    /// for invalid geometry (not cached). The host picks the geometry, so the cache
+    /// is cleared at `rsDecoderCacheCap` rather than left to grow without bound.
     private func decoder(dataShards ds: Int, parityShards ps: Int) -> ReedSolomon? {
         let shape = ReedSolomonShape(ds: ds, ps: ps)
         if let cached = rsDecoderCache[shape] { return cached }
         guard let rs = ReedSolomon(dataShards: ds, parityShards: ps) else { return nil }
+        if rsDecoderCache.count >= Self.rsDecoderCacheCap {
+            rsDecoderCache.removeAll(keepingCapacity: true)
+        }
         rsDecoderCache[shape] = rs
         return rs
     }

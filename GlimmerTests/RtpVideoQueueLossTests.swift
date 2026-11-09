@@ -90,23 +90,49 @@ struct RtpVideoQueueLossTests {
     }
 
     /// Garbage parity makes every rebuild fail its shard checks. A failed rebuild commits
-    /// nothing, so the block is not submitted with a hole in it, and the data shards that
-    /// complete the frame on their own still deliver it whole.
-    @Test func failedRebuildCommitsNothing() {
+    /// nothing and is latched until a data shard arrives, so later parity packets don't
+    /// rerun Reed-Solomon, and the data shards that complete the frame on their own still
+    /// deliver it whole.
+    @Test func failedRebuildWaitsForANewDataShard() {
         let queue = makeQueue()
         queue.addRawDatagram(VideoWire.singlePacketFrame(1, seq: 0, type: 2), receiveTimeUs: 1_000)
         let garbage = [UInt8](repeating: 0xAB, count: 8), body = [UInt8](repeating: 2, count: 8)
         let header = VideoWire.frameHeader(type: 1, lastPayloadLength: body.count)
         queue.addRawDatagram(wideShard(0, flags: RtpVideoQueue.FLAG_SOF, payload: header), receiveTimeUs: 2_000)
         queue.addRawDatagram(wideShard(3, flags: 0, payload: garbage), receiveTimeUs: 2_001)
+        #expect(queue.fecFailedDataCount == -1)
         queue.addRawDatagram(wideShard(4, flags: 0, payload: garbage), receiveTimeUs: 2_002)
+        #expect(queue.fecFailedDataCount == 1)
+        #expect(queue.rsDecoderCache.count == 1)
         queue.addRawDatagram(wideShard(5, flags: 0, payload: garbage), receiveTimeUs: 2_003)
+        #expect(queue.fecFailedDataCount == 1)
         #expect(delegate.units.map(\.frameNumber) == [1])
         queue.addRawDatagram(wideShard(1, flags: 0, payload: body), receiveTimeUs: 2_004)
+        #expect(queue.fecFailedDataCount == 2)
         queue.addRawDatagram(wideShard(2, flags: RtpVideoQueue.FLAG_EOF, payload: body), receiveTimeUs: 2_005)
         #expect(delegate.units.map(\.frameNumber) == [1, 2])
         #expect(delegate.units.last?.buffers.first?.data == Data(body + body))
         #expect(queue.fecRecoveredFramesInWindow == 0)
+    }
+
+    /// Data plus parity over 255 shards can never decode: it is logged once per stream
+    /// and the block is not retried on every later parity packet.
+    @Test func hostileFecGeometryLogsOnceAndLatches() {
+        let queue = makeQueue()
+        func shard(_ fecIndex: Int) -> [UInt8] {
+            VideoWire.shard(seq: UInt16(fecIndex), frame: 1, fecIndex: fecIndex, dataCount: 200, fecPercent: 50,
+                            flags: fecIndex == 0 ? RtpVideoQueue.FLAG_SOF : 0, payload: [1])
+        }
+        func geometryLines() -> Int {
+            LogStore.shared.snapshot().filter { $0.message.contains("FEC geometry") }.count
+        }
+        let before = geometryLines()
+        for fecIndex in 0..<199 { queue.addRawDatagram(shard(fecIndex), receiveTimeUs: 1_000) }
+        #expect(queue.fecFailedDataCount == -1)
+        for fecIndex in 200..<210 { queue.addRawDatagram(shard(fecIndex), receiveTimeUs: 1_000) }
+        #expect(queue.fecFailedDataCount == 199)
+        #expect(queue.rsDecoderCache.isEmpty)
+        #expect(geometryLines() == before + 1)
     }
 
     /// Dropping a frame for a lost FEC block must not silence the report for the frame after it.

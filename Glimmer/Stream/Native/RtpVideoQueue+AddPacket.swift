@@ -284,6 +284,7 @@ extension RtpVideoQueue {
         missingPackets = 0
         useFastQueuePath = true
         reportedLostFrame = false
+        fecFailedDataCount = -1
         bufferDataPackets = Int((fecInfo & 0xFFC00000) >> 22)
         fecPercentage = Int((fecInfo & 0xFF0) >> 4)
         bufferParityPackets = (bufferDataPackets * fecPercentage + 99) / 100

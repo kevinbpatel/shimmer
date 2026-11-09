@@ -114,6 +114,12 @@ final class RtpVideoQueue {
     /// Single receive thread → no lock; bounded by the few shapes a stream uses.
     var rsDecoderCache: [ReedSolomonShape: ReedSolomon] = [:]
     struct ReedSolomonShape: Hashable { let ds: Int; let ps: Int }
+    static let rsDecoderCacheCap = 256
+    /// A host geometry ReedSolomon can't build (over 255 shards) logs once per stream.
+    var loggedBadFecGeometry = false
+    /// receivedDataPackets when this block's rebuild last failed: a retry can only
+    /// succeed once a late data shard changes the gap set. -1 = no failure yet.
+    var fecFailedDataCount = -1
 
     // MARK: - Receive-side reorder tolerance
     //
