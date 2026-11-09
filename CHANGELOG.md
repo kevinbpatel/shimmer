@@ -41,6 +41,13 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - `shimmerctl`: check connectivity, read logs and run test streams, locally
   or on another Mac over SSH ([docs/CLI.md](docs/CLI.md)).
 
+### Removed
+- glimmer's Wi-Fi helper, which paused AirDrop's radio during a stream. It
+  needed a root background daemon and a macOS approval, and macOS didn't keep
+  it registered reliably across updates. If an earlier build registered it,
+  the first launch marks it unregistered; macOS may keep the old job loaded
+  until the next restart.
+
 ### Ported from later glimmer releases
 - Identity storage never reads or deletes Keychain items (glimmer 8aaaaa5).
 - AV1 from AMD encoders, which pad 1080p to 1082 rows, decodes instead of
@@ -53,9 +60,6 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - Logs you copy or share, and `shimmerctl`'s view of them, hide PC names,
   addresses and error details; telemetry names machines by a per-install
   pseudonym.
-- The Wi-Fi helper accepts connections only from the Shimmer build it ships
-  with and runs with hardened-process protections. It previously required
-  glimmer's signing team, so Shimmer builds could never use it.
 - Audio: a packet that won't decode is concealed instead of dropped, the
   playout cushion recovers from under-runs without over-growing (gaps no
   cushion could bridge no longer count), audio FEC survives a misaligned

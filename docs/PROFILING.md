@@ -36,7 +36,6 @@ partition the output. The full list (grep `Logger(subsystem:` to verify):
 | Category               | File                                                                              |
 | ---------------------- | --------------------------------------------------------------------------------- |
 | `AppModel`             | `Glimmer/AppModel.swift`                                                          |
-| `AWDLHelper`           | `Glimmer/AWDLHelperManager.swift`                                                 |
 | `ContainerMigration`   | `Glimmer/ContainerMigration.swift`                                                |
 | `Diag.FileSink`        | `Glimmer/LogStore.swift`                                                          |
 | `DualSenseHID`         | `Glimmer/Stream/DualSenseHID.swift`                                               |
@@ -57,10 +56,6 @@ partition the output. The full list (grep `Logger(subsystem:` to verify):
 | `Stream.Telemetry`     | `TelemetryExporter`, `TelemetryFrameTrace`, `IOReportSampler`, `DisplayTelemetry` |
 | `Stream.VideoDecoder`  | `Glimmer/Stream/VideoDecoder.swift` (+ extensions)                                |
 | `Stream.Window`        | `Glimmer/Stream/StreamWindow.swift`                                               |
-
-The privileged AWDL helper is a separate process and logs under its own
-subsystem, `io.ugfugl.glimmer.helper` (lowercase `g`), with categories `main`,
-`AWDL`, and `XPC`.
 
 OSSignpost categories are different (they live on the same subsystem but a
 separate axis - see `Glimmer/Stream/Signposts.swift`):

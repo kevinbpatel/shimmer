@@ -312,8 +312,7 @@ the comment at `StreamBridgeContext.eventContinuation` (in
 `Logger` from `os`, never `print`, never `os_log`.
 
 - Subsystem: **`io.ugfugl.Glimmer`** (capital G). Every `Logger` in the app uses
-  this string; no `.Stream` suffix on the subsystem. The privileged AWDL helper
-  is a separate process and uses `io.ugfugl.glimmer.helper`.
+  this string; no `.Stream` suffix on the subsystem.
 - Category: per-file, dotted form `Stream.<Area>` for streaming-engine files.
   The current list is in [PROFILING.md](PROFILING.md#unified-log); add to it
   when you add a file, don't reuse a neighbour's category. Signposts sit on the

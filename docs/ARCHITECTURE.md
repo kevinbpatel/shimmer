@@ -8,11 +8,6 @@ GameStream/Sunshine transport is implemented in Swift under
 Opus (audio decode) and OpenSSL (identity / pairing / network crypto), plus a
 few inline shims in `CHelpers.h`.
 
-There is one other process, and it is not in the stream path: an opt-in root
-LaunchDaemon under `helper/` that parks the AirDrop radio (`awdl0`) for the
-duration of a stream. It is loaded through `SMAppService.daemon` and talks XPC.
-See [SECURITY.md](SECURITY.md) for why it exists and what it is allowed to do.
-
 ## Overview
 
 The user picks a host in the SwiftUI launcher, clicks Stream, and a borderless

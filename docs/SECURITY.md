@@ -12,9 +12,8 @@ About, or
 
 Public disclosure on GitHub Issues is acceptable for non-exploitable bugs (UI
 glitches, build failures, etc.). Anything involving the client identity, the
-pairing handshake, host-cert pinning, the stream-transport parsers, the
-privileged AWDL helper, or the Hardened Runtime posture should go through a
-private advisory first.
+pairing handshake, host-cert pinning, the stream-transport parsers, or the
+Hardened Runtime posture should go through a private advisory first.
 
 ## Threat model
 
@@ -220,14 +219,12 @@ the cert cannot also produce the PIN.
 
 **Glimmer runs UNSANDBOXED.** This is a deliberate trade, not an oversight.
 
-**Why no sandbox.** The Wi-Fi-stutter helper registers a root LaunchDaemon via
-`SMAppService.daemon`, and a sandboxed app cannot install or run a system
-daemon - the helper needs root to run `ifconfig awdl0 down`. The Mac App Store
-path was already closed independently: the root `SMAppService` daemon cannot be
-shipped sandboxed at all, and a sandboxed build would also need
-`com.apple.security.device.usb` (DualSense raw-HID adaptive triggers / haptics),
-a hard MAS reject. There was no sandboxed-and-shippable configuration to give
-up.
+**Why no sandbox.** Shimmer inherited this from glimmer, which went unsandboxed
+to install a root Wi-Fi helper. Shimmer has removed that helper, so nothing in
+the app runs as root or needs a system daemon any more. It stays unsandboxed
+because sandboxing it again is untested: raw-HID DualSense support would need
+`com.apple.security.device.usb` (a Mac App Store reject), and the bundled
+`shimmerctl` reads the app's state file and the unified log from outside it.
 
 **Compensating controls that remain:**
 
@@ -238,24 +235,6 @@ up.
 - **Developer-ID signing + notarization + stapling.** Release builds are signed
   with the team Developer ID, notarized by Apple, and the ticket is stapled to
   the app and DMG.
-- **Minimal-attack-surface helper.** The root daemon's XPC protocol is four
-  methods (`helper/Protocol.swift`), and exactly one of them changes anything:
-  `setAWDLDown(_:reason:)`. The other three (`currentStatus`, `ping`,
-  `reSuppressCount`) are read-only. It is not a run-anything-as-root backdoor.
-  Each connection carries a code-signing requirement the OS checks against the
-  caller's audit token (`helper/HelperAuthorization.swift`), derived from the
-  helper's own signature. A Developer ID helper requires
-  `identifier "com.kevinbpatel.shimmer" and anchor apple generic and certificate leaf[subject.OU] = "<the helper's team>"`
-  - the signed Shimmer app, not a process that merely claims the bundle id. An ad
-  hoc helper (local builds) has no team to pin, so it requires the exact cdhash
-  of the Shimmer.app it ships in, read per connection; there, write access to
-  that app bundle is the trust boundary. No requirement means no connection.
-  Only the connection that parked awdl0 can restore it by disconnecting, so a
-  second client that connects and leaves can't end a stream's suppression.
-- **Helper memory protections.** The helper is signed with the hardened-process
-  entitlements in `helper/Helper.entitlements` (hardened heap, read-only dyld
-  state, platform restrictions), and the build runs it with `--check-launch`
-  after signing to prove it still launches.
 
 **The defense-in-depth the sandbox used to provide** was containment of a
 memory-safety exploit in the streaming-protocol parsers reachable from a
@@ -280,7 +259,7 @@ is low-likelihood to begin with.
 
 | Key            | Value | Why                                                                     |
 | -------------- | ----- | ----------------------------------------------------------------------- |
-| `app-sandbox`  | false | Unsandboxed - required to install/run the root AWDL helper (see above). |
+| `app-sandbox`  | false | Unsandboxed (see above).                                                |
 | `cs.allow-jit` | false | No JIT.                                                                 |
 
 Unsandboxed builds carry no `device.*` exceptions - those are sandbox

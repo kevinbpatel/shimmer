@@ -13,8 +13,8 @@ import SwiftUI
 /// force-unwrapped URLs) so the pane renders link rows with a lint-clean
 /// `if let`; a malformed constant degrades to "row missing", never a crash.
 private enum AboutLink {
-    static let repo = "https://github.com/kevinbpatel/shimmer"
-    static let credits = "https://github.com/kevinbpatel/shimmer/blob/main/CREDITS.md"
+    static let repo = "https://github.com/slaughterhousesoftware/shimmer"
+    static let credits = "https://github.com/slaughterhousesoftware/shimmer/blob/main/CREDITS.md"
     static let upstream = "https://github.com/Se7enbrc/glimmer"
     static let license = "https://www.gnu.org/licenses/gpl-3.0.html"
     static let sunshine = "https://github.com/LizardByte/Sunshine"

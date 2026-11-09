@@ -515,10 +515,6 @@ final class TelemetryCounters: @unchecked Sendable {
     let reorderDispLock = os_unfair_lock_t.allocate(capacity: 1)
     var reorderDispValue: ReorderDisplacementSnapshot?
 
-    /// AWDL helper gauge (awdl0 parked + macOS re-raise count). Set by
-    /// AWDLHelperManager on the suppress heartbeat; read by the exporter. Self-locked.
-    let awdlHelperState = OSAllocatedUnfairLock<AWDLHelperSnapshot?>(initialState: nil)
-
     /// Host-RUMBLE receipt stamp (the last 0x010b receipt instant) - the detach-
     /// context breadcrumb's rumble-age source (ControllerForwarder.detach).
     /// Self-locked holder (the `P2State` idiom), defined in

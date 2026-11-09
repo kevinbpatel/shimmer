@@ -47,8 +47,6 @@ private struct WindowChromeTweak: NSViewRepresentable {
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
-    @State private var showAWDLPrompt = false
-    @State private var awdlPromptChecked = false
 
     var body: some View {
         @Bindable var model = model
@@ -63,35 +61,11 @@ struct MainWindow: View {
             Button("Enable") { model.enableRawHIDFromPrompt() }
             // "Not Now" just dismisses - no permanent flag - so a future
             // DualSense connect offers again. Only "Don't Ask Again" answers
-            // for good (matches AWDLEnablePrompt's Not Now / Don't ask again
-            // split). declineRawHIDPrompt() already sets the permanent flag.
+            // for good. declineRawHIDPrompt() already sets the permanent flag.
             Button("Not Now", role: .cancel) { model.showRawHIDPrompt = false }
             Button("Don't Ask Again") { model.declineRawHIDPrompt() }
         } message: {
             Text(AppModel.rawHIDExplanation)
-        }
-        // One-time launch nudge to enable Wi-Fi stutter protection. Only for
-        // users who've paired a PC (skips first-run onboarding), never while the
-        // rawHID prompt is up; "Don't ask again" inside silences it for good.
-        .sheet(isPresented: $showAWDLPrompt) {
-            AWDLEnablePrompt(manager: AWDLHelperManager.shared)
-        }
-        .task {
-            guard !awdlPromptChecked else { return }
-            awdlPromptChecked = true
-            // Let hosts load + the window settle before deciding - checking
-            // hosts.isEmpty immediately on appear raced the async host load,
-            // so the prompt never fired.
-            try? await Task.sleep(for: .seconds(1.0))
-            AWDLHelperManager.shared.refresh()
-            // Parking awdl0 only smooths Wi-Fi; on a confirmed wired route it's
-            // a privileged-helper install for nothing. Suppress ONLY on .wired -
-            // Wi-Fi / tunnel / still-resolving unknown still prompt.
-            guard !model.hosts.isEmpty,
-                  !model.showRawHIDPrompt,
-                  model.hostRoute.routeClass != .wired,
-                  AWDLHelperManager.shared.shouldPromptToEnable else { return }
-            showAWDLPrompt = true
         }
         // No .frame: forcing either axis to .infinity gives the window an
         // unbounded box to fill, and the only thing available to fill it with is

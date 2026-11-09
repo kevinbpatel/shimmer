@@ -45,17 +45,14 @@ COMMANDS_DIR = STATE_FILE.parent / "agent-commands"
 # `auto` marks fixes safe to apply without asking; the others open a System
 # Settings pane where a person has to flip a switch.
 FIXES = {
-    "refresh": ("refresh", True, "Re-check the PC, the helpers and permissions"),
-    "wifi-helper": ("repair-wifi-helper", True, "Re-register the Wi-Fi helper so launchd can start it"),
+    "refresh": ("refresh", True, "Re-check the PC, the login helper and permissions"),
     "login-item": ("repair-login-item", True, "Re-register the launch-at-login helper"),
     "cancel-connect": ("cancel-connect", True, "Cancel a stream that is stuck connecting"),
     "approve-background": ("open-login-items", False, "Open Login Items; switch Shimmer on"),
     "input-monitoring": ("open-input-monitoring", False, "Open Input Monitoring; switch Shimmer on, then relaunch"),
     "open-settings": ("open-settings", False, "Show Shimmer's window (optionally --tab)"),
 }
-ISSUE_FIX = {"host_status_loading": "refresh", "wifi_helper_not_running": "wifi-helper",
-             "wifi_helper_unavailable": "wifi-helper", "login_item_broken": "login-item",
-             "wifi_helper_needs_approval": "approve-background",
+ISSUE_FIX = {"host_status_loading": "refresh", "login_item_broken": "login-item",
              "login_item_needs_approval": "approve-background",
              "input_monitoring_off": "input-monitoring"}
 
@@ -136,11 +133,6 @@ def fix(args):
     if args.what == "auto":
         state = send(args.app, "refresh")
         applied, manual = [], []
-        # launchd can hold a helper job it can't spawn while the app only sees
-        # "waiting for approval"; re-registering gives it a fresh job either way.
-        if launchd_job("io.ugfugl.glimmer.helper").get("spawn_failing"):
-            send(args.app, FIXES["wifi-helper"][0], timeout=25)
-            applied.append("wifi-helper")
         for item in state.get("issues", []):
             name = ISSUE_FIX.get(item["id"])
             if name and FIXES[name][1] and name not in applied:
@@ -221,10 +213,9 @@ def doctor(args):
     if state:
         result["app"] = {key: state.get(key) for key in
                          ("ui", "selected_host", "stream", "controller", "permissions",
-                          "wifi_helper", "login_item", "loading", "issues")}
+                          "login_item", "loading", "issues")}
         result["app"]["stale"] = state.get("stale")
-    result["launchd"] = {"wifi_helper": launchd_job("io.ugfugl.glimmer.helper"),
-                         "login_helper": launchd_job("com.kevinbpatel.shimmer.LoginHelper",
+    result["launchd"] = {"login_helper": launchd_job("com.kevinbpatel.shimmer.LoginHelper",
                                                      "gui/%d" % __import__("os").getuid())}
     if not args.host and state:
         selected = state.get("selected_host") or {}
@@ -252,8 +243,6 @@ def doctor(args):
     issues = (result.get("app") or {}).get("issues") or []
     result["fixes"] = sorted({"shimmerctl fix " + ISSUE_FIX[item["id"]]
                               for item in issues if item["id"] in ISSUE_FIX})
-    if result["launchd"]["wifi_helper"].get("spawn_failing"):
-        result["fixes"] = sorted(set(result["fixes"]) | {"shimmerctl fix wifi-helper"})
     result["guidance"] = {
         "macos_local_network_denied": "Allow Shimmer in macOS Privacy & Security > Local Network.",
         "secure_port_unreachable": "The PC answers on HTTP but not HTTPS. Check Sunshine's HTTPS listener and firewall. An exhausted accept queue requires restarting Sunshine; re-pairing does not repair that listener.",

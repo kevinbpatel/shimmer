@@ -6,8 +6,8 @@
 //
 //  STATE. The app keeps ~/Library/Application Support/Shimmer/agent-state.json
 //  current: what's on screen, the selected PC and whether its status is still
-//  loading, the stream phase, the controller, the permissions and both
-//  background helpers, plus a list of `issues`, each with the shimmerctl
+//  loading, the stream phase, the controller, the permissions and the
+//  login helper, plus a list of `issues`, each with the shimmerctl
 //  command that fixes it. Rewritten whenever something in it changes (checked
 //  every 2 s) and after every command. Local file, owner-only; no network
 //  listener.
@@ -44,7 +44,6 @@ final class AgentControl: NSObject {
     /// quits a game on the PC, or changes a setting.
     enum Command: String, CaseIterable {
         case state, refresh
-        case repairWifiHelper = "repair-wifi-helper"
         case repairLoginItem = "repair-login-item"
         case openSettings = "open-settings"
         case openLoginItems = "open-login-items"
@@ -129,7 +128,6 @@ final class AgentControl: NSObject {
         case .state:
             finish(id: id, name: name, result: "ok")
         case .refresh:
-            AWDLHelperManager.shared.refresh()
             guard let model, let host = model.selectedHost else {
                 finish(id: id, name: name, result: "ok")
                 return
@@ -145,12 +143,6 @@ final class AgentControl: NSObject {
                 if once.claim() {
                     self.finish(id: id, name: name, result: "ok; the PC's status is still being checked")
                 }
-            }
-        case .repairWifiHelper:
-            AWDLHelperManager.shared.repair()
-            // Registration settles asynchronously; report what it settled to.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-                self.finish(id: id, name: name, result: "re-registered; wifi_helper shows the outcome")
             }
         case .repairLoginItem:
             LoginItemManager.reconcile()
@@ -216,7 +208,6 @@ final class AgentControl: NSObject {
                          lastCommand: [String: String]?) -> [String: Any] {
         let bundle = Bundle.main
         let mainOpen = NSApp.windows.contains { $0.identifier?.rawValue == "main" && $0.isVisible }
-        let helper = AWDLHelperManager.shared
         let loginStatus = LoginItemManager.currentStatus
         let wantsLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
         let inputMonitoring = Self.inputMonitoringStatus()
@@ -258,22 +249,6 @@ final class AgentControl: NSObject {
             issue("stream_error", error, "shimmerctl logs --last 10m")
         }
 
-        let helperState: String
-        switch helper.state {
-        case .enabled: helperState = "enabled"
-        case .notRunning:
-            helperState = "approved but macOS can't start it"
-            issue("wifi_helper_not_running", "The Wi-Fi helper is approved but launchd can't start it",
-                  "shimmerctl fix wifi-helper")
-        case .requiresApproval:
-            helperState = "waiting for approval"
-            issue("wifi_helper_needs_approval", "The Wi-Fi helper is waiting for approval",
-                  "shimmerctl fix approve-background (opens Login Items; the user switches Shimmer on)")
-        case .notRegistered: helperState = "off"
-        case .unavailable(let why): helperState = "unavailable: \(why)"
-            issue("wifi_helper_unavailable", why, "shimmerctl fix wifi-helper")
-        }
-
         if wantsLogin {
             if loginStatus == .requiresApproval {
                 issue("login_item_needs_approval", "\"Be ready at login\" is waiting for approval",
@@ -312,7 +287,6 @@ final class AgentControl: NSObject {
                            "battery_percent": model.menuBarControllerBattery?.percent ?? -1],
             "permissions": ["input_monitoring": inputMonitoring,
                             "raw_controller_buttons_enabled": model.rawHIDControllerEnabled],
-            "wifi_helper": ["state": helperState, "suppressing_awdl": helper.suppressing],
             "login_item": ["wanted": wantsLogin,
                            "status": LoginItemManager.statusLabel(loginStatus)],
             "loading": loading,

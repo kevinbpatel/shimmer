@@ -27,16 +27,16 @@ scripts/shimmerctl test-stream --host gaming-pc --seconds 12
 
 1. `shimmerctl doctor`. With no `--host` it uses the PC selected in Shimmer.
    It reports the running app's own state - which screen is up, the selected
-   PC's status, the stream phase, anything still `loading`, permissions, both
-   background helpers - plus launchd's view of those helpers (a helper launchd
-   can't spawn shows `spawn_failing`), the PC's ports, and a `fixes` list.
+   PC's status, the stream phase, anything still `loading`, permissions, the
+   login helper - plus launchd's view of that helper (one launchd can't spawn
+   shows `spawn_failing`), the PC's ports, and a `fixes` list.
 2. `shimmerctl fix auto` applies every fix that needs no person: re-checking
-   the PC (`refresh`), re-registering a Wi-Fi or login helper launchd can't
-   start (`wifi-helper`, `login-item`), cancelling a stuck connect
-   (`cancel-connect`). It lists the rest under `needs_a_person`.
+   the PC (`refresh`), re-registering a login helper launchd can't start
+   (`login-item`), cancelling a stuck connect (`cancel-connect`). It lists the
+   rest under `needs_a_person`.
 3. The rest open the right System Settings pane, where someone has to flip a
-   switch: `fix approve-background` (Login Items & Extensions, for the Wi-Fi
-   helper and "Be ready at login") and `fix input-monitoring` (then relaunch).
+   switch: `fix approve-background` (Login Items & Extensions, for "Be ready
+   at login") and `fix input-monitoring` (then relaunch).
 4. `shimmerctl fix relaunch` quits and reopens Shimmer when the app itself is
    stuck or doesn't answer.
 

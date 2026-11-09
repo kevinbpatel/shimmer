@@ -121,7 +121,6 @@ extension TelemetryCounters {
         os_unfair_lock_lock(gapLock); packetGapValue = nil; os_unfair_lock_unlock(gapLock)
         os_unfair_lock_lock(decodeStateLock); decodeStateValue = nil; os_unfair_lock_unlock(decodeStateLock)
         os_unfair_lock_lock(fecHealthLock); fecHealthValue = nil; os_unfair_lock_unlock(fecHealthLock)
-        awdlHelperState.withLock { $0 = nil }
         os_unfair_lock_lock(audioStateLock)
         audioStateValue = nil; audioBufferFillMinMsValue = .infinity
         os_unfair_lock_unlock(audioStateLock)

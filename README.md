@@ -63,7 +63,7 @@ is a nod to the moonlight → sunshine → glimmer lineage it sits in.
 
 shimmer is based on glimmer 2026.9.0, plus fixes ported from later glimmer
 releases (AV1 from AMD encoders, DualSense identity at stream start, packet
-source checks, private logs, Wi-Fi helper hardening). glimmer has kept moving
+source checks, private logs, stream reliability). glimmer has kept moving
 since - it now has its own floating Mini Player, iOS apps, and a separate
 streaming engine framework. Merging those back in is planned; until then, if
 you don't need macOS's system Picture in Picture, glimmer itself is the more
@@ -85,8 +85,6 @@ actively maintained choice.
 - **Mouse and keyboard.** Raw 1:1 aim with the Mac's pointer acceleration
   removed, a velocity-gated boost on fast flicks, optional ⌘-shortcut
   forwarding.
-- **Wi-Fi.** An optional helper parks AWDL (AirDrop's radio time-share) during a
-  stream - the usual cause of multi-second Wi-Fi freezes.
 - **Hosts.** mDNS discovery, PIN pairing, hosts by IP or name (Tailscale works),
   one-time import of moonlight-qt pairings.
 - **Mac things.** Menu bar item, display-matched quality presets, stats overlay,
@@ -102,23 +100,19 @@ Homebrew tap yet, and it does not auto-update (the upstream update feed is
 deliberately disconnected so a shimmer build never replaces itself with stock
 glimmer).
 
-Signed ad-hoc when built locally, not sandboxed, not on the App Store - the
-Wi-Fi helper needs that freedom ([docs/SECURITY.md](docs/SECURITY.md)).
+Signed ad-hoc when built locally, not sandboxed, not on the App Store
+([docs/SECURITY.md](docs/SECURITY.md)).
 
 Your host needs Sunshine and a display that can present the exact mode you ask
 for: a virtual display driver on Windows, a current Sunshine on Linux.
 [docs/HOST_SETUP.md](docs/HOST_SETUP.md).
-
-The Wi-Fi helper lives in Stream › Wi-Fi; macOS asks for one
-approval under Login Items & Extensions. If it reports `rejected by BTM`, run
-`sudo sfltool resetbtm` once.
 
 ## Build
 
 Xcode 26 (Swift 6) and Homebrew.
 
 ```bash
-git clone https://github.com/kevinbpatel/shimmer.git
+git clone https://github.com/slaughterhousesoftware/shimmer.git
 cd shimmer
 brew install openssl@3 opus
 make
@@ -128,8 +122,8 @@ make
 ships. `make app` compile-checks, `make test` runs the unit tests,
 `make uninstall` removes it. Without an Apple Developer ID, run
 `make local-signing-setup` once first: builds are then signed with a stable
-self-signed identity instead of ad hoc, so macOS keeps Input Monitoring and
-the Wi-Fi helper's approval across rebuilds. The engine is under `Glimmer/Stream/` (the source
+self-signed identity instead of ad hoc, so macOS keeps Input Monitoring
+across rebuilds. The engine is under `Glimmer/Stream/` (the source
 tree and Swift module keep glimmer's name; the app, bundle id
 `com.kevinbpatel.shimmer`, and data folders are Shimmer's). Upgrading from a
 glimmer install is automatic: on first launch Shimmer copies your pairings,

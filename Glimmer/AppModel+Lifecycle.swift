@@ -29,11 +29,19 @@ extension AppModel {
         // it now. This is the fix for "doesn't start after reboot" - the next
         // reboot picks up the freshly-reconciled registration.
         LoginItemManager.reconcile()
-        // Same self-heal for the privileged AWDL daemon: an app update / reinstall
-        // swaps the bundle (and the daemon binary inside it), which can wedge the
-        // SMAppService registration. Re-assert it so the post-update stream uses
-        // the new daemon without the user re-toggling anything.
-        AWDLHelperManager.shared.reconcileAfterUpdate()
+        // Earlier builds could register a root Wi-Fi helper (since removed).
+        // Unregister it once. Without the helper's plist in the bundle this
+        // only marks the record unregistered - smd can't boot the job out, so
+        // launchd keeps it until the next restart.
+        if !UserDefaults.standard.bool(forKey: "legacyNetworkHelperRemoved") {
+            Task { @MainActor in
+                try? await SMAppService.daemon(plistName: "io.ugfugl.glimmer.helper.plist").unregister()
+                for key in ["awdlHelperEnabled", "awdlHelperPromptSuppressed"] {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+                UserDefaults.standard.set(true, forKey: "legacyNetworkHelperRemoved")
+            }
+        }
         log.info("Shimmer stream engine: Swift-native")
         migrateFromMoonlightQtIfNeeded()
         loadHosts()

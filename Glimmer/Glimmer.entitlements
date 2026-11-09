@@ -2,12 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Glimmer runs UNSANDBOXED: it registers a root AWDL LaunchDaemon via
-	     SMAppService, which App Sandbox forbids. Stays Hardened Runtime +
-	     Developer-ID + notarized; MAS was already out (device.usb + library
-	     validation). Rationale + threat model: docs/SECURITY.md. Unsandboxed
-	     needs no network/files/device/temporary-exception keys - only the
-	     Hardened-Runtime ones remain. -->
+	<!-- Shimmer runs UNSANDBOXED. It was unsandboxed for a root Wi-Fi helper
+	     that has since been removed; running it sandboxed again is untested
+	     (raw HID, the bundled CLI and its state file would all need
+	     entitlements). Stays Hardened Runtime. See docs/SECURITY.md. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
 

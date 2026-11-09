@@ -2,8 +2,7 @@
 //  SettingsVideoPane.swift
 //
 //  The Video pane: the codec the selected PC is allowed to send (the same
-//  per-host preference the launcher's context menu edits), HDR, and the Wi-Fi
-//  smoothing helper (it improves the stream, so it lives on the Stream tab).
+//  per-host preference the launcher's context menu edits) and HDR.
 //  Size / rate / bitrate belong to the Stream pane. The stats overlay moved to
 //  General, next to Troubleshooting - it is a diagnostic, not a picture setting.
 //
@@ -29,17 +28,6 @@ struct VideoPane: View {
             })
     }
 
-    /// The privileged AWDL network helper (parks awdl0 during streams).
-    @ObservedObject private var awdl = AWDLHelperManager.shared
-
-    /// Defer the register/unregister off the SwiftUI update transaction -
-    /// running the XPC-backed call inline mid-update dismissed the window.
-    private func scheduleHelperToggle(_ enable: Bool) {
-        Task { @MainActor in
-            if enable { AWDLHelperManager.shared.enable() } else { AWDLHelperManager.shared.disable() }
-        }
-    }
-
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: SettingsMetrics.rowSpacing) {
@@ -61,45 +49,8 @@ struct VideoPane: View {
             SettingsField("HDR") {
                 Toggle("Brighter highlights, deeper colour", isOn: $model.customHDR)
             }
-
-            SettingsField("Wi-Fi") {
-                // Waiting for approval, the setting isn't on, so it never shows
-                // a tick: a red dot stands in the checkbox's place until the
-                // user allows Shimmer in the background.
-                if case .requiresApproval = awdl.state {
-                    // Like Tailscale: a row with a trailing button carries no
-                    // description under it; the explanation is the tooltip
-                    // until the checkbox (and its description) comes back.
-                    SettingsNotice(message: "Reduce lag spikes on Wi-Fi", firstInGroup: true) {
-                        Button("Open Settings…") { awdl.openSystemSettings() }
-                    }
-                    .help("Turn on Shimmer under Allow in the Background. AirDrop, AirPlay and "
-                        + "Sidecar share your Wi-Fi radio and can interrupt the stream; this pauses "
-                        + "them while you play.")
-                } else {
-                    Toggle("Reduce lag spikes on Wi-Fi",
-                           isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
-                    SettingsHelp("AirDrop, AirPlay and Sidecar share your Wi-Fi radio and can interrupt the "
-                        + "stream. This pauses them while you play. Not needed on Ethernet.")
-                }
-                if case .notRunning = awdl.state {
-                    SettingsNotice(message: "The network helper is approved, but macOS can't start it.") {
-                        Button("Repair") { awdl.repair() }
-                    }
-                }
-                if case .unavailable(let why) = awdl.state {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Network helper unavailable: \(why)", systemImage: "xmark.octagon")
-                            .font(.system(size: 12)).foregroundStyle(.red)
-                        if let url = awdl.recoveryDocURL {
-                            Link("How to manage login items (Apple Support)", destination: url)
-                                .font(.system(size: 12))
-                        }
-                    }
-                }
-            }
         }
-        .onAppear { reloadCodec(); awdl.refresh() }
+        .onAppear { reloadCodec() }
         .onChange(of: model.selectedHost?.id) { _, _ in reloadCodec() }
     }
 

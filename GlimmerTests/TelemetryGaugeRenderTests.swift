@@ -15,7 +15,6 @@ struct TelemetryGaugeRenderTests {
         var snap = TelemetrySnapshot()
         snap.presentOnTimeCount = 4_321
         snap.presentLateCount = 1_234
-        snap.awdlReSuppressTotal = 77
         snap.resource = ResourceSnapshot(physFootprintBytes: 987_654_321)
         let lines = TelemetryRenderer.prometheus(snap, extras: TelemetrySnapshot.Extras())
             .split(separator: "\n").filter { !$0.hasPrefix("#") }
@@ -25,7 +24,6 @@ struct TelemetryGaugeRenderTests {
         }
         #expect(value("glimmer_present_on_time_frames") == "4321")
         #expect(value("glimmer_present_late_frames") == "1234")
-        #expect(value("glimmer_awdl_resuppress_total") == "77")
         #expect(value("glimmer_process_phys_footprint_bytes") == "987654321")
     }
 }

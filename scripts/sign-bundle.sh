@@ -34,15 +34,13 @@ KCF=""; [ -n "$KC" ] && [ "$ID" != "-" ] && KCF="--keychain $KC"
 # timestamp; ad hoc and the local self-signed identity skip the round-trip.
 case "$ID" in "Developer ID Application:"*) TS="--timestamp" ;; *) TS="--timestamp=none" ;; esac
 
-# The two background items (the login helper and the AWDL LaunchDaemon) are
-# signed ad hoc unless the identity is a Developer ID. Background Task
-# Management pins each item's launch requirement to how it was signed when it
-# was registered, and can only re-pin a rebuilt item that is ad hoc (cdhash) or
-# Team-ID signed; a team-less certificate - the local self-signed identity -
-# fails the update (`Unable to update LWCR with smd: 22`) and launchd then
-# refuses to spawn the item at all. The app keeps the stable identity, which is
-# what privacy grants key on, and the AWDL helper authorizes its clients by the
-# app's own designated requirement, so nothing else changes.
+# The login helper is signed ad hoc unless the identity is a Developer ID.
+# Background Task Management pins a launch item's requirement to how it was
+# signed when it was registered, and can only re-pin a rebuilt item that is ad
+# hoc (cdhash) or Team-ID signed; a team-less certificate - the local
+# self-signed identity - fails the update (`Unable to update LWCR with smd: 22`)
+# and launchd then refuses to spawn the item at all. The app keeps the stable
+# identity, which is what privacy grants key on.
 case "$ID" in
 	"Developer ID Application:"*) BG_ID="$ID"; BG_KCF="$KCF" ;;
 	*) BG_ID="-"; BG_KCF="" ;;
@@ -78,17 +76,6 @@ if [ -d "$HELPER" ]; then
 		codesign --force --options runtime $TS $BG_KCF --sign "$BG_ID" \
 			--preserve-metadata=entitlements,identifier "$HELPER"
 	fi
-fi
-
-DAEMON="$APP/Contents/MacOS/io.ugfugl.glimmer.helper"
-DAEMON_ENT="helper/Helper.entitlements"
-if [ -f "$DAEMON" ]; then
-	echo "Signing the AWDL network helper (root LaunchDaemon, hardened runtime + memory protections)"
-	codesign --force --options runtime $TS $BG_KCF --sign "$BG_ID" --identifier "io.ugfugl.glimmer.helper" \
-		--entitlements "$DAEMON_ENT" "$DAEMON"
-	# AMFI kills a binary whose entitlements its signature can't carry; catch that
-	# here rather than as a helper that silently never starts.
-	"$DAEMON" --check-launch || { echo "ERR: the signed AWDL helper does not launch" >&2; exit 1; }
 fi
 
 echo "Signing the app bundle (app entitlements, no --deep)"

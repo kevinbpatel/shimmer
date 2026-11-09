@@ -338,10 +338,6 @@ extension TelemetryExporter {
             snap.fecPercentage = fec.fecPercentage
             snap.fecParityMargin = fec.parityMargin
         }
-        if let awdl = counters.awdlHelper {
-            snap.awdlSuppressing = awdl.suppressing
-            snap.awdlReSuppressTotal = awdl.reSuppressTotal
-        }
         if let reorder = counters.reorderDisplacement {
             snap.reorderDispMaxMs = reorder.maxMs
             snap.reorderDispMaxPackets = reorder.maxPackets

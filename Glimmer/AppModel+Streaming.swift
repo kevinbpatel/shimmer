@@ -152,14 +152,6 @@ extension AppModel {
         activeStreamHostID = host.id
         activeStreamHasVideo = false
         isStreaming = true
-        // Park awdl0 for the life of the stream - but ONLY off a confirmed-wired
-        // route. AWDL contention is a single-radio Wi-Fi problem; on Ethernet,
-        // parking awdl0 just disables AirDrop/Continuity system-wide for nothing.
-        // Wi-Fi/tunnel/unknown still engage (no-op unless the helper is enabled);
-        // cleanupAfterStream releases it on every exit path.
-        if hostRoute.routeClass != .wired {
-            AWDLHelperManager.shared.suppressForStream()
-        }
         // Cancel the chip poller while the stream is up - the native
         // engine reports its own RTT to the stats overlay, and polling
         // /serverinfo concurrently with the RTSP handshake confuses both
@@ -337,10 +329,6 @@ extension AppModel {
         self.streamPhase = .idle
         self.isStreaming = false
         self.activeStreamApp = nil
-        // Restore awdl0 (AirDrop/Continuity) now the stream is down - covers the
-        // clean-stop, error, and user-cancel paths since this is the single
-        // teardown site. No-op if the helper was never engaged.
-        AWDLHelperManager.shared.releaseForStream()
         self.nativeStreamBackgrounded = false
         self.nativeStreamPictureInPicture = false
         self.nativeSession = nil

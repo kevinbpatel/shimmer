@@ -71,16 +71,6 @@ extension TelemetryRenderer {
                      + "(parity - data deficit); absent on windows with no recovery. Trends "
                      + "toward 0 before a frame goes unrecoverable.",
                      snap.fecParityMargin.map(Double.init))
-        // AWDL helper: awdl0 parked + how hard macOS fights it back up (resuppress
-        // climbs on a contested link, ~0 on a clean one). Emit 0 (not absent) when
-        // the helper never engaged, so off != missing-data for degraded-link coverage.
-        builder.emit("glimmer_awdl_suppressing",
-                     "awdl0 parked by the Wi-Fi helper this stream (1 = parked, 0 = not/helper off).",
-                     (snap.awdlSuppressing ?? false) ? 1.0 : 0.0)
-        builder.emit("glimmer_awdl_resuppress_total",
-                     "Times macOS re-raised awdl0 this stream - the AWDL-contention rate the helper fights "
-                     + "(per-stream; high on a contested link).",
-                     snap.awdlReSuppressTotal.map { Double($0) })
         builder.emit("glimmer_net_packets_per_second", "Video packets received per second.", snap.packetsPerSecond)
         builder.emit("glimmer_net_rtt_ms", "ENet RTT estimate (high-res local clock), ms.", snap.rttMs)
         builder.emit("glimmer_net_rtt_variance_ms", "ENet RTT variance, ms.", snap.rttVarianceMs)

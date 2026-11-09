@@ -100,15 +100,6 @@ struct DiagMessageTests {
         let plain = try #require(entries.first { $0.message.hasSuffix("plain") })
         #expect(plain.redactedMessage == nil && plain.shareable == plain.plain)
     }
-
-    /// Shimmer's AWDL helper state carries SMAppService error text; only that part is private.
-    @Test @MainActor func awdlHelperStateKeepsItsErrorTextPrivate() {
-        let unavailable = AWDLHelperManager.State.unavailable("/Users/someone/Shimmer.app: denied")
-        #expect(unavailable.diagDescription.systemLogText == "unavailable(\"<private>\")")
-        #expect(unavailable.diagDescription.text.contains("/Users/someone"))
-        let enabled = AWDLHelperManager.State.enabled.diagDescription
-        #expect(enabled.systemLogText == "enabled" && enabled.text == "enabled")
-    }
 }
 
 struct SessionFilePrivacyTests {
