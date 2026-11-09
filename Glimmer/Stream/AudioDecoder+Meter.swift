@@ -181,6 +181,10 @@ extension AudioDecoder {
             playoutStarted = true
             driftAnchorNanos = DispatchTime.now().uptimeNanoseconds
             driftAnchorFramesPlayed = framesPlayed
+            // A new playout segment judges its drift afresh: a prior segment's
+            // failure must not hold this one's cushion release.
+            resamplerDriftWindow = ResamplerDriftWindow()
+            resamplerSkewConverged = false
             // Stall watchdog: the arm edge IS progress (a paused cold pre-roll or
             // a post-recovery rebuild starts its 3s clock here, not at zero), and
             // a recovery episode ends at the edge it exists to reach.
@@ -361,6 +365,8 @@ extension AudioDecoder {
     /// value means the audio clock is running slow relative to wall time.
     func publishAudioState() {
         audioMeterLock.lock()
+        // Later route or resampler work must not add its latency to this snapshot's drift.
+        let observedAtNanos = DispatchTime.now().uptimeNanoseconds
         let aheadFrames = framesScheduled &- framesPlayed
         let residentSilenceFrames = pendingSilenceFrames
         let rate = meterSampleRate
@@ -402,9 +408,8 @@ extension AudioDecoder {
         // are both relative to the segment anchor (re-baselined on each restart),
         // so a prior drain's wall-vs-media gap is excluded rather than pinned.
         if started, anchorNanos != 0, playedFrames >= anchorFramesPlayed {
-            let now = DispatchTime.now().uptimeNanoseconds
-            if now >= anchorNanos {
-                let wallElapsedMs = Double(now &- anchorNanos) / 1_000_000.0
+            if observedAtNanos >= anchorNanos {
+                let wallElapsedMs = Double(observedAtNanos &- anchorNanos) / 1_000_000.0
                 let segmentFramesPlayed = playedFrames &- anchorFramesPlayed
                 let mediaPlayedMs = Double(segmentFramesPlayed) / rate * 1000.0
                 // Slip of media-played behind wall time, net of the steady buffer
@@ -414,17 +419,19 @@ extension AudioDecoder {
             }
         }
         // MIRROR the resampler-converged verdict into the meter-lock domain so the
-        // cushion shallow-release (completion thread, under the lock) reads it safely
-        // instead of touching this lockless publish-path state. Converged = the loop
-        // is carrying the skew within its real envelope (|integral| bounded AND drift
-        // bounded, or drift not yet measured). Railing ⇒ deep cushion is load-bearing.
-        let driftBounded = driftMs.map { abs($0) <= Self.cushionReleaseDriftBoundMs } ?? true
-        // Read the PI state under the meter lock (driveResampler mutates it under the
-        // same lock) so the converged verdict + the published ppm can't tear against
-        // the completion-thread driveResampler call.
+        // cushion shallow-release (completion thread, under the lock) reads it safely.
+        // Converged = the loop is carrying the skew within its real envelope: |integral|
+        // bounded AND recent drift stable (or not yet measured). Absolute drift can't
+        // judge it - a correctly compensated clock accumulates offset from wall time
+        // while its buffer stays full. A segment restart can race this snapshot, so
+        // only its own samples may update the window; both callers share the lock.
         audioMeterLock.lock()
-        let converged = abs(resamplerIntegralPpm) <= Self.cushionReleaseSkewPpm && driftBounded
-        resamplerSkewConverged = converged
+        if anchorNanos == driftAnchorNanos {
+            let driftBounded = driftMs.map {
+                resamplerDriftWindow.observe(driftMs: $0, now: observedAtNanos)
+            } ?? true
+            resamplerSkewConverged = abs(resamplerIntegralPpm) <= Self.cushionReleaseSkewPpm && driftBounded
+        }
         let appliedPpm = resamplerEpsPpm
         audioMeterLock.unlock()
         TelemetryCounters.shared.setAudioState(
