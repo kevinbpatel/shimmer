@@ -111,31 +111,53 @@ extension EnetControlChannel {
         }
     }
 
+    /// Floor (ms) between wire IDRs, and between wire RFIs: the old one-per-20 ms
+    /// control tick's spacing (see `recoverySpacingMs`).
+    static let recoveryMinSpacingMs: UInt32 = 20
+
+    /// Repeats of one request kind wait for the previous one's answer: on a 50 ms
+    /// tunnel the 20 ms tick let two or three identical requests leave before the
+    /// first could land. Unsampled RTT changes nothing; capped at 1 s.
+    static func recoverySpacingMs(rttMs: Double?) -> UInt32 {
+        max(recoveryMinSpacingMs, UInt32(min(rttMs ?? 0, 1000)))
+    }
+
     /// Drain the coalesced IDR/RFI requests onto the wire. Called once per
     /// control-loop tick (controlLoopTick) on the loop's dedicated thread -
     /// the single drain point that mirrors moonlight's requestIdrFrameFunc
-    /// (ControlStream.c:1624-1640). Sends AT MOST ONE REQUEST_IDR and AT MOST
-    /// ONE RFI per tick; an IDR supersedes a same-tick RFI. stateLock is taken
-    /// only to read+clear the flags, never across the (blocking) send.
+    /// (ControlStream.c:1624-1640). Sends AT MOST ONE REQUEST_IDR or RFI per
+    /// tick; an IDR supersedes a same-tick RFI. A repeat of the kind sent last
+    /// waits `recoverySpacingMs` and stays pending until then; the first request
+    /// of a loss event leaves on the next tick. stateLock is taken only to
+    /// read+clear the flags, never across the (blocking) send.
     func drainPendingRecoveryRequests() {
+        let now = serviceTimeMs
         let (sendIdr, rfi): (Bool, (from: Int, to: Int)?) = withState {
-            let idr = idrPending
-            idrPending = false
-            // An IDR supersedes the RFI (redundant once we ask for a full IDR).
-            let window = idr ? nil : pendingRfi
+            let spacing = Self.recoverySpacingMs(rttMs: hasRttSample ? roundTripTime : nil)
+            if idrPending {
+                // An IDR supersedes the RFI (redundant once we ask for a full IDR).
+                pendingRfi = nil
+                guard lastIdrSentMs.map({ now &- $0 >= spacing }) ?? true else { return (false, nil) }
+                idrPending = false
+                return (true, nil)
+            }
+            guard let window = pendingRfi,
+                  lastRfiSentMs.map({ now &- $0 >= spacing }) ?? true else { return (false, nil) }
             pendingRfi = nil
-            return (idr, window)
+            return (false, window)
         }
         if sendIdr {
+            lastIdrSentMs = now
             sendIdrFrameNow()
         } else if let rfi {
+            lastRfiSentMs = now
             sendRfiNow(from: rfi.from, to: rfi.to)
         }
     }
 
     /// Send one REQUEST_IDR on the wire (gen7Enc: type 0x0302, payload {0,0},
     /// URGENT chan, RELIABLE). ControlStream.c:1521. Only reached from
-    /// `drainPendingRecoveryRequests`, so exactly one fires per loss event.
+    /// `drainPendingRecoveryRequests`, which spaces repeats `recoverySpacingMs`.
     private func sendIdrFrameNow() {
         do {
             _ = try sendEncryptedControl(

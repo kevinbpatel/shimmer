@@ -320,4 +320,58 @@ struct EnetControlChannelTests {
         #expect(order.held.isEmpty)
         #expect(order.next == UInt16(EnetInboundOrder.maxHeld + 3))
     }
+
+    // MARK: Recovery request spacing
+
+    static func urgentRelSeq(_ channel: EnetControlChannel) -> UInt16 {
+        channel.withState { channel.channelOutgoingReliableSeq[Enet.ctrlChannelUrgent] ?? 0 }
+    }
+
+    /// On a slow path a repeat waits for the first request's answer: the spacing
+    /// follows the smoothed RTT above the 20 ms floor, and the first request of an
+    /// episode still leaves on the next drain.
+    @Test func repeatRequestsWaitOutTheRoundTrip() throws {
+        #expect(EnetControlChannel.recoverySpacingMs(rttMs: nil) == 20)
+        #expect(EnetControlChannel.recoverySpacingMs(rttMs: 4) == 20)
+        #expect(EnetControlChannel.recoverySpacingMs(rttMs: 80) == 80)
+        #expect(EnetControlChannel.recoverySpacingMs(rttMs: 5000) == 1000)
+
+        let (channel, _) = try Self.makeChannel()
+        channel.withState { channel.roundTripTime = 80; channel.hasRttSample = true }
+        channel.requestIdrFrame()
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 1)
+
+        channel.requestIdrFrame()
+        channel.lastIdrSentMs = channel.serviceTimeMs
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 1)
+        #expect(channel.withState { channel.idrPending })
+
+        channel.lastIdrSentMs = channel.serviceTimeMs &- 80
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 2)
+        #expect(!channel.withState { channel.idrPending })
+    }
+
+    /// RFIs are spaced on their own clock, and an IDR held for spacing still
+    /// supersedes any RFI queued behind it.
+    @Test func rfiRepeatsWaitAndAHeldIdrSupersedesThem() throws {
+        let (channel, _) = try Self.makeChannel()
+        channel.invalidateReferenceFrames(from: 10, to: 12)
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 1)
+
+        channel.invalidateReferenceFrames(from: 13, to: 14)
+        channel.lastRfiSentMs = channel.serviceTimeMs
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 1)
+        #expect(channel.withState { channel.pendingRfi != nil })
+
+        channel.requestIdrFrame()
+        channel.lastIdrSentMs = channel.serviceTimeMs
+        channel.drainPendingRecoveryRequests()
+        #expect(Self.urgentRelSeq(channel) == 1)
+        #expect(channel.withState { channel.pendingRfi == nil && channel.idrPending })
+    }
 }

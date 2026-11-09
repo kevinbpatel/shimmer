@@ -198,6 +198,11 @@ final class EnetControlChannel: @unchecked Sendable {
     /// widest window seen since the last drain (the host re-IDRs/recovers the
     /// whole span anyway, and one packet beats per-frame spam).
     var pendingRfi: (from: Int, to: Int)?
+    /// serviceTimeMs of the last wire REQUEST_IDR / RFI, so a repeat of the same
+    /// kind waits `recoverySpacingMs` for the first one's answer. Touched only by
+    /// the control loop's drain, so no lock.
+    var lastIdrSentMs: UInt32?
+    var lastRfiSentMs: UInt32?
 
     /// currentEnetSequenceNumber (ControlStream.c) - monotonic from 0. GLOBAL
     /// across ALL encrypted control sends; must increment under stateLock to
