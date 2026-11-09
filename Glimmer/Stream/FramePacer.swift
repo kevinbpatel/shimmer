@@ -173,11 +173,14 @@ final class FramePacer: @unchecked Sendable {
     /// state groups; the grow/decay math is in FramePacer+AdaptiveDepth.swift.
     var adaptiveDepth = AdaptiveDepthState()
 
-    /// Display-clock time (`CADisplayLink.targetTimestamp`) of the last
-    /// present - the cadence base we gate the next "is a frame DUE" decision
-    /// against. `.nan` until the first present so the first frame goes out
-    /// immediately.
+    /// Display-clock time (`CADisplayLink.targetTimestamp`, or the scanout a
+    /// submit-time release claimed) of the last present - the cadence base we gate
+    /// the next "is a frame DUE" decision against. `.nan` until the first present
+    /// so the first frame goes out immediately.
     var lastPresentMediaTime: CFTimeInterval = .nan
+    /// Fractional cadence error carried across scanouts (see
+    /// `advanceCadenceLocked`), bounded to half a vsync. Guarded by `lock`.
+    var cadenceRemainderSeconds: CFTimeInterval = 0
 
     /// True between `start()` and `stop()`. The tick and the dispatched
     /// release both bail when false so we never enqueue to a released layer.

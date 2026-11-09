@@ -208,6 +208,124 @@ struct FramePacerTests {
         #expect(pacer.stats.presentationLateDropCount() == 4)
     }
 
+    static let cadenceCases: [(Double, Double)] = [
+        (0.031, 120), (0.031, 240), (1 / 59.94, 120),
+        (1 / 32, 144), (1 / 120, 240), (1 / 240, 240)
+    ]
+
+    /// A source rate that doesn't divide the panel's must not fall a frame behind: every
+    /// arrival is released within a vsync and a half, and nothing piles up.
+    @Test(arguments: cadenceCases)
+    func fractionalCadenceDoesNotAccumulateAFrameOfLatency(interval: Double, panelHz: Double) throws {
+        for phase in [0.05, 0.35, 0.85] {
+            let pacer = try makePacer(fps: 120, queued: 0)
+            pacer.streamFrameIntervalSeconds = interval
+            let sample = try emptySampleBuffer()
+            let vsync = 1 / panelHz
+            var arrival = phase * vsync
+            var received = 0
+            var released = 0
+            var maxWait = 0.0
+            pacer.lock.lock()
+            for tick in 0..<Int(panelHz * 30) {
+                let now = Double(tick) * vsync
+                while arrival <= now {
+                    pacer.queue.append(FramePacer.Entry(sampleBuffer: sample, hostPTSSeconds: arrival))
+                    received += 1
+                    arrival += interval
+                }
+                let result = pacer.dequeueDueFrameLocked(
+                    targetTimestamp: now, vsyncInterval: vsync, effectiveTarget: 1)
+                if let entry = result.toPresent {
+                    released += 1
+                    maxWait = max(maxWait, now - entry.hostPTSSeconds)
+                }
+            }
+            pacer.lock.unlock()
+            #expect(received - released <= 1)
+            #expect(maxWait <= 1.5 * vsync + 1e-8)
+        }
+    }
+
+    @Test(arguments: [120, 240])
+    func aScanoutCannotBeClaimedTwiceEvenWithBacklog(fps: Int32) throws {
+        let pacer = try makePacer(fps: fps, queued: 4)
+        pacer.lock.lock()
+        let first = pacer.dequeueDueFrameLocked(
+            targetTimestamp: 10, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        let duplicate = pacer.dequeueDueFrameLocked(
+            targetTimestamp: 10, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        let next = pacer.dequeueDueFrameLocked(
+            targetTimestamp: 10 + 1.0 / 120, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        pacer.lock.unlock()
+        #expect(first.toPresent != nil)
+        #expect(duplicate.toPresent == nil)
+        #expect(next.toPresent != nil)
+    }
+
+    @Test func cadencePhaseSurvivesEmptyTicksButNotRecovery() throws {
+        let pacer = try makePacer(fps: 32, queued: 0)
+        pacer.lock.lock()
+        defer { pacer.lock.unlock() }
+        pacer.lastPresentMediaTime = 10
+        pacer.cadenceRemainderSeconds = 0.003
+        _ = pacer.dequeueDueFrameLocked(targetTimestamp: 10.008, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        #expect(pacer.cadenceRemainderSeconds == 0.003)
+
+        pacer.advanceCadenceLocked(to: 10.2, vsyncInterval: 1.0 / 120)
+        #expect(pacer.cadenceRemainderSeconds == 0)
+        #expect(pacer.lastPresentMediaTime == 10.2)
+        pacer.cadenceRemainderSeconds = 0.003
+        pacer.advanceCadenceLocked(to: 1, vsyncInterval: 1.0 / 120)
+        #expect(pacer.cadenceRemainderSeconds == 0)
+        #expect(pacer.lastPresentMediaTime == 1)
+
+        pacer.cadenceRemainderSeconds = 0.003
+        pacer.anchorCadenceBaseOnGridLocked(targetTimestamp: 2)
+        #expect(pacer.cadenceRemainderSeconds == 0)
+        pacer.cadenceRemainderSeconds = 0.003
+        pacer.resetCadenceBaseLocked()
+        #expect(pacer.cadenceRemainderSeconds == 0)
+        #expect(pacer.lastPresentMediaTime.isNaN)
+    }
+
+    @Test func adaptiveGrowthAndForcedCatchupDiscardCadencePhase() throws {
+        let pacer = try makePacer(fps: 32, queued: 1)
+        pacer.lock.lock()
+        defer { pacer.lock.unlock() }
+        pacer.lastPresentMediaTime = 10
+        pacer.cadenceRemainderSeconds = 0.003
+        pacer.adaptiveDepth.adaptiveTargetDepth = 3
+        pacer.liveness.releaseCount = 100
+        let held = pacer.dequeueDueFrameLocked(targetTimestamp: 10.03, vsyncInterval: 1.0 / 120, effectiveTarget: 3)
+        #expect(held.toPresent == nil)
+        #expect(held.heldForGrowth)
+        #expect(pacer.cadenceRemainderSeconds == 0)
+        pacer.adaptiveDepth.adaptiveTargetDepth = 1
+        let released = pacer.dequeueDueFrameLocked(targetTimestamp: 10.03, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        #expect(released.toPresent != nil)
+        pacer.cadenceRemainderSeconds = 0.003
+        let sample = try emptySampleBuffer()
+        pacer.queue = (0..<3).map { FramePacer.Entry(sampleBuffer: sample, hostPTSSeconds: Double($0)) }
+        let catchup = pacer.dequeueDueFrameLocked(targetTimestamp: 10.04, vsyncInterval: 1.0 / 120, effectiveTarget: 1)
+        #expect(catchup.forcedOverTarget)
+        #expect(pacer.cadenceRemainderSeconds == 0)
+    }
+
+    @Test(arguments: [0.003, -0.003])
+    func submitUsesTheSameCadenceRemainderAsTicks(remainder: Double) throws {
+        let (pacer, presents) = try makeRestingPacer()
+        let scanout = CACurrentMediaTime() + 0.05
+        pacer.streamFrameIntervalSeconds = 0.031
+        pacer.liveness.lastTickTargetMediaTime = scanout
+        pacer.lastPresentMediaTime = scanout - 0.027
+        pacer.cadenceRemainderSeconds = remainder
+        try pacer.submit(emptySampleBuffer(), hostPTS: .invalid)
+        pacer.pacingQueue.sync {}
+        #expect(presents.withLock { $0 } == (remainder > 0 ? 1 : 0))
+        #expect(pacer.queue.count == (remainder > 0 ? 0 : 1))
+    }
+
     @Test func nextScanoutFollowsTheTickGrid() {
         #expect(FramePacer.nextScanout(now: 10.0, lastTickTarget: 10.004, vsync: 0.004) == 10.004)
         #expect(abs(FramePacer.nextScanout(now: 10.005, lastTickTarget: 10.004, vsync: 0.004) - 10.008) < 1e-9)

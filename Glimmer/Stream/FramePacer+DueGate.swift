@@ -47,6 +47,7 @@ extension FramePacer {
     /// base from the CURRENT link's clock. This is the prime root-cause fix.
     func resetCadenceBaseLocked() {
         lastPresentMediaTime = .nan
+        cadenceRemainderSeconds = 0
         prevPresentMediaTimeForMetric = .nan
         liveness.lastTickTargetMediaTime = .nan
         liveness.staleCandidateTarget = .nan
@@ -67,6 +68,7 @@ extension FramePacer {
             return
         }
         lastPresentMediaTime = targetTimestamp - streamFrameIntervalSeconds
+        cadenceRemainderSeconds = 0
         prevPresentMediaTimeForMetric = .nan
     }
 
@@ -159,108 +161,107 @@ extension FramePacer {
         }
     }
 
+    /// Preserve the fractional source cadence only at baseline depth. Adaptive
+    /// growth retains its deliberate holds, and faster streams release per tick.
+    func cadenceRemainderLocked(vsyncInterval: CFTimeInterval) -> CFTimeInterval {
+        assertLockHeld()
+        guard adaptiveDepth.adaptiveTargetDepth == Self.targetDepth,
+              vsyncInterval.isFinite, vsyncInterval > 0,
+              streamFrameIntervalSeconds > vsyncInterval else {
+            cadenceRemainderSeconds = 0
+            return 0
+        }
+        let slack = vsyncInterval * 0.5
+        return min(max(cadenceRemainderSeconds, -slack), slack)
+    }
+
+    /// Record a claimed scanout as the cadence base, keeping the actual scanout for
+    /// telemetry and carrying only the bounded quantization error into the next
+    /// decision: a 31 ms stream on a 120 Hz grid lands 4 vsyncs (33.3 ms) apart
+    /// each time, and without the carry those 2.3 ms surpluses are thrown away, so
+    /// the stream slowly falls a whole frame behind its source. Gaps and forced
+    /// backlog releases start a fresh cadence instead of owing beats.
+    func advanceCadenceLocked(to timestamp: CFTimeInterval, vsyncInterval: CFTimeInterval,
+                              preservePhase: Bool = true) {
+        assertLockHeld()
+        let elapsed = timestamp - lastPresentMediaTime
+        let remainder = cadenceRemainderLocked(vsyncInterval: vsyncInterval)
+        let interval = streamFrameIntervalSeconds
+        if preservePhase, adaptiveDepth.adaptiveTargetDepth == Self.targetDepth,
+           vsyncInterval.isFinite, vsyncInterval > 0, interval > vsyncInterval,
+           elapsed > 0, elapsed <= interval + vsyncInterval {
+            let slack = vsyncInterval * 0.5
+            cadenceRemainderSeconds = min(max(remainder + elapsed - interval, -slack), slack)
+        } else {
+            cadenceRemainderSeconds = 0
+        }
+        lastPresentMediaTime = timestamp
+    }
+
     /// Decide whether the head frame is DUE this vsync and pop it if so (called
     /// under `lock` from `releaseDueFrame`). Refresh-vs-fps aware: due every tick
     /// at fps==refresh, every Nth tick at fps<refresh (idle ticks re-show the last
     /// frame), every tick at fps>refresh (the trim already dropped the backlog). A
-    /// half-vsync of slack avoids the fps≈refresh 1.5x judder; the
-    /// grow-without-a-hitch gate tightens that slack only while filling toward a
-    /// raised adaptive target. MUTATES queue state - caller must hold the lock.
+    /// half-vsync of slack avoids the fps≈refresh 1.5x judder, and the carried
+    /// cadence remainder keeps a fractional stream rate from drifting a frame
+    /// behind. Never claims the same scanout twice. MUTATES queue state - caller
+    /// must hold the lock.
+    ///
+    /// The rules, in order:
+    ///  * An empty queue is a content gap: break the cadence-metric baseline so
+    ///    the next post-gap present isn't scored a pacing miss.
+    ///  * A scanout a submit-time release already claimed presents nothing more.
+    ///  * DEFENSIVE CLAMP (the freeze fix): `targetTimestamp` and
+    ///    `lastPresentMediaTime` share the CADisplayLink's timebase, which goes
+    ///    discontinuous across a link rebuild / mode switch / VRR retrain /
+    ///    sleep-wake. A non-finite, negative or >1 s delta (and the first present)
+    ///    is "due now", re-seeding the base from the current link's clock.
+    ///  * OVER-TARGET: a real backlog over target survived the trim - force the
+    ///    head out. Only count == target+2 or more is LABELLED forced (the
+    ///    oscillation signal); target+1 is benign bunching.
+    ///  * GROW-WITHOUT-A-HITCH: while filling toward a raised adaptive target
+    ///    (and only once cadence has locked, past `startupGrowHoldReleases`),
+    ///    require a whole interval so a barely-due head is held one more tick and
+    ///    the buffer deepens out of the slack; `heldForGrowth` keeps the starvation
+    ///    failsafe from mistaking that hold for a wedge.
     func dequeueDueFrameLocked(
         targetTimestamp: CFTimeInterval, vsyncInterval: CFTimeInterval, effectiveTarget: Int
     ) -> DueGateResult {
         assertLockHeld()
         guard !queue.isEmpty else {
-            // Content gap (nothing queued to present): break the cadence-metric
-            // baseline so the next post-gap present isn't scored a pacing miss.
-            // Desktop idle / fps<content reads healthy; a full-queue game still
-            // scores every beat because its queue never drains.
             prevPresentMediaTimeForMetric = .nan
             return DueGateResult(toPresent: nil, heldForGrowth: false, forcedOverTarget: false)
         }
-        var heldForGrowth = false
-        var forcedOverTarget = false
-        let due: Bool
-        // GROW-WITHOUT-A-HITCH gate. When the adaptive target has risen above the
-        // current depth (the link just got jittery, or we're filling the baseline
-        // after a flush), hold one extra frame so the buffer DEEPENS out of the
-        // slack a clean link provides - at zero added per-frame latency, because we
-        // only ever hold back a frame that is BARELY due (within the half-vsync
-        // slack). A genuinely overdue frame always releases, so this can never
-        // starve the present path. fps<refresh idle ticks (head not due at all) are
-        // untouched. The gate is purely additive: it tightens release only while
-        // depth < target.
+        let remainder = cadenceRemainderLocked(vsyncInterval: vsyncInterval)
+        let sinceLast = targetTimestamp - lastPresentMediaTime
+        // A submit can already own this tick, including when more frames queued behind it.
+        if sinceLast == 0 {
+            return DueGateResult(toPresent: nil, heldForGrowth: false, forcedOverTarget: false)
+        }
         let belowTarget = queue.count <= effectiveTarget
-        if lastPresentMediaTime.isFinite {
-            let sinceLast = targetTimestamp - lastPresentMediaTime
-            // DEFENSIVE CLAMP - the heart of the freeze fix on the gate.
-            // `targetTimestamp` and `lastPresentMediaTime` must share the
-            // CADisplayLink's timebase, but that timebase goes DISCONTINUOUS across
-            // a link rebuild / display-mode switch / VRR retrain / sleep-wake. When
-            // it does, `sinceLast` can go negative (or absurdly large), and the
-            // plain `>=` test below would latch false forever → permanent freeze.
-            // Treat any non-finite / negative / >1s delta as "due now" and re-seed
-            // from the current link's clock (the `if due` block below sets
-            // lastPresentMediaTime = targetTimestamp), so a timebase jump
-            // self-corrects on the very NEXT tick instead of wedging.
-            if !sinceLast.isFinite || sinceLast < 0 || sinceLast > 1.0 {
-                due = true
-            } else if !belowTarget {
-                // OVER-TARGET SHORT-CIRCUIT: a real backlog over target survived the
-                // trim - holding is always wrong, so force the head out NOW to drain.
-                // Below-target (passthrough / jitter buffer) keeps the due logic below.
-                due = true
-                // Only LABEL it forced-over-target (the oscillation signal) when the
-                // backlog exceeds the +1 trim slack - count == target+1 is benign
-                // bunching, not oscillation, so don't mislabel it.
-                forcedOverTarget = queue.count > effectiveTarget + 1
-            } else {
-                // Slack = half a vsync; lets a barely-not-due head present now rather
-                // than wait a whole vsync (the fps≈refresh 1.5x judder).
-                let slack = vsyncInterval * 0.5
-                let interval = streamFrameIntervalSeconds
-                // GROW: while we're still filling toward the adaptive target,
-                // require the head to be FULLY due (a whole interval elapsed)
-                // instead of due-minus-slack. That holds a barely-due head for one
-                // more tick so the queue can build the extra slot. Once at or above
-                // target, use the normal slack-relaxed test so steady state has
-                // zero added latency.
-                //
-                // STARTUP GATE: do NOT run the grow-hold until cadence has locked
-                // (`liveness.releaseCount > startupGrowHoldReleases`). During the first
-                // ~0.25s the PTS-median interval is still converging and startup
-                // jitter has transiently inflated the adaptive target; holding
-                // barely-due frames in that window presents half of them late (the
-                // startup chop) and trips the present-stall watchdog. Until cadence
-                // locks we use the normal slack-relaxed test, so the buffer primes
-                // from a clean link's natural slack WITHOUT ever holding a frame late.
-                let cadenceLocked = liveness.releaseCount > FramePacer.startupGrowHoldReleases
-                if cadenceLocked && belowTarget
-                    && adaptiveDepth.adaptiveTargetDepth > FramePacer.targetDepth {
-                    due = sinceLast >= interval
-                    // If the head was barely-due (would have presented under the
-                    // normal slack test) but we held it to grow, mark it so the
-                    // starvation failsafe doesn't count this tick.
-                    if !due && sinceLast >= (interval - slack) {
-                        heldForGrowth = true
-                    }
-                } else {
-                    due = sinceLast >= (interval - slack)
-                }
-            }
-        } else {
-            // First present: always release immediately so the window can fade in
-            // on a real frame without waiting a cadence beat.
+        let validElapsed = sinceLast.isFinite && sinceLast >= 0 && sinceLast <= 1
+        let slack = vsyncInterval * 0.5
+        let interval = streamFrameIntervalSeconds
+        let cadenceLocked = liveness.releaseCount > Self.startupGrowHoldReleases
+        let growing = cadenceLocked && belowTarget && adaptiveDepth.adaptiveTargetDepth > Self.targetDepth
+        let due: Bool
+        if !validElapsed || !belowTarget {
             due = true
+        } else if growing {
+            due = sinceLast >= interval
+        } else {
+            due = sinceLast + remainder >= interval - slack
         }
         guard due else {
-            return DueGateResult(
-                toPresent: nil, heldForGrowth: heldForGrowth, forcedOverTarget: false)
+            return DueGateResult(toPresent: nil,
+                                 heldForGrowth: growing && sinceLast >= interval - slack,
+                                 forcedOverTarget: false)
         }
+        let forcedOverTarget = validElapsed && queue.count > effectiveTarget + 1
         let entry = queue.removeFirst()
-        lastPresentMediaTime = targetTimestamp
-        return DueGateResult(
-            toPresent: entry, heldForGrowth: false, forcedOverTarget: forcedOverTarget)
+        advanceCadenceLocked(to: targetTimestamp, vsyncInterval: vsyncInterval,
+                             preservePhase: validElapsed && belowTarget)
+        return DueGateResult(toPresent: entry, heldForGrowth: false, forcedOverTarget: forcedOverTarget)
     }
 
     /// Decide-and-release on the dedicated serial queue. Releases at most one
