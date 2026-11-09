@@ -101,18 +101,20 @@ extension VideoDecoder {
     /// depth + colorspace). Reads the HW-accelerated-decoder property back from the
     /// live session - VT only resolves it after create - so a silent software
     /// fallback (an OS/driver regression past our hardware REQUIRE) is surfaced
-    /// rather than assumed. The colorspace key reflects the last one the decode
-    /// path derived; it is refreshed on a colorspace change in `enqueueDecodedFrame`.
+    /// rather than assumed. The colorspace key is the one the VT thread last
+    /// published, never `lastColorSpaceKey` (VT output thread only): this runs on
+    /// the decode queue during a mid-stream session recreate.
     private nonisolated func publishDecodeStateTelemetry(
         session: VTDecompressionSession, outputPixelFormat: OSType
     ) {
         let isTenBit = (streamVideoFormat & StreamProtocol.VIDEO_FORMAT_MASK_10BIT) != 0
-        TelemetryCounters.shared.setDecodeState(TelemetryCounters.DecodeState(
+        let counters = TelemetryCounters.shared
+        counters.setDecodeState(TelemetryCounters.DecodeState(
             hwDecode: readHardwareDecodeConfirmation(session: session),
             codec: Self.codecLabel(for: streamVideoFormat),
             pixelFormat: fourCCString(from: outputPixelFormat),
             bitDepth: isTenBit ? 10 : 8,
-            colorSpaceKey: lastColorSpaceKey ?? "pending"))
+            colorSpaceKey: counters.decodeState?.colorSpaceKey ?? "pending"))
     }
 
     /// Map a negotiated stream-format bitmask to a codec label for telemetry.

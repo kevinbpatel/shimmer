@@ -36,9 +36,9 @@ extension FramePacer {
 
         var droppedStale: CMSampleBuffer?
         var suppressedDisplaced: CMSampleBuffer?
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         guard running else {
-            os_unfair_lock_unlock(&lock)
+            lock.unlock()
             return
         }
 
@@ -85,7 +85,7 @@ extension FramePacer {
         // over warm-up (nothing may present at a hidden layer) - the suppressed
         // branch below keeps its single-newest-frame behavior.
         if tickDeficit.warmingUp && !presentSuppressed {
-            os_unfair_lock_unlock(&lock)
+            lock.unlock()
             presentWarmHandoverFrame(entry)
             return
         }
@@ -126,7 +126,7 @@ extension FramePacer {
             // feels laggy after a while" symptom we're killing.
             droppedStale = queue.removeFirst().sampleBuffer
         }
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
 
         if suppressedDisplaced != nil {
             // Suppressed-mode drops are quiet by design: the suppression EDGES
@@ -170,7 +170,7 @@ extension FramePacer {
     /// rolling) and judged ≤0.5s later - inside the watchdog's 1.75s trip.
     func setPresentSuppressed(_ suppressed: Bool) {
         var events: [TickDeficitEvent] = []
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         let wasSuppressed = presentSuppressed
         presentSuppressed = suppressed
         if wasSuppressed != suppressed {
@@ -182,7 +182,7 @@ extension FramePacer {
                     now + FramePacer.resumeVerdictHoldSeconds
             }
         }
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
         // Logs the disengage + reconciles the off-tick timer OFF the lock -
         // the same discipline as every other caller of the service pass.
         handleTickDeficitEvents(events)

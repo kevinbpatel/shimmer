@@ -30,7 +30,7 @@
 //      `minWindowSeconds == 0`, preserving the original reset-every-read
 //      window on its own cadence.
 //
-//  All shared mutable state is protected by a single os_unfair_lock. The hot
+//  All shared mutable state is protected by a single OSAllocatedUnfairLock. The hot
 //  paths only hold it for a handful of integer/double updates per frame -
 //  well under a microsecond - which at 240 FPS is nowhere near a contention
 //  risk and orders of magnitude under any frame-pacing budget. Using a lock
@@ -238,14 +238,14 @@ final class StatsCollector: @unchecked Sendable {
     var windowMaxFrameBytes: Int = 0
     var windowIdrFrameCount: UInt64 = 0
 
-    var lock = os_unfair_lock_s()
+    let lock = OSAllocatedUnfairLock()
 
     func reset() {
         // Drain any open signpost intervals before clearing the FIFO; without
         // this, a reset() between recordDecodeSubmit and recordDecodeComplete
         // would leak every still-open DecodeFrame interval.
         var leftover: [OSSignpostIntervalState] = []
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         leftover.reserveCapacity(submitFifo.count)
         for entry in submitFifo { leftover.append(entry.state) }
         submitFifo.removeAll(keepingCapacity: true)
@@ -285,7 +285,7 @@ final class StatsCollector: @unchecked Sendable {
         framesWithHostProcessingLatency = 0
         windowFrameBytesSum = 0; windowFrameCount = 0
         windowMaxFrameBytes = 0; windowIdrFrameCount = 0
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
         for state in leftover {
             OSSignposter.decode.endInterval(
                 "DecodeFrame", state, "outcome=reset")
@@ -310,8 +310,8 @@ final class StatsCollector: @unchecked Sendable {
     /// so its NDJSON keeps emitting fresh per-tick windows on its own cadence.
     func snapshot(minWindowSeconds: Double = 0) -> StreamStatsSnapshot {
         let now = CACurrentMediaTime()
-        os_unfair_lock_lock(&lock)
-        defer { os_unfair_lock_unlock(&lock) }
+        lock.lock()
+        defer { lock.unlock() }
 
         var snap = StreamStatsSnapshot()
 

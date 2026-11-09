@@ -9,7 +9,7 @@
 //
 //  Everything here runs OFF the pacer lock, which is the whole point of the
 //  event vocabulary: LogStore takes its own lock and DispatchSource ops
-//  allocate, so neither may run under the pacer's hot os_unfair_lock. See
+//  allocate, so neither may run under the pacer's hot lock. See
 //  FramePacer+TickDeficit.swift for the state machine that detects these
 //  transitions and FramePacer+DeficitTimer.swift for the off-tick timer the
 //  reconcile flag drives.
@@ -23,7 +23,7 @@ extension FramePacer {
     /// One state transition the locked service pass detected, surfaced so the
     /// caller can log / reconcile the timer OFF the lock (LogStore takes its
     /// own lock; DispatchSource ops allocate - neither belongs under the
-    /// pacer's hot os_unfair_lock).
+    /// pacer's hot lock).
     enum TickDeficitEvent {
         case deficitEngaged(ticksPerS: Double, expectedHz: Double, depth: Int)
         case deficitDisengaged(

@@ -106,12 +106,12 @@ extension FramePacer {
     /// `willPresent` return. Shared by the due-gate release, the backoff beat,
     /// and the warm-handover direct present.
     func noteFramePresented(_ sampleBuffer: CMSampleBuffer) {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         liveness.lastReleaseHostTime = CFAbsoluteTimeGetCurrent()
         liveness.releaseCount &+= 1
         liveness.presentRejectStreak = 0
         tickDeficit.lastPresentedSampleBuffer = sampleBuffer
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     /// Count one pacer-path release the renderer REFUSED (`willPresent` false).
@@ -128,9 +128,9 @@ extension FramePacer {
     /// flip the flag for one frame" class, and anything wifi jitter can cause
     /// upstream - can never accumulate toward the ladder's threshold.
     func noteGateReleaseRejected() {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         liveness.presentRejectStreak += 1
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     /// Present the freshest frame from a backoff beat and record its telemetry.
@@ -274,14 +274,14 @@ extension FramePacer {
         // below - under the pacer lock - then reads only the pulled snapshot.
         refreshReconciledTarget()
 
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         // `!tickDeficit.warmingUp`: during a warm handover the queue is empty by design
         // (submits direct-present until the rebuilt link proves healthy ticks
         // - FramePacer+TickDeficit.swift), so a tick here has nothing to do.
         // Bailing keeps the priming span from polluting the depth samples and
         // stale-repeat counter while real frames are demonstrably flowing.
         guard running, !tickDeficit.warmingUp else {
-            os_unfair_lock_unlock(&lock)
+            lock.unlock()
             return
         }
 
@@ -344,7 +344,7 @@ extension FramePacer {
         if !inGapRecovery,
            let backoff = takeBackoffNewestLocked(targetTimestamp: targetTimestamp) {
             sampledDepth = 0
-            os_unfair_lock_unlock(&lock)
+            lock.unlock()
             presentBackoffAndYield(backoff)
             // Yield: do NOT fall through to the due gate / starvation failsafe.
             // The backlog is gone and the newest frame is on screen.
@@ -415,7 +415,7 @@ extension FramePacer {
             streak: liveness.starvedTickStreak, depth: sampledDepth,
             sinceLastMs: sinceLastForLog * 1000, targetTimestamp: targetTimestamp,
             lastPresent: lastPresentMediaTime, intervalMs: streamFrameIntervalSeconds * 1000)
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
 
         // Per-tick PRESENT-signal observability (the stale-frame repeat + the
         // over-target force-release telemetry). Folded into one helper so neither
@@ -531,7 +531,7 @@ extension FramePacer {
         let released = gate.toPresent != nil
         var streakSnapshot = 0
         var shouldSignpost = false
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         if forced {
             liveness.overTargetReleaseStreak += 1
             streakSnapshot = liveness.overTargetReleaseStreak
@@ -543,7 +543,7 @@ extension FramePacer {
         } else if released {
             liveness.overTargetReleaseStreak = 0
         }
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
         guard forced else { return }
         TelemetryCounters.shared.pacerOverTargetReleaseTotal.increment()
         if shouldSignpost {

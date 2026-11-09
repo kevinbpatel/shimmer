@@ -93,6 +93,7 @@ import AVFoundation
 import CoreMedia
 import CoreVideo
 import Foundation
+import Synchronization
 import VideoToolbox
 import os
 @MainActor
@@ -436,6 +437,8 @@ public final class VideoDecoder {
     // pattern in vt_avsamplelayer.mm. The key is a tuple of (primaries,
     // transfer) decoded from the pixel buffer's attachments at frame time;
     // changes when the host swaps from Rec.709 SDR ↔ Rec.2020/PQ HDR.
+    // VT output thread only; the stop path clears both on the decode queue
+    // after WaitForAsynchronousFrames, so no callback runs concurrently.
     nonisolated(unsafe) var lastColorSpaceKey: String?
     nonisolated(unsafe) var lastColorSpace: CGColorSpace?
 
@@ -451,7 +454,9 @@ public final class VideoDecoder {
     // IDR off the transient renderer-not-ready flag - a presentation-timing
     // drop of an already-decoded frame never needs a keyframe (the reference
     // chain is intact). IDR/RFI is reserved for genuine decode/reference breaks.
-    nonisolated(unsafe) var consecutiveBackpressureDrops: Int = 0
+    // Atomic because the paced present runs on pacingQueue while the direct and
+    // warm-handover presents run on the VT output thread.
+    nonisolated let consecutiveBackpressureDrops = Atomic<Int>(0)
 
     /// Consecutive decode-backlog overflows - how long the backlog has sat in
     /// the over-the-nominal-bound zone. A burst of late-then-clustered frames
