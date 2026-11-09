@@ -394,6 +394,10 @@ public final class AudioDecoder: @unchecked Sendable {
     /// 10ms step back down requires its own full quiet window. Guarded by
     /// `audioMeterLock`.
     var quietSinceNanos: UInt64 = 0
+    /// The target the last under-run failed at, and when. A quiet-window walk-down stays a step
+    /// above it for a while (`recentFailureFloorMs`). Guarded by `audioMeterLock`.
+    var lastFailedTargetMs: Double = 0
+    var lastUnderrunNanos: UInt64 = 0
 
     // MARK: - P1 AUDIO playout-stall watchdog (the 2026-08-12 overnight wedge)
     //

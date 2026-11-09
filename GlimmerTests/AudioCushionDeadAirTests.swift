@@ -2,7 +2,8 @@
 //  AudioCushionDeadAirTests.swift
 //
 //  How the adaptive audio cushion walks back down: a quiet window releases a
-//  learned floor on every link class.
+//  learned floor on every link class, but never straight back to a level that
+//  just under-ran.
 //
 
 import Foundation
@@ -33,5 +34,53 @@ extension AudioPlayoutStallTests {
         #expect((decoder.cushionQuietAdjustLocked(now: now) != nil) == releases)
         #expect(decoder.playoutTargetMs == (releases ? 100 : 110))
         #expect(decoder.learnedFloorMs == (releases ? 95 : 105))
+    }
+
+    /// For the recent-failure hold after an under-run, a quiet window won't walk the target back
+    /// below a step above the level that failed; once the hold passes, it may.
+    @Test func walkDownHoldsAboveARecentFailure() {
+        let decoder = AudioDecoder()
+        let now = DispatchTime.now().uptimeNanoseconds
+        decoder.audioMeterLock.lock()
+        defer { decoder.audioMeterLock.unlock() }
+        decoder.cushionLinkClass = "wifi"
+        decoder.resamplerSkewConverged = true
+        decoder.playoutTargetMs = 54
+        decoder.learnedFloorMs = 50
+        decoder.lastFailedTargetMs = 44
+        decoder.lastUnderrunNanos = now &- 60_000_000_000
+        decoder.quietSinceNanos = now &- AudioDecoder.playoutDecayQuietNanos
+        decoder.floorQuietSinceNanos = now
+        decoder.quietWindowMinFillMs = 25
+        #expect(decoder.cushionQuietAdjustLocked(now: now) == nil)
+        #expect(decoder.playoutTargetMs == 54)
+
+        decoder.lastUnderrunNanos = now &- AudioDecoder.cushionFloorDecayQuietNanos
+        #expect(decoder.cushionQuietAdjustLocked(now: now) != nil)
+        #expect(decoder.playoutTargetMs == 44)
+    }
+
+    /// The ordinary walk-down, far above the floor, holds a step above a recent failure too: a grow
+    /// that never taught the floor must not walk straight back to the level that under-ran.
+    @Test func ordinaryWalkDownHoldsAboveARecentFailure() {
+        let decoder = AudioDecoder()
+        let now = DispatchTime.now().uptimeNanoseconds
+        decoder.audioMeterLock.lock()
+        defer { decoder.audioMeterLock.unlock() }
+        decoder.cushionLinkClass = "wifi"
+        decoder.resamplerSkewConverged = true
+        decoder.playoutTargetMs = 70
+        decoder.learnedFloorMs = 45
+        decoder.lastFailedTargetMs = 60
+        decoder.lastUnderrunNanos = now &- 60_000_000_000
+        decoder.quietSinceNanos = now &- AudioDecoder.playoutDecayQuietNanos
+        decoder.floorQuietSinceNanos = now
+        decoder.quietWindowMinFillMs = 25
+        #expect(decoder.cushionQuietAdjustLocked(now: now) == nil)
+        #expect(decoder.playoutTargetMs == 70)
+
+        decoder.lastUnderrunNanos = now &- AudioDecoder.cushionFloorDecayQuietNanos
+        #expect(decoder.cushionQuietAdjustLocked(now: now) != nil)
+        #expect(decoder.playoutTargetMs == 60)
     }
 }

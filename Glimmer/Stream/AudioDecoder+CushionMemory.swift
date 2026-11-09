@@ -320,6 +320,8 @@ extension AudioDecoder {
                 ? failedTargetMs
                 : learnedFloorMs + Self.cushionFloorEwmaWeight * (failedTargetMs - learnedFloorMs)
             learnedFloorMs = min(learnedFloorMs, effectiveCushionMaxMs)
+            lastFailedTargetMs = failedTargetMs
+            lastUnderrunNanos = now
         }
         floorQuietSinceNanos = now
         quietWindowMinFillMs = .infinity
@@ -327,13 +329,16 @@ extension AudioDecoder {
                                   floorMs: learnedFloorMs)
     }
 
-    /// QUIET completion while elevated: arbitrate the two decay clocks.
-    /// Floor decay first (the slow ~10min clock), then the target step gated
-    /// on (a) the elapsed quiet window, (b) the near-miss margin - a held
-    /// window consumes its evidence and starts a fresh one - and (c) the
-    /// floor cutoff, which leaves the window STANDING so the step fires the
-    /// moment the floor's own decay unblocks it. Returns a memory write when
-    /// anything moved; nil on the (overwhelmingly common) no-op.
+    /// A step above the level that last under-ran, until the floor's slow decay window has passed:
+    /// on Wi-Fi the walk-down otherwise retried the failed level a minute later.
+    func recentFailureFloorMs(now: UInt64) -> Double {
+        guard lastUnderrunNanos > 0, now &- lastUnderrunNanos < Self.cushionFloorDecayQuietNanos else { return 0 }
+        return lastFailedTargetMs + Self.playoutCushionStepMs
+    }
+
+    /// QUIET completion while elevated: the floor decays on its ~10 min clock, then the target steps
+    /// down unless the window nearly drained, a recent failure is a step away, or the floor blocks it.
+    /// The last two leave the window standing. Returns a memory write when anything moved.
     func cushionQuietAdjustLocked(now: UInt64) -> CushionMemoryWrite? {
         var changed = false
         if learnedFloorMs > 0,
@@ -349,6 +354,8 @@ extension AudioDecoder {
                 // would starve - keep depth, pay nothing audible.
                 quietSinceNanos = now
                 quietWindowMinFillMs = .infinity
+            } else if candidate < recentFailureFloorMs(now: now) {
+                // RECENT-FAILURE HOLD, on every path down: the window stands until the hold expires.
             } else if learnedFloorMs > 0,
                       candidate < learnedFloorMs + Self.playoutCushionStepMs {
                 // FLOOR HOLD, unless a quiet window walks floor and target down together instead of
