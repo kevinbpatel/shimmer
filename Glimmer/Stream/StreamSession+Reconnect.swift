@@ -23,6 +23,7 @@
 
 import Foundation
 import Network
+import QuartzCore
 import SwiftUI
 import os
 
@@ -124,38 +125,36 @@ extension StreamSession {
             return
         }
 
-        await runReconnectEpisode(code: code)
+        await runReconnectEpisode(code: code, cause: Self.reconnectCause(code: code))
     }
 
-    /// SELF-INITIATED reconnect to apply a lowered bitrate (see
-    /// BitrateDownshiftController). Unlike `handleHostTerminate`, the host has
-    /// NOT closed anything - the connection is live but useless, carrying video
-    /// we cannot decode. We tear it down ourselves and rebuild from the config
-    /// the caller just rewrote.
-    ///
-    /// Reuses the same episode machinery, so the user experience is the existing
-    /// one: the frozen last frame is held under a banner while the rebuild runs,
-    /// and video resumes in place. The banner text is the one difference - this
-    /// is a deliberate quality change, not a fault, and saying so is the honest
-    /// thing to put on screen.
-    func runDownshiftReconnect(toKbps: Int) async {
+    /// Why the episode's log line says the link went away: -1 is our own link
+    /// dropping, not the PC restarting.
+    static func reconnectCause(code: Int32) -> String {
+        if code == deadPeerTerminationCode { return "our link to the PC dropped (code -1)" }
+        return "the PC closed the live stream (code 0x\(String(UInt32(bitPattern: code), radix: 16))), "
+            + "likely restarting across a lock or desktop switch"
+    }
+
+    /// A reconnect this side chose on a live connection (a bitrate change, a
+    /// decoder that never decodes what arrives). Unlike `handleHostTerminate`,
+    /// the host has NOT closed anything; the same episode machinery runs, so the
+    /// frozen frame holds under the banner and video resumes in place. The first
+    /// `reconnectInPlace` brings the live connection down itself
+    /// (`teardownConnectionForReconnect` is idempotent), so this only stops
+    /// feeding the uplink, exactly as the host-terminate path does.
+    func runSelfInitiatedReconnect(cause: String, bannerText: String = "Reconnecting…") async {
         guard isStreaming, !stopInProgress, !isReconnecting else { return }
-        // The live-but-useless connection must come down before the rebuild; the
-        // episode's first `reconnectInPlace` calls `teardownConnectionForReconnect`
-        // which is idempotent, so we do NOT pre-tear here - we just stop feeding
-        // the dead uplink, exactly as the host-terminate path does.
         let inp = input
         DispatchQueue.main.async { MainActor.assumeIsolated { inp?.setReady(false) } }
-        await runReconnectEpisode(
-            code: Self.deadPeerTerminationCode,
-            bannerText: "Connection is weak - lowering quality to \(toKbps / 1000) Mbps…")
+        await runReconnectEpisode(code: Self.deadPeerTerminationCode, cause: cause, bannerText: bannerText)
     }
 
     /// Drive a bounded reconnect episode: hold the frozen frame, retry the
     /// in-place rebuild with a short backoff until it succeeds or we exhaust the
     /// attempt/time budget, then resume (`.reconnected`) or give up (real
     /// teardown). MainActor work happens inside `reconnectInPlace`.
-    private func runReconnectEpisode(code: Int32, bannerText: String = "Reconnecting…") async {
+    private func runReconnectEpisode(code: Int32, cause: String, bannerText: String = "Reconnecting…") async {
         isReconnecting = true
         reconnectAttempts = 0
         var budget = StreamReconnectBudget(now: Date(), wakeRevision: reconnectWakeRevision)
@@ -171,11 +170,7 @@ extension StreamSession {
             // reconnect explicitly (the most safety-critical in-stream state).
             AccessibilityNotification.Announcement(bannerText).post()
         }
-        Diag.notice(
-            "Host closed the live stream (code 0x\(String(UInt32(bitPattern: code), radix: 16))) "
-            + "- reconnecting in place, holding the last frame (the host likely restarted "
-            + "across a lock/desktop transition).",
-            "Stream")
+        Diag.notice("Reconnecting in place, holding the last frame: \(cause).", "Stream")
 
         startReconnectPathMonitor()
         defer { stopReconnectPathMonitor() }
@@ -238,10 +233,11 @@ extension StreamSession {
                 let winForHide = window
                 await MainActor.run { winForHide?.reconnectBanner.setVisible(false) }
                 Diag.notice("reconnected - stream resumed in place", "Stream")
-                // Re-arm the stall latches so a later stall logs/recovers fresh.
-                didLogDecodeOnlyStall = false
-                didAttemptStallRecovery = false
-                didLogWatchdogHold = false
+                // The new connection's decode clock starts here, not at the old
+                // connection's last frame (watchdogDecodeIdle floors at the arm),
+                // and a later stall logs/recovers fresh.
+                await MainActor.run { self.frameWatchdogArmedAt = CACurrentMediaTime() }
+                resetStallLatches()
                 return
             }
         }

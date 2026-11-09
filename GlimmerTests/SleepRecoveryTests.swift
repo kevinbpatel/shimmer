@@ -213,3 +213,58 @@ private extension StreamSession {
         network = nil
     }
 }
+
+// MARK: - Frame watchdog (ported from upstream's StreamReconnectTests)
+
+struct StreamReconnectTests {
+
+    @Test func staleGateLiftDoesNotCountAsDecodeProgress() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: .infinity, sinceGateLift: 60, sinceArm: 0.5).isInfinite)
+    }
+
+    @Test func freshGateLiftStartsAnewIdleClock() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: .infinity, sinceGateLift: 0.2, sinceArm: 5) == 0.2)
+    }
+
+    @Test func noGateLiftUsesTheDecodedFrameClock() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: 1, sinceGateLift: .infinity, sinceArm: 5) == 1)
+    }
+
+    @Test func noGateLiftOrDecodedFrameAwaitsFirstFrame() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: .infinity, sinceGateLift: .infinity, sinceArm: 0.5).isInfinite)
+    }
+
+    @Test func freshGateLiftShortensDecodedIdle() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: 100, sinceGateLift: 3, sinceArm: 200) == 3)
+    }
+
+    /// A reconnect inherits the old connection's decoded-frame clock. Counted from there, the first tick
+    /// after the resume read a 6 s stall and asked for a keyframe Sunshine was already sending.
+    @Test func reconnectArmFloorsTheInheritedDecodeClock() {
+        #expect(StreamSession.watchdogDecodeIdle(
+            sinceDecoded: 6, sinceGateLift: .infinity, sinceArm: 0.3) == 0.3)
+    }
+
+    /// One keyframe request at 2 s, then at 4, 8, 16 and every 16 s: a paused encoder answers the first,
+    /// and a stalled path is not helped by one every second.
+    @Test func keyframeNudgesBackOffThenHoldAtSixteenSeconds() {
+        var nudge = DecodeStallNudge()
+        var asked: [Double] = []
+        for tick in stride(from: 0.5, through: 70, by: 1.0) where nudge.due(at: tick) { asked.append(tick) }
+        #expect(asked == [2.5, 4.5, 8.5, 16.5, 32.5, 48.5, 64.5])
+        #expect(DecodeStallNudge().nextAt == StreamSession.decodeStallRecoveryThreshold)
+    }
+
+    /// The episode's log line says whose side dropped: our own dead-peer is not the PC restarting.
+    @Test func reconnectCauseNamesWhoseSideDropped() {
+        #expect(StreamSession.reconnectCause(code: StreamSession.deadPeerTerminationCode)
+            == "our link to the PC dropped (code -1)")
+        #expect(StreamSession.reconnectCause(code: StreamSession.recoverableTerminationCode)
+            .hasPrefix("the PC closed the live stream (code 0x80030023)"))
+    }
+}
