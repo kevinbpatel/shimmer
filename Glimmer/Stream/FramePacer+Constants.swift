@@ -69,6 +69,9 @@ extension FramePacer {
     /// 500ms = moonlight's pacing-history window. Latency exists only mid-burst; a
     /// surplus persisting past this is a standing build and trims tight.
     static let postDrainLenientSeconds = 0.5
+    /// A depth above target on every tick for this long is a standing extra frame of latency,
+    /// not benign bunching, and trims to target (moonlight's ~500 ms pacing history).
+    static let standingExtraFrameSeconds = 0.5
 
     /// After this many consecutive ticks with frames queued but nothing
     /// released, the in-pacer failsafe re-seeds the cadence base to force a

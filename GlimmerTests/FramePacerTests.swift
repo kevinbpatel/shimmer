@@ -37,6 +37,38 @@ struct FramePacerTests {
         pacer.lock.unlock()
     }
 
+    /// A frame standing above target for a whole history window is latency, not bunching:
+    /// the trim drops it to target, and a dip back to target re-arms the window.
+    @Test func standingExtraFrameTrimsAfterHistoryWindow() throws {
+        let pacer = try makePacer(fps: 120, queued: 2)
+        let start = CFAbsoluteTimeGetCurrent()
+        pacer.lock.lock()
+        defer { pacer.lock.unlock() }
+        #expect(pacer.gapAwareTrimLocked(now: start, effectiveTarget: 1).trimmed.isEmpty)
+        #expect(pacer.gapAwareTrimLocked(now: start + 0.3, effectiveTarget: 1).trimmed.isEmpty)
+        #expect(pacer.queue.count == 2)
+        #expect(pacer.gapAwareTrimLocked(now: start + 0.6, effectiveTarget: 1).trimmed.count == 1)
+        #expect(pacer.queue.count == 1)
+        #expect(pacer.gapAwareTrimLocked(now: start + 0.7, effectiveTarget: 1).trimmed.isEmpty)
+        #expect(pacer.liveness.overTargetSince.isNaN)
+        pacer.queue.append(FramePacer.Entry(sampleBuffer: try emptySampleBuffer(), hostPTSSeconds: 1))
+        #expect(pacer.gapAwareTrimLocked(now: start + 1.3, effectiveTarget: 1).trimmed.isEmpty)
+        #expect(pacer.queue.count == 2)
+    }
+
+    /// The post-gap catch-up is exempt: while it plays through, nothing trims to target.
+    @Test func standingFrameRuleSparesThePostGapCatchUp() throws {
+        let pacer = try makePacer(fps: 120, queued: 3)
+        let start = CFAbsoluteTimeGetCurrent()
+        pacer.liveness.lastGapRecoveryTime = start
+        pacer.lock.lock()
+        defer { pacer.lock.unlock() }
+        #expect(pacer.gapAwareTrimLocked(now: start, effectiveTarget: 1).inGapRecovery)
+        #expect(pacer.gapAwareTrimLocked(now: start + 0.45, effectiveTarget: 1).trimmed.isEmpty)
+        #expect(pacer.queue.count == 3)
+        #expect(pacer.liveness.overTargetSince.isNaN)
+    }
+
     // MARK: - Helpers
 
     private func makePacer(fps: Int32, queued: Int) throws -> FramePacer {
