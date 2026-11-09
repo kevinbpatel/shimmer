@@ -54,6 +54,15 @@ extension AppModel {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && $0.level == .normal }),
               let view = window.contentView?.superview ?? window.contentView else { return }
         window.makeKeyAndOrderFront(nil)
+        // A sheet is its own window; capture it (as <name>-sheet.png) too.
+        if let sheet = window.attachedSheet, let sheetView = sheet.contentView?.superview ?? sheet.contentView {
+            let sheetURL = url.deletingPathExtension().appendingPathExtension("sheet.png")
+            snapshot(sheetView, to: sheetURL)
+        }
+        snapshot(view, to: url)
+    }
+
+    private static func snapshot(_ view: NSView, to url: URL) {
         let size = view.bounds.size
         guard let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),

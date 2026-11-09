@@ -265,6 +265,10 @@ struct SettingsField<Content: View>: View {
 struct SettingsNotice<Action: View>: View {
     let message: String
     var tint: Color = .red
+    /// True when the row opens its group (nothing above it in the column):
+    /// the 4 pt that keeps the button off a description above isn't needed,
+    /// and would only widen the gap above the group.
+    var firstInGroup = false
     @ViewBuilder var action: () -> Action
 
     var body: some View {
@@ -288,7 +292,7 @@ struct SettingsNotice<Action: View>: View {
         // A notice sits INSIDE a group, only `contentSpacing` under the line
         // above, so the button's 4pt top overhang nearly touched that help
         // text. Give the overhang back on top; it still saves 4pt below.
-        .padding(.top, 4)
+        .padding(.top, firstInGroup ? 0 : 4)
     }
 }
 

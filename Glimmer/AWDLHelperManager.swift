@@ -491,7 +491,7 @@ struct AWDLEnablePrompt: View {
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Smooth out Wi-Fi stutter").font(.headline)
+                    Text("Reduce lag spikes on Wi-Fi").font(.headline)
                     Text("Recommended for wireless streaming")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }

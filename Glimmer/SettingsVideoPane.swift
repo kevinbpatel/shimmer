@@ -63,13 +63,24 @@ struct VideoPane: View {
             }
 
             SettingsField("Wi-Fi") {
-                Toggle("Smooth out Wi-Fi stutter while streaming",
-                       isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
-                SettingsHelp("Temporarily pauses AirDrop and related Wi-Fi activity during a stream.")
+                // Waiting for approval, the setting isn't on, so it never shows
+                // a tick: a red dot stands in the checkbox's place until the
+                // user allows Shimmer in the background.
                 if case .requiresApproval = awdl.state {
-                    SettingsNotice(message: "macOS needs you to approve the Shimmer network helper.") {
-                        Button("Open Login Items…") { awdl.openSystemSettings() }
+                    // Like Tailscale: a row with a trailing button carries no
+                    // description under it; the explanation is the tooltip
+                    // until the checkbox (and its description) comes back.
+                    SettingsNotice(message: "Reduce lag spikes on Wi-Fi", firstInGroup: true) {
+                        Button("Open Settings…") { awdl.openSystemSettings() }
                     }
+                    .help("Turn on Shimmer under Allow in the Background. AirDrop, AirPlay and "
+                        + "Sidecar share your Wi-Fi radio and can interrupt the stream; this pauses "
+                        + "them while you play.")
+                } else {
+                    Toggle("Reduce lag spikes on Wi-Fi",
+                           isOn: Binding(get: { awdl.isRegistered }, set: { scheduleHelperToggle($0) }))
+                    SettingsHelp("AirDrop, AirPlay and Sidecar share your Wi-Fi radio and can interrupt the "
+                        + "stream. This pauses them while you play. Not needed on Ethernet.")
                 }
                 if case .notRunning = awdl.state {
                     SettingsNotice(message: "The network helper is approved, but macOS can't start it.") {

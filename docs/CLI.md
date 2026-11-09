@@ -4,22 +4,16 @@
 It prints JSON and returns nonzero on a failed diagnosis or stream test.
 It requires Python 3 and the existing user account's access to macOS unified logs.
 
-The app bundles the command and this guide in `Contents/Resources`. In
-**General → CLI integration → Show Me How**, use **Add Command to PATH** to add
-`~/.local/bin/shimmerctl` for your account. Open a new Terminal window afterward.
-Removing it removes only Shimmer's symlink and its marked shell-profile block.
-The installer supports zsh, bash, and fish and does not overwrite other commands.
-
-Without adding it to PATH:
+The app bundles the command and this guide in `Contents/Resources`:
 
 ```sh
-/Applications/Shimmer.app/Contents/Resources/shimmerctl status
+/Applications/Shimmer.app/Contents/Resources/shimmerctl doctor
 ```
 
-Coding agents can discover `shimmerctl` on PATH or use that bundled path, read
-`--help`, and consult the bundled `CLI.md`. **Copy Agent Instructions** in the
-same sheet includes this discovery information and the selected PC. No pairing
-credentials are copied. In a source checkout, `scripts/shimmerctl` remains usable.
+It's meant for coding agents. **General → Coding agents → Copy Instructions**
+copies a prompt with that path, the selected PC and the workflow below; paste it
+into your agent. No pairing credentials are copied. In a source checkout,
+`scripts/shimmerctl` works the same.
 
 ```sh
 scripts/shimmerctl doctor              # start here: app state, helpers, PC ports, fixes

@@ -26,7 +26,6 @@ struct AppPane: View {
     /// in System Settings > Login Items - surfaced inline so the user is not
     /// left with a toggle that silently does nothing at the next reboot.
     @State private var loginItemNeedsApproval = false
-    @State private var showCLIIntegration = false
 
     /// Defer the SMAppService register/unregister off the SwiftUI `.onChange`
     /// transaction - running it inline (synchronous, XPC-backed) mid-update
@@ -47,15 +46,19 @@ struct AppPane: View {
                 SettingsHelp("Hidden when idle. Shimmer stays available in the Dock.")
                 // The login helper suppresses the window; Dock access remains
                 // available whenever there is no useful menu-bar status.
-                Toggle("Be ready at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, on in
-                        scheduleLoginItemRegistration(launchAtLogin: on)
-                    }
-                SettingsHelp("Starts quietly when you sign in.")
+                // Waiting for approval it isn't on, so no tick: a red dot stands
+                // in the checkbox's place until the user allows Shimmer.
                 if loginItemNeedsApproval {
-                    SettingsNotice(message: "macOS needs you to approve Shimmer in Login Items.") {
-                        Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+                    SettingsNotice(message: "Be ready at login") {
+                        Button("Open Settings…") { SMAppService.openSystemSettingsLoginItems() }
                     }
+                    .help("Turn on Shimmer under Allow in the Background. Starts quietly when you sign in.")
+                } else {
+                    Toggle("Be ready at login", isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { _, on in
+                            scheduleLoginItemRegistration(launchAtLogin: on)
+                        }
+                    SettingsHelp("Starts quietly when you sign in.")
                 }
             }
 
@@ -81,12 +84,17 @@ struct AppPane: View {
                 }
             }
 
-            SettingsField("CLI integration") {
+            // The agent finds the bundled shimmerctl itself (the instructions
+            // carry its path), so there's nothing to install or type here.
+            SettingsField("Coding agents") {
                 HStack {
-                    Text("Diagnose Shimmer from Terminal.")
+                    Text("Let an agent check and fix Shimmer.")
                     Spacer(minLength: 8)
-                    Button("Show Me How") { showCLIIntegration = true }
-                        .settingsTrailingButton()
+                    CLICopyButton("Copy Instructions") {
+                        ShimmerCLIAgentInstructions.text(hostName: model.selectedHost?.displayName,
+                            address: model.selectedHostRouteAddress)
+                    }
+                    .settingsTrailingButton()
                 }
             }
 
@@ -103,13 +111,16 @@ struct AppPane: View {
                 }
             }
         }
-        .sheet(isPresented: $showCLIIntegration) {
-            CLIIntegrationSheet().environment(model)
+        .onAppear { refreshLoginApproval() }
+        // Approval happens in System Settings; re-check on the way back.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLoginApproval()
         }
-        .onAppear {
-            guard launchAtLogin else { loginItemNeedsApproval = false; return }
-            let service = SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
-            loginItemNeedsApproval = (service.status == .requiresApproval)
-        }
+    }
+
+    private func refreshLoginApproval() {
+        guard launchAtLogin else { loginItemNeedsApproval = false; return }
+        let service = SMAppService.loginItem(identifier: LoginItemManager.helperBundleID)
+        loginItemNeedsApproval = (service.status == .requiresApproval)
     }
 }
