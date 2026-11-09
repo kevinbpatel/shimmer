@@ -293,6 +293,7 @@
 		A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DE000320000000000000 /* PictureInPictureTests.swift */; };
 		A1C0DEAV1SEQ100000000000 /* AV1SequenceHeaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEAV1SEQ200000000000 /* AV1SequenceHeaderTests.swift */; };
 		A1C0DEAUDCEL100000000000 /* AudioCushionCeilingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEAUDCEL200000000000 /* AudioCushionCeilingTests.swift */; };
+		A1C0DEADDAIR100000000000 /* AudioCushionDeadAirTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEADDAIR200000000000 /* AudioCushionDeadAirTests.swift */; };
 		A1C0DEADOPUS100000000000 /* OpusConcealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEADOPUS200000000000 /* OpusConcealTests.swift */; };
 		A1C0DEADRTPR100000000000 /* RtpAudioReceiverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DEADRTPR200000000000 /* RtpAudioReceiverTests.swift */; };
 		A1C0DECDCMSK100000000000 /* CodecMaskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */; };
@@ -629,6 +630,7 @@
 		A1C0DE000320000000000000 /* PictureInPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PictureInPictureTests.swift"; sourceTree = "<group>"; };
 		A1C0DEAV1SEQ200000000000 /* AV1SequenceHeaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AV1SequenceHeaderTests.swift; sourceTree = "<group>"; };
 		A1C0DEAUDCEL200000000000 /* AudioCushionCeilingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioCushionCeilingTests.swift"; sourceTree = "<group>"; };
+		A1C0DEADDAIR200000000000 /* AudioCushionDeadAirTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioCushionDeadAirTests.swift"; sourceTree = "<group>"; };
 		A1C0DEADOPUS200000000000 /* OpusConcealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OpusConcealTests.swift"; sourceTree = "<group>"; };
 		A1C0DEADRTPR200000000000 /* RtpAudioReceiverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RtpAudioReceiverTests.swift"; sourceTree = "<group>"; };
 		A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CodecMaskTests.swift"; sourceTree = "<group>"; };
@@ -1021,6 +1023,7 @@
 				A1C0DE000320000000000000 /* PictureInPictureTests.swift */,
 				A1C0DEAV1SEQ200000000000 /* AV1SequenceHeaderTests.swift */,
 				A1C0DEAUDCEL200000000000 /* AudioCushionCeilingTests.swift */,
+				A1C0DEADDAIR200000000000 /* AudioCushionDeadAirTests.swift */,
 				A1C0DEADOPUS200000000000 /* OpusConcealTests.swift */,
 				A1C0DEADRTPR200000000000 /* RtpAudioReceiverTests.swift */,
 				A1C0DECDCMSK200000000000 /* CodecMaskTests.swift */,
@@ -1452,6 +1455,7 @@
 				A1C0DE000310000000000000 /* PictureInPictureTests.swift in Sources */,
 				A1C0DEAV1SEQ100000000000 /* AV1SequenceHeaderTests.swift in Sources */,
 				A1C0DEAUDCEL100000000000 /* AudioCushionCeilingTests.swift in Sources */,
+				A1C0DEADDAIR100000000000 /* AudioCushionDeadAirTests.swift in Sources */,
 				A1C0DEADOPUS100000000000 /* OpusConcealTests.swift in Sources */,
 				A1C0DEADRTPR100000000000 /* RtpAudioReceiverTests.swift in Sources */,
 				A1C0DECDCMSK100000000000 /* CodecMaskTests.swift in Sources */,
