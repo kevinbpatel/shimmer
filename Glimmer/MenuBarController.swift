@@ -152,6 +152,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Rebuilt from the model each time the menu opens, so every row reflects
     /// the moment of opening; nothing here is observed while the menu is up.
     func menuWillOpen(_ menu: NSMenu) {
+        // Recorded for shimmerctl: if the icon "doesn't respond" and this
+        // never fires, the click never reached Shimmer (status-item clicks
+        // bypass the app's event stream, so they can't be observed directly).
+        AgentControl.shared.menuBarEvent("open")
+        Diag.info("menu bar menu opened", "MenuBar")
         menu.removeAllItems()
 
         // The header: the PC's name over its live status, inert.

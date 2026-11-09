@@ -51,6 +51,10 @@ extension StreamWindow {
     func setMouseInputDisabled(_ disabled: Bool) {
         mouseInputDisabled = disabled
         guard !didClose else { return }
+        // The menu bar's reachability follows who owns the pointer.
+        if displayMode == .fullScreen, !isBackgrounded, window.isKeyWindow {
+            NSApp.presentationOptions = fullScreenPresentationOptions(coversNotch: coversNotch)
+        }
         let view = window.contentView as? StreamInputView
         if disabled {
             setCursorHidden(false)
@@ -167,11 +171,7 @@ extension StreamWindow {
         // gate in show() - coversNotch picks the strict `.hideMenuBar +
         // .hideDock` for notch coverage, otherwise the softer
         // `.autoHideMenuBar + .autoHideDock`.
-        if coversNotch {
-            NSApp.presentationOptions = [.hideMenuBar, .hideDock]
-        } else {
-            NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
-        }
+        NSApp.presentationOptions = fullScreenPresentationOptions(coversNotch: coversNotch)
         onBackgroundedChanged?(false)
     }
 }

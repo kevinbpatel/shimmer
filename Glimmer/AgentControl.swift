@@ -57,6 +57,15 @@ final class AgentControl: NSObject {
     private var lastContent: Data?
     private var lastCommand: [String: String]?
     private var watcher: DispatchSourceFileSystemObject?
+    private var menuBarEvents: [String: String] = [:]
+
+    /// The last click on Shimmer's status item and the last time its menu
+    /// opened (see MenuBarController's click monitor).
+    func menuBarEvent(_ kind: String, detail: String? = nil) {
+        menuBarEvents["last_" + kind] = ISO8601DateFormatter().string(from: Date())
+        if let detail { menuBarEvents["last_" + kind + "_detail"] = detail }
+        writeState(force: true)
+    }
     private let launchedAt = Date()
 
     func start(model: AppModel) {
@@ -121,13 +130,21 @@ final class AgentControl: NSObject {
             finish(id: id, name: name, result: "ok")
         case .refresh:
             AWDLHelperManager.shared.refresh()
-            if let model, let host = model.selectedHost {
-                Task { @MainActor in
-                    await model.pollHostStatusOnce(for: host.id)
-                    self.finish(id: id, name: name, result: "ok")
-                }
-            } else {
+            guard let model, let host = model.selectedHost else {
                 finish(id: id, name: name, result: "ok")
+                return
+            }
+            // Answer when the PC check finishes or after 6 s, whichever is
+            // first: a slow /serverinfo must not leave the CLI waiting.
+            let once = Once()
+            Task { @MainActor in
+                await model.pollHostStatusOnce(for: host.id)
+                if once.claim() { self.finish(id: id, name: name, result: "ok") }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                if once.claim() {
+                    self.finish(id: id, name: name, result: "ok; the PC's status is still being checked")
+                }
             }
         case .repairWifiHelper:
             AWDLHelperManager.shared.repair()
@@ -174,7 +191,12 @@ final class AgentControl: NSObject {
 
     func writeState(force: Bool = false) {
         guard let model else { return }
-        let snapshot = Self.snapshot(model: model, launchedAt: launchedAt, lastCommand: lastCommand)
+        var snapshot = Self.snapshot(model: model, launchedAt: launchedAt, lastCommand: lastCommand)
+        let options = NSApp.presentationOptions
+        snapshot["menu_bar"] = menuBarEvents.merging([
+            "hidden_by_shimmer": options.contains(.hideMenuBar) ? "yes (full-screen stream covering the notch)"
+                : options.contains(.autoHideMenuBar) ? "auto-hides (full-screen stream)" : "no",
+        ]) { current, _ in current } as [String: Any]
         guard let content = try? JSONSerialization.data(
             withJSONObject: snapshot, options: [.prettyPrinted, .sortedKeys]) else { return }
         guard force || content != lastContent else { return }
@@ -298,6 +320,12 @@ final class AgentControl: NSObject {
             "last_command": lastCommand ?? [:],
             "commands": Command.allCases.map(\.rawValue),
         ]
+    }
+
+    /// Lets exactly one of two racing completions report.
+    @MainActor private final class Once {
+        private var done = false
+        func claim() -> Bool { defer { done = true }; return !done }
     }
 
     static func inputMonitoringStatus() -> String {

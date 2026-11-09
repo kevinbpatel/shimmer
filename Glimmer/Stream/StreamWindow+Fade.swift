@@ -76,11 +76,19 @@ extension StreamWindow {
         // bar and Dock stay, that's the point of a window. (`show()` skipped
         // saving them too, so close() has nothing to restore.)
         guard displayMode == .fullScreen else { return }
-        if cover {
-            NSApp.presentationOptions = [.hideMenuBar, .hideDock]
-        } else {
-            NSApp.presentationOptions = [.autoHideMenuBar, .autoHideDock]
-        }
+        NSApp.presentationOptions = fullScreenPresentationOptions(coversNotch: cover)
+    }
+
+    /// The menu bar and Dock while a full-screen stream is up. Covering the
+    /// notch normally hides them outright, so a pointer driving the game can't
+    /// drag the menu bar down over the picture. With mouse input disabled the
+    /// pointer is the Mac's own, and hiding the menu bar outright made
+    /// Shimmer's menu bar icon (and every other) unreachable for the whole
+    /// stream - so it auto-hides instead and slides down at the top edge.
+    func fullScreenPresentationOptions(coversNotch: Bool) -> NSApplication.PresentationOptions {
+        coversNotch && !mouseInputDisabled
+            ? [.hideMenuBar, .hideDock]
+            : [.autoHideMenuBar, .autoHideDock]
     }
 
     /// Tear the stream window down cleanly. Safe to call more than once.

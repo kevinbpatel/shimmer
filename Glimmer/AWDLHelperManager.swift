@@ -287,13 +287,17 @@ final class AWDLHelperManager: ObservableObject {
             return
         }
         guard approvalPoll == nil else { return }
-        approvalPoll = Task { @MainActor in
+        // ONE loop. refresh() calls back into this function, which returns
+        // early while `approvalPoll` is set and cancels it once approval lands -
+        // so the loop never starts a second copy of itself. (It once cleared
+        // `approvalPoll` before refreshing, so every pass spawned another loop;
+        // within minutes thousands of them pinned the main thread on
+        // SMAppService.status and the app stopped responding.)
+        approvalPoll = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard !Task.isCancelled else { return }
-                self.approvalPoll = nil
+                try? await Task.sleep(for: .seconds(3))
+                guard let self, !Task.isCancelled else { return }
                 self.refresh()
-                if self.approvalPoll == nil { return }  // no longer pending
             }
         }
     }
