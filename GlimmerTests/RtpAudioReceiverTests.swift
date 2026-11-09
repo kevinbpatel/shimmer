@@ -76,4 +76,28 @@ struct RtpAudioReceiverTests {
             [UInt8](repeating: 6, count: 8)
         ])
     }
+
+    /// One stray misaligned parity packet used to turn audio FEC, and with it reordering, off for the session.
+    @Test func oneMisalignedParityPacketLeavesAudioFecOn() {
+        let sink = RecordingAudioSink()
+        let receiver = Self.audioReceiver(sink: sink)
+        for parity in [Self.parityDatagram(sequence: 0, base: 0), Self.parityDatagram(sequence: 1, base: 6)] {
+            receiver.handleDatagram(parity, count: parity.count)
+        }
+        Self.feed(receiver, dataSequences: [4, 6, 5])
+        #expect(!receiver.queue.incompatibleServer)
+        #expect(sink.recordedPackets().map(\.first) == [4, 5, 6])
+    }
+
+    @Test func aStreakOfMisalignedParityTurnsAudioFecOff() {
+        let receiver = Self.audioReceiver(sink: NullAudioSink())
+        let sync = Self.parityDatagram(sequence: 0, base: 0)
+        receiver.handleDatagram(sync, count: sync.count)
+        for index in 1...RtpAudioQueue.layoutMismatchStreakLimit {
+            #expect(!receiver.queue.incompatibleServer)
+            let parity = Self.parityDatagram(sequence: UInt16(index), base: 6)
+            receiver.handleDatagram(parity, count: parity.count)
+        }
+        #expect(receiver.queue.incompatibleServer)
+    }
 }
