@@ -267,4 +267,31 @@ struct StreamReconnectTests {
         #expect(StreamSession.reconnectCause(code: StreamSession.recoverableTerminationCode)
             .hasPrefix("the PC closed the live stream (code 0x80030023)"))
     }
+
+    // MARK: - The PC ended the session on purpose (upstream fa9edc30)
+
+    /// The game quit on the PC, or Force Stop: the PC answers idle, so the stream ends cleanly
+    /// instead of relaunching the game the user just closed.
+    @Test func anIdlePCEndedTheSession() {
+        #expect(StreamSession.pcEndedSession(runningAppID: 0, appID: 881))
+    }
+
+    /// Another device took the PC over: ending, not reconnecting, leaves its session alone.
+    @Test func anotherAppMeansThePCMovedOn() {
+        #expect(StreamSession.pcEndedSession(runningAppID: 42, appID: 881))
+        #expect(StreamSession.pcMovedOn(runningAppID: 42, appID: 881))
+    }
+
+    @Test func ourAppStillRunningIsAReconnect() {
+        #expect(!StreamSession.pcEndedSession(runningAppID: 881, appID: 881))
+        #expect(!StreamSession.pcMovedOn(runningAppID: 881, appID: 881))
+    }
+
+    /// No answer is Sunshine restarting across a lock, which a reconnect rides out; and an idle PC
+    /// mid-reconnect is ours to relaunch, not another device's session.
+    @Test func noAnswerOrIdleMidReconnectStillReconnects() {
+        #expect(!StreamSession.pcEndedSession(runningAppID: nil, appID: 881))
+        #expect(!StreamSession.pcEndedSession(runningAppID: 0, appID: nil))
+        #expect(!StreamSession.pcMovedOn(runningAppID: 0, appID: 881))
+    }
 }

@@ -152,7 +152,9 @@ extension StreamSession {
         //    Best-effort; the host can be unreachable if the network dropped.
         let provider = quitAppOnStopProvider
         let settingSaysQuit = await MainActor.run { provider() }
-        let quitApp = quitAppRequested || settingSaysQuit
+        // Once the PC ended the session itself, nothing of ours is left to /cancel,
+        // and a /cancel would quit whatever another device is streaming now.
+        let quitApp = (quitAppRequested || settingSaysQuit) && !pcEndedSession
         if let net = network {
             if quitApp {
                 log.info("Stop: /cancel - ending the host's app")
@@ -432,7 +434,7 @@ extension StreamSession {
 /// the (single) pending `value` read; later offers are dropped. Used by M6 to
 /// race a non-cancellable launch against a deadline/stop watcher and return the
 /// instant either lands. Actor-isolated for race-free latching.
-private actor FirstResultBox<T: Sendable> {
+actor FirstResultBox<T: Sendable> {
     private var result: Result<T, Error>?
     private var waiter: CheckedContinuation<Result<T, Error>, Never>?
 

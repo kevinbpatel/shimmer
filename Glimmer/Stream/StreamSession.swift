@@ -271,6 +271,9 @@ public actor StreamSession {
     static let reconnectAttemptCap = 5
     /// ...and at most this long wall-clock before we give up and tear down.
     static let reconnectWindowSeconds: TimeInterval = 30.0
+    /// How long a PC-sent terminate waits on /serverinfo to learn whether the PC
+    /// ended the session on purpose. No answer in time means reconnect.
+    static let hostEndProbeSeconds: TimeInterval = 1.5
 
     // MARK: - Launch deadline (M6)
 
@@ -291,6 +294,9 @@ public actor StreamSession {
     /// watchdog) and makes `handleHostTerminate` ignore re-entrant terminates
     /// fired by the dead/old backend mid-reconnect.
     var isReconnecting = false
+    /// The PC ended the session on purpose (a quit on the PC, Force Stop, or
+    /// another device taking over): stop() must not /cancel whatever runs now.
+    var pcEndedSession = false
     /// Attempt counter + deadline for the current reconnect episode.
     var reconnectAttempts = 0
     /// The inputs needed to rebuild the connection on a reconnect, captured at

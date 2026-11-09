@@ -125,7 +125,67 @@ extension StreamSession {
             return
         }
 
+        // Our own dead-peer (-1) says nothing about the PC. A code the PC sent may
+        // mean it ended the session on purpose (a quit on the PC, Force Stop, or
+        // another device taking over), so ask before relaunching anything.
+        if code != Self.deadPeerTerminationCode {
+            isReconnecting = true   // the probe owns the outcome; re-entrant terminates wait
+            let runningAppID = await probeRunningAppID()
+            isReconnecting = false
+            guard isStreaming, !stopInProgress else { return }
+            if Self.pcEndedSession(runningAppID: runningAppID, appID: reconnectAppID) {
+                Diag.notice("The PC ended the session (code 0x\(String(UInt32(bitPattern: code), radix: 16)), "
+                    + "now running app \(runningAppID ?? 0)) - ending the stream, not reconnecting.", "Stream")
+                await endStreamClosedByPC()
+                return
+            }
+        }
         await runReconnectEpisode(code: code, cause: Self.reconnectCause(code: code))
+    }
+
+    /// Whether the PC ended the session on purpose: it answered and no longer
+    /// runs our app (0 after a quit on the PC or Force Stop, another id after a
+    /// takeover). No answer means Sunshine is restarting, which a reconnect rides out.
+    static func pcEndedSession(runningAppID: Int?, appID: Int?) -> Bool {
+        guard let runningAppID, let appID else { return false }
+        return runningAppID != appID
+    }
+
+    /// Whether a reconnect would take the PC over from another app: it now runs
+    /// one that isn't ours, which only another device (or the user at the PC)
+    /// could have started. Idle (0) is ours to relaunch.
+    static func pcMovedOn(runningAppID: Int, appID: Int) -> Bool {
+        runningAppID != 0 && runningAppID != appID
+    }
+
+    /// One quick /serverinfo over the paired channel: the app the PC runs now,
+    /// or nil if it didn't answer in time (or answered without a trustworthy
+    /// currentgame). The HTTP leg can't be cancelled, so it is raced, not awaited.
+    private func probeRunningAppID() async -> Int? {
+        guard let server = reconnectServer else { return nil }
+        let net = NetworkClient(server: server)
+        let box = FirstResultBox<Int?>()
+        let probe = Task {
+            let info = try? await net.fetchServerInfo()
+            let trusted = info.map { $0.reportsCurrentGame && $0.pairStatus == .paired } ?? false
+            await box.offer(.success(trusted ? info?.currentGameID : nil))
+        }
+        let timer = Task {
+            try? await Task.sleep(for: .seconds(Self.hostEndProbeSeconds))
+            await box.offer(.success(nil))
+        }
+        let answer = try? await box.value.get()
+        probe.cancel()
+        timer.cancel()
+        return answer ?? nil
+    }
+
+    /// The PC ended the session on purpose: end it like a clean close, with no
+    /// error banner, no /launch and no /cancel.
+    private func endStreamClosedByPC() async {
+        pcEndedSession = true
+        bridge?.eventContinuation?.yield(.connectionTerminated(errorCode: 0))
+        await stop(cause: .hostClosedClean)
     }
 
     /// Why the episode's log line says the link went away: -1 is our own link
@@ -175,6 +235,7 @@ extension StreamSession {
         startReconnectPathMonitor()
         defer { stopReconnectPathMonitor() }
         var waitingForNetwork = false
+        var pcMovedOn = false
 
         recovery: while isStreaming, !stopInProgress {
             switch budget.nextStep(now: Date(), sleeping: systemSleeping,
@@ -219,7 +280,12 @@ extension StreamSession {
                 reconnectServer?.address = address
             }
             Diag.notice("reconnect attempt \(reconnectAttempts)/\(Self.reconnectAttemptCap)...", "Stream")
-            if await reconnectInPlace() {
+            let outcome = await reconnectInPlace()
+            if outcome == .pcMovedOn {
+                pcMovedOn = true
+                break recovery
+            }
+            if outcome == .resumed {
                 isReconnecting = false
                 reconnectAttempts = 0
                 // Count the genuine reconnect HERE. The established-edge inference
@@ -248,6 +314,12 @@ extension StreamSession {
         let winForGiveup = window
         await MainActor.run { winForGiveup?.reconnectBanner.setVisible(false) }
         guard isStreaming, !stopInProgress else { return }
+        if pcMovedOn {
+            Diag.notice("reconnect: the PC is running another app now - ending the stream, not taking it over.",
+                        "Stream")
+            await endStreamClosedByPC()
+            return
+        }
         Diag.error(
             "reconnect exhausted after \(reconnectAttempts) attempt(s) - tearing down",
             "Stream")
@@ -304,13 +376,13 @@ extension StreamSession {
     /// backend, re-point input/decoder at it, and re-run the handshake +
     /// /launch + startConnection against the (restarted) host - all while the
     /// window, decoder, frozen frame, bridge, and event stream stay alive.
-    /// Returns true once the connection is back up.
-    private func reconnectInPlace() async -> Bool {
-        guard isStreaming, !stopInProgress else { return false }
+    /// Says whether the connection is back up, or the PC now runs another app.
+    private func reconnectInPlace() async -> ReconnectAttemptOutcome {
+        guard isStreaming, !stopInProgress else { return .failed }
         guard let server = reconnectServer,
               let config = reconnectConfig,
               let appID = reconnectAppID,
-              let win = window, let inp = input, let dec = videoDecoder else { return false }
+              let win = window, let inp = input, let dec = videoDecoder else { return .failed }
 
         // 1. Bring the dead connection fully down (idempotent - onTerminated
         //    already called stopConnection). Keeps the window/decoder/frozen
@@ -321,7 +393,7 @@ extension StreamSession {
         // stopInProgress synchronously before its own first await, so a guard
         // evaluated ON the actor between awaits reliably observes a teardown that
         // slipped in. Bail BEFORE building a fresh backend - nothing to clean up.
-        guard isStreaming, !stopInProgress else { return false }
+        guard isStreaming, !stopInProgress else { return .failed }
 
         // 2. Swap in a fresh backend (NativeBackend is one-shot: its connection
         //    state can't be reused and interrupt() latches permanently). Re-point
@@ -350,6 +422,16 @@ extension StreamSession {
         self.network = net
         do {
             let serverInfo = try await net.fetchServerInfo()
+            // Another app on the PC means someone took it over (or the user
+            // started something at the PC): a reconnect must not /cancel it.
+            if serverInfo.reportsCurrentGame,
+               Self.pcMovedOn(runningAppID: serverInfo.currentGameID, appID: appID) {
+                Diag.notice("reconnect: the PC now runs app \(serverInfo.currentGameID), not ours (\(appID))",
+                            "Stream")
+                await net.shutdown()
+                if self.network === net { self.network = nil }
+                return .pcMovedOn
+            }
             let launch = try await launchWithBusyRecovery(
                 network: net, appID: appID, config: config,
                 hintCurrentGame: serverInfo.currentGameID, allowResume: !serverInfo.isRealGFE)
@@ -368,7 +450,7 @@ extension StreamSession {
             Diag.notice("reconnect attempt failed: \(error, privacy: .private)", "Stream")
             await net.shutdown()
             self.network = nil
-            return false
+            return .failed
         }
 
         // H5: a stop() can land at ANY of the awaits above (~0.8-2.4s of handshake
@@ -384,13 +466,13 @@ extension StreamSession {
             Diag.notice("reconnect: stop slipped in mid-handshake - "
                 + "interrupting the freshly-built backend to kill the zombie connection", "Stream")
             await tearDownSlippedInReconnect(fresh: fresh, net: net)
-            return false
+            return .failed
         }
 
         // 4. Nudge a keyframe so the fresh VT session repaints over the frozen
         //    frame promptly (Sunshine sends one at start; cheap insurance).
         backend.requestIdrFrame()
-        return true
+        return .resumed
     }
 
     /// H5 cleanup: a `stop()` slipped in while this attempt was mid-handshake, so
@@ -422,4 +504,12 @@ extension StreamSession {
             connectFlowState = nil
         }
     }
+}
+
+/// How one in-place reconnect attempt ended.
+enum ReconnectAttemptOutcome: Equatable {
+    case resumed
+    case failed
+    /// The PC runs another app now; reconnecting would take it over.
+    case pcMovedOn
 }
