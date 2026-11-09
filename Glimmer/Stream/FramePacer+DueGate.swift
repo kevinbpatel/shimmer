@@ -48,6 +48,7 @@ extension FramePacer {
     func resetCadenceBaseLocked() {
         lastPresentMediaTime = .nan
         prevPresentMediaTimeForMetric = .nan
+        liveness.lastTickTargetMediaTime = .nan
     }
 
     /// In-place sibling of `resetCadenceBaseLocked`: re-anchor the cadence base ON
@@ -416,6 +417,9 @@ extension FramePacer {
             && liveness.starvedTickStreak >= FramePacer.starvationLogTicks
             && !liveness.loggedStarvation
         if shouldLogStarvation { liveness.loggedStarvation = true }
+        // A submit-time release already claimed this tick's vsync: the screen shows a new frame.
+        let claimedBySubmit = toPresent == nil && lastPresentMediaTime.isFinite
+            && abs(targetTimestamp - lastPresentMediaTime) < vsyncInterval * 0.5
         let starvationSnapshot = StarvationSnapshot(
             streak: liveness.starvedTickStreak, depth: sampledDepth,
             sinceLastMs: sinceLastForLog * 1000, targetTimestamp: targetTimestamp,
@@ -426,7 +430,7 @@ extension FramePacer {
         // over-target force-release telemetry). Folded into one helper so neither
         // branch grows this already-large function's complexity/body; see
         // `recordPerTickPresentSignals` for the two signals' rationale.
-        recordPerTickPresentSignals(gate, depth: sampledDepth)
+        recordPerTickPresentSignals(gate, depth: sampledDepth, claimedBySubmit: claimedBySubmit)
 
         emitStarvationDiagnostics(
             shouldLog: shouldLogStarvation, forcedSelfHeal: forcedSelfHeal,
@@ -461,39 +465,25 @@ extension FramePacer {
         // wire loss, VT decode errors) own the only remaining IDR/RFI paths.
 
         guard let entry = toPresent else { return }
+        presentGateRelease(entry, vsyncInterval: vsyncInterval)
+    }
 
-        // Hand the frame to the owner's present path. `willPresent`
-        // (VideoDecoder.presentFrame) owns the renderer-status / backpressure
-        // policy AND the actual `renderer.enqueue` - the pacer deliberately
-        // does NOT enqueue itself, so there's a single enqueue site and the
-        // pacer stays decoupled from the layer's failure handling. A false
-        // return means the frame was dropped at the renderer (failed / not
-        // ready); we don't count it as an on-cadence present in that case.
+    /// Hand a gate-released frame to the owner's present path. `willPresent`
+    /// (VideoDecoder.presentFrame) owns the renderer-status / backpressure policy
+    /// AND the actual `renderer.enqueue` - the pacer deliberately does NOT enqueue
+    /// itself, so there's a single enqueue site. A false return means the RENDERER
+    /// refused the frame (failed / not ready): count the consecutive-reject streak,
+    /// the wedge signature the recovery ladder keys its flush on. A present stamps
+    /// the present-side liveness clock the watchdog gates on, then the cadence
+    /// metric (realized inter-present interval vs the stream's frame interval).
+    /// Off the lock; shared by the tick and submit-release paths.
+    func presentGateRelease(_ entry: Entry, vsyncInterval: CFTimeInterval) {
         guard let willPresent else { return }
-        let presented = willPresent(entry.sampleBuffer)
-        guard presented else {
-            // The gate did its job - the RENDERER refused the frame (failed /
-            // not ready). Count the consecutive-reject streak: this is the
-            // wedge signature the renderer-refusal incident proved invisible
-            // (releases 0/s, ticks healthy, depth 1, survived a link rebuild) -
-            // the measured escape the recovery ladder keys the flush on.
+        guard willPresent(entry.sampleBuffer) else {
             noteGateReleaseRejected()
             return
         }
-
-        // Present-side liveness: a frame ACTUALLY reached the renderer. This is
-        // the clock the watchdog's "present wedged" trip gates on - the single
-        // number that proves the screen is being updated, distinct from the
-        // decode-output clock the old watchdog was blind to. Stamp it (plus the
-        // tick-deficit repaint source) before the cadence metric so the
-        // watchdog sees the freshest possible value.
         noteFramePresented(entry.sampleBuffer)
-
-        // Present-cadence metric (only for frames that actually reached the
-        // renderer): how far this present landed from the ideal grid. We
-        // measure present-vs-PTS as the delta between the realized inter-present
-        // wall-clock and the stream's frame interval - a smooth stream lands
-        // near zero; jitter shows as spread.
         let presentDelta = lastPresentInterPresentDelta()
         stats.recordPresent(cadenceErrorMs: presentDelta * 1000.0)
     }
@@ -502,8 +492,8 @@ extension FramePacer {
     /// grows `releaseDueFrame`'s complexity/body: the stale-frame REPEAT counter
     /// and the over-target force-release telemetry. Called OFF the gate's lock
     /// (caller unlocked). See each sub-helper for its rationale.
-    func recordPerTickPresentSignals(_ gate: DueGateResult, depth: Int) {
-        recordStaleRepeatIfNeeded(gate.toPresent == nil, queueEmpty: depth == 0)
+    func recordPerTickPresentSignals(_ gate: DueGateResult, depth: Int, claimedBySubmit: Bool) {
+        recordStaleRepeatIfNeeded(gate.toPresent == nil && !claimedBySubmit, queueEmpty: depth == 0)
         recordOverTargetReleaseIfNeeded(gate, depth: depth)
     }
 

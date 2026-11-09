@@ -75,7 +75,7 @@ extension TelemetryCounters {
                         pacerOverTargetReleaseTotal,
                         tickMissDescheduledTotal, tickMissCoalescedTotal,
                         tickMissPreemptedTotal, tickMissLinkskipTotal,
-                        suppressedDropTotal, decodeGatedDropTotal,
+                        suppressedDropTotal, pacerSubmitReleaseTotal, decodeGatedDropTotal,
                         discontinuityFlushTotal,
                         audioPacketsTotal, audioPacketsLostTotal, audioFecRecoveredTotal,
                         audioFecMismatchTotal, audioUnderrunTotal, audioUnderrunDeadairTotal, audioOverrunTotal,

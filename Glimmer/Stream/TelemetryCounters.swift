@@ -320,6 +320,9 @@ final class TelemetryCounters: @unchecked Sendable {
     /// suppressed-mode noise. Incremented on the pacer's submit path while the
     /// suppression gauge below is set; always-live like its sibling drop counters.
     let suppressedDropTotal = Counter()
+    /// Frames the pacer released straight from submit at rest instead of on a display tick. Read
+    /// beside `drops_backpressure`: a fast present that crowds the layer's queue shows in both.
+    let pacerSubmitReleaseTotal = Counter()
 
     /// Frames dropped WITHOUT decode while the DECODE GATE is engaged (stage 2
     /// of hidden-window handling: after ~2s of continuous suppression the

@@ -12,6 +12,7 @@
 
 import AVFoundation
 import CoreMedia
+import QuartzCore
 import os
 
 extension FramePacer {
@@ -27,7 +28,9 @@ extension FramePacer {
     /// the displaced frame counts as a SUPPRESSED drop - see the suppressed
     /// branch below.
     ///
-    /// Returns immediately - the actual present happens on the next due vsync.
+    /// Returns immediately - the actual present happens on the next due vsync,
+    /// except during warm handover and at rest, where a frame the cadence gate
+    /// already calls due is released from here (on the pacing queue).
     func submit(_ sampleBuffer: CMSampleBuffer, hostPTS: CMTime) {
         let ptsSeconds = hostPTS.isValid ? CMTimeGetSeconds(hostPTS) : Double.nan
         let entry = Entry(
@@ -90,6 +93,20 @@ extension FramePacer {
             return
         }
 
+        // RELEASE AT SUBMIT: at rest a due frame waited for the next tick plus a
+        // queue hop - up to a vsync of output_to_present for nothing. The gate
+        // still spaces presents one stream interval apart. The present runs on the
+        // pacing queue, behind any tick already releasing: from this decoder thread
+        // it could otherwise reach the layer ahead of an older frame a late tick
+        // has already dequeued.
+        if let vsync = passthroughVsyncLocked() {
+            lock.unlock()
+            TelemetryCounters.shared.pacerSubmitReleaseTotal.increment()
+            let handoff = SubmitRelease(entry: entry)
+            pacingQueue.async { [weak self] in self?.presentGateRelease(handoff.entry, vsyncInterval: vsync) }
+            return
+        }
+
         // Insert in hostPTS order. Common case (in-order arrival) is an append;
         // the search walks back from the tail so a single reorder is cheap.
         if ptsSeconds.isFinite {
@@ -148,6 +165,38 @@ extension FramePacer {
         }
     }
 
+    /// At rest (target 1, nothing queued, ticks owning the release, no gap
+    /// recovery), decide whether the cadence gate calls a frame submitted now due
+    /// on its next scanout. If so, claim that scanout as the present time and
+    /// return the vsync interval. Under `lock`.
+    private func passthroughVsyncLocked() -> CFTimeInterval? {
+        guard !presentSuppressed, queue.isEmpty,
+              adaptiveDepth.adaptiveTargetDepth == FramePacer.targetDepth,
+              !tickDeficit.deficitModeActive, !tickDeficit.floorAssistActive,
+              lastPresentMediaTime.isFinite, liveness.lastTickTargetMediaTime.isFinite else { return nil }
+        let vsync = refreshTelemetry.lastRefreshIntervalSeconds
+        let hostNow = CFAbsoluteTimeGetCurrent()
+        guard vsync.isFinite, vsync > 0, !inGapRecoveryLocked(now: hostNow) else { return nil }
+        let scanout = Self.nextScanout(
+            now: CACurrentMediaTime(), lastTickTarget: liveness.lastTickTargetMediaTime, vsync: vsync)
+        // The tick gate's test (interval minus half a vsync); a timebase jump is left to the tick.
+        let sinceLast = scanout - lastPresentMediaTime
+        guard sinceLast >= 0, sinceLast <= 1.0,
+              sinceLast >= streamFrameIntervalSeconds - vsync * 0.5 else { return nil }
+        lastPresentMediaTime = scanout
+        tickDeficit.tickScanoutMediaTime = scanout
+        updateGapRecoveryLocked(presented: true, empty: true, now: hostNow)
+        return vsync
+    }
+
+    /// The panel vsync a frame released at `now` lands on: the last tick's target, or the
+    /// first grid step past `now` when the next tick is late. Pure, so the test can pin it.
+    static func nextScanout(now: CFTimeInterval, lastTickTarget: CFTimeInterval, vsync: CFTimeInterval)
+        -> CFTimeInterval {
+        guard now > lastTickTarget else { return lastTickTarget }
+        return lastTickTarget + vsync * ((now - lastTickTarget) / vsync).rounded(.up)
+    }
+
     // MARK: - Suppression flag (suppression edges)
 
     /// Flip the pacer-side suppression flag (`presentSuppressed`, declared with
@@ -187,4 +236,10 @@ extension FramePacer {
         // the same discipline as every other caller of the service pass.
         handleTickDeficitEvents(events)
     }
+}
+
+/// A release-at-submit frame on its way to the pacing queue. @unchecked: the decoder thread hands
+/// the frame over and never touches it again, so the pacing queue is its only user.
+private struct SubmitRelease: @unchecked Sendable {
+    let entry: FramePacer.Entry
 }

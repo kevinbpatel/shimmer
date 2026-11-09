@@ -97,7 +97,89 @@ struct FramePacerTests {
         #expect(!FramePacer.tickOwnsScanout(now: 100, scanout: .nan))
     }
 
+    /// At rest a due frame reaches the renderer from submit instead of waiting for the next
+    /// tick, and claims the vsync it lands on, so the next frame still waits for the gate.
+    @Test func restingPacerReleasesADueFrameAtSubmit() throws {
+        let (pacer, presents) = try makeRestingPacer()
+        let tickTarget = CACurrentMediaTime() + 0.05
+        pacer.liveness.lastTickTargetMediaTime = tickTarget
+        pacer.lastPresentMediaTime = tickTarget - 1.0 / 120
+        try pacer.submit(emptySampleBuffer(), hostPTS: CMTime(value: 0, timescale: 90_000))
+        pacer.pacingQueue.sync {}
+        #expect(presents.withLock { $0 } == 1)
+        #expect(pacer.queue.isEmpty)
+        #expect(pacer.lastPresentMediaTime == tickTarget)
+        try pacer.submit(emptySampleBuffer(), hostPTS: CMTime(value: 750, timescale: 90_000))
+        pacer.pacingQueue.sync {}
+        #expect(presents.withLock { $0 } == 1)
+        #expect(pacer.queue.count == 1)
+    }
+
+    /// A late tick has dequeued frame A and is handing it to the layer when frame B arrives and is
+    /// due at once: B is presented after A, never ahead of it.
+    @Test func aSubmitReleaseNeverOvertakesATicksFrame() throws {
+        let pacer = try makePacer(fps: 120, queued: 1)
+        pacer.refreshTelemetry.lastRefreshIntervalSeconds = 1.0 / 120
+        let frameA = try ObjectIdentifier(#require(pacer.queue.first?.sampleBuffer))
+        let order = OSAllocatedUnfairLock(initialState: [String]())
+        let entered = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        pacer.willPresent = { buffer in
+            let label = ObjectIdentifier(buffer) == frameA ? "A" : "B"
+            if label == "A" {
+                entered.signal()
+                _ = release.wait(timeout: .now() + 2)
+            }
+            order.withLock { $0.append(label) }
+            return true
+        }
+        let target = CACurrentMediaTime() - 0.05
+        pacer.liveness.lastTickTargetMediaTime = target
+        pacer.pacingQueue.async {
+            pacer.releaseDueFrame(targetTimestamp: target, vsyncInterval: 1.0 / 120, tickScanout: target)
+        }
+        #expect(entered.wait(timeout: .now() + 2) == .success)
+        try pacer.submit(emptySampleBuffer(), hostPTS: CMTime(value: 750, timescale: 90_000))
+        release.signal()
+        pacer.pacingQueue.sync {}
+        #expect(order.withLock { $0 } == ["A", "B"])
+    }
+
+    /// Passthrough stays off while a jitter buffer is wanted and before the first tick,
+    /// so the tick path keeps owning those cases.
+    @Test func submitReleaseNeedsRestConditions() throws {
+        let (pacer, presents) = try makeRestingPacer()
+        let tickTarget = CACurrentMediaTime() + 0.05
+        pacer.liveness.lastTickTargetMediaTime = tickTarget
+        pacer.lastPresentMediaTime = tickTarget - 1.0 / 120
+        pacer.adaptiveDepth.adaptiveTargetDepth = 2
+        try pacer.submit(emptySampleBuffer(), hostPTS: CMTime(value: 0, timescale: 90_000))
+        pacer.pacingQueue.sync {}
+        #expect(presents.withLock { $0 } == 0)
+        #expect(pacer.queue.count == 1)
+        pacer.adaptiveDepth.adaptiveTargetDepth = 1
+        pacer.queue.removeAll()
+        pacer.liveness.lastTickTargetMediaTime = .nan
+        try pacer.submit(emptySampleBuffer(), hostPTS: CMTime(value: 750, timescale: 90_000))
+        pacer.pacingQueue.sync {}
+        #expect(presents.withLock { $0 } == 0)
+        #expect(pacer.queue.count == 1)
+    }
+
+    @Test func nextScanoutFollowsTheTickGrid() {
+        #expect(FramePacer.nextScanout(now: 10.0, lastTickTarget: 10.004, vsync: 0.004) == 10.004)
+        #expect(abs(FramePacer.nextScanout(now: 10.005, lastTickTarget: 10.004, vsync: 0.004) - 10.008) < 1e-9)
+        #expect(abs(FramePacer.nextScanout(now: 10.0201, lastTickTarget: 10.004, vsync: 0.004) - 10.024) < 1e-9)
+    }
+
     // MARK: - Helpers
+
+    /// A ticking 120 Hz pacer at rest with nothing queued.
+    private func makeRestingPacer() throws -> (FramePacer, OSAllocatedUnfairLock<Int>) {
+        let (pacer, presents) = try makeCountingPacer(queued: 0)
+        pacer.refreshTelemetry.lastRefreshIntervalSeconds = 1.0 / 120
+        return (pacer, presents)
+    }
 
     /// A long panel vsync keeps the scanout and target 50-100 ms from `now`, so a
     /// scheduling delay between the test's clock read and the beat's can't flip either test.
