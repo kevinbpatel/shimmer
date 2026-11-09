@@ -180,6 +180,8 @@ extension AudioDecoder {
         pendingResolveTopUp = false; floorLearnGateUntilNanos = 0
         nearMissLatched = false
         quietSinceNanos = seedNowNanos
+        lastCushionGrowNanos = 0
+        pendingUnderrunTargetMs = nil; underrunArrivalGapNanos = 0
         floorQuietSinceNanos = seedNowNanos
         rebuildIsReprime = false
         lastUnderrunNoticeNanos = 0; underrunNoticesSuppressed = 0

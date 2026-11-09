@@ -1,9 +1,10 @@
 //
 //  AudioCushionDeadAirTests.swift
 //
-//  How the adaptive audio cushion walks back down: a quiet window releases a
-//  learned floor on every link class, but never straight back to a level that
-//  just under-ran.
+//  An under-run after an arrival gap no cushion could bridge (dead air) must
+//  not deepen the cushion or teach its floor, one drain episode grows it at most
+//  once per window, and a quiet window walks a learned floor back down, but
+//  never straight back to a level that just under-ran.
 //
 
 import Foundation
@@ -13,6 +14,60 @@ import Testing
 // Same serialized suite as the stall tests: drains bump the shared under-run
 // counter that suite's evidence-gate pair brackets.
 extension AudioPlayoutStallTests {
+
+    /// A primed, playing meter one 5ms buffer from empty on a Wi-Fi-sized cap, whose newest packet
+    /// ended an ordinary 5ms gap: the history a dead-air test at the drain itself would misread.
+    private func drainingDecoder(targetMs: Double) -> AudioDecoder {
+        let decoder = AudioDecoder()
+        decoder.audioMeterLock.lock()
+        decoder.meterSampleRate = 48_000
+        decoder.playoutStarted = true
+        decoder.primed = true
+        decoder.playoutDrained = false
+        decoder.framesScheduled = 240
+        decoder.framesPlayed = 0
+        decoder.playoutTargetMs = targetMs
+        decoder.effectiveCushionMaxMs = 200
+        decoder.cushionLinkResolved = true
+        decoder.audioMeterLock.unlock()
+        decoder.noteArrivalGap(nanos: 5_000_000)
+        return decoder
+    }
+
+    /// Drain, then the packets that end the outage arrive (the longest gap first), then the next
+    /// buffer is scheduled: the order a real outage takes.
+    private func drainAndResume(_ decoder: AudioDecoder, gapsMs: [Double]) {
+        decoder.meterCompleteOnePlayout(frames: 240)
+        for gap in gapsMs { decoder.noteArrivalGap(nanos: UInt64(gap * 1_000_000)) }
+        _ = decoder.meterRegisterScheduleOrOverrun(frames: 240)
+    }
+
+    /// The 6s-blackout shape: a 625ms gap outlasts the 200ms cap, so the drain is counted as dead
+    /// air and the cushion and floor stay put, even with repair-held packets arriving 5ms apart.
+    @Test func deadAirDrainLeavesCushionAndFloorAlone() {
+        let decoder = drainingDecoder(targetMs: 170)
+        let before = TelemetryCounters.shared.audioUnderrunDeadairTotal.value
+        drainAndResume(decoder, gapsMs: [625, 5, 5])
+        #expect(decoder.playoutTargetMs == 170)
+        #expect(decoder.learnedFloorMs == 0)
+        #expect(TelemetryCounters.shared.audioUnderrunDeadairTotal.value == before + 1)
+    }
+
+    /// Control: the same drain ended by a gap a cushion can bridge is real depth evidence.
+    @Test func drainAfterBridgeableGapGrowsAndLearnsTheFloor() {
+        let decoder = drainingDecoder(targetMs: 170)
+        drainAndResume(decoder, gapsMs: [120])
+        #expect(decoder.playoutTargetMs == 180)
+        #expect(decoder.learnedFloorMs == 170)
+    }
+
+    /// A second drain inside the grow window counts but doesn't grow again.
+    @Test func secondDrainInsideTheGrowWindowDoesNotGrow() {
+        let decoder = drainingDecoder(targetMs: 100)
+        decoder.lastCushionGrowNanos = DispatchTime.now().uptimeNanoseconds
+        drainAndResume(decoder, gapsMs: [40])
+        #expect(decoder.playoutTargetMs == 100)
+    }
 
     /// A target one step above its learned floor, at the end of a quiet window whose trough
     /// stayed `minFillMs` above empty. Only wired links used to release the floor here; the

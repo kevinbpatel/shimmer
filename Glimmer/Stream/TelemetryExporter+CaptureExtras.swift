@@ -39,6 +39,7 @@ extension TelemetryExporter {
         extras.audioFecMismatchTotal = counters.audioFecMismatchTotal.value
         extras.audioReceiveFailedTotal = counters.audioReceiveFailedTotal.value
         extras.audioDecodeFailedTotal = counters.audioDecodeFailedTotal.value
+        extras.audioUnderrunDeadairTotal = counters.audioUnderrunDeadairTotal.value
         // The third hidden-window state: gated (decode stopped) vs merely
         // suppressed (decoded, dropped-to-newest) - plus its designed drops.
         extras.decodeGated = counters.decodeGated
@@ -192,6 +193,8 @@ extension TelemetrySnapshot {
         var audioReceiveFailedTotal: UInt64 = 0
         /// Received Opus packets that failed to decode and were concealed.
         var audioDecodeFailedTotal: UInt64 = 0
+        /// Under-runs settled as dead air (a gap no cushion could bridge).
+        var audioUnderrunDeadairTotal: UInt64 = 0
         /// Pacer display-link ticks + frame releases per second, from the
         /// liveness totals - the DIRECT measure of display-link callback misses
         /// (previously only reconstructable as rendered+stale).

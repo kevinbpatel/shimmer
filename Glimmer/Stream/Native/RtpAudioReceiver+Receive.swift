@@ -238,6 +238,9 @@ extension RtpAudioReceiver {
             if gap >= Self.flowResumeGapNanos {
                 sink?.notePacketFlowResumed(afterGapMs: Double(gap) / 1_000_000)
             }
+            // The decoder's dead-air test: an under-run after a gap no cushion
+            // could bridge must not deepen the cushion.
+            sink?.noteArrivalGap(nanos: gap)
         }
         lastDatagramArrivalNanos = now
     }

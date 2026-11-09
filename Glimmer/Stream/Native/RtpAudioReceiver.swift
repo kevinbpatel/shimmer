@@ -76,10 +76,16 @@ public protocol NativeAudioSink: AnyObject, Sendable {
     /// segment anchors don't survive the gap; the default does nothing. Called
     /// on the receive thread, so implementations must make NO AV calls.
     func notePacketFlowResumed(afterGapMs: Double)
+    /// The inter-arrival gap that ended with the newest datagram, for the
+    /// decoder's dead-air test at an under-run. Called on the receive thread for
+    /// every datagram after the first, so implementations must stay cheap and
+    /// make NO AV calls; the default does nothing.
+    func noteArrivalGap(nanos: UInt64)
 }
 
 public extension NativeAudioSink {
     func notePacketFlowResumed(afterGapMs: Double) {}
+    func noteArrivalGap(nanos: UInt64) {}
 }
 
 final class RtpAudioReceiver: @unchecked Sendable {

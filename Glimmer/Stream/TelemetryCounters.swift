@@ -372,6 +372,9 @@ final class TelemetryCounters: @unchecked Sendable {
     /// Bumped on the audio output path when a scheduled buffer completes and the
     /// scheduled-ahead duration has fallen to zero. Always-live integer add.
     let audioUnderrunTotal = Counter()
+    /// Under-runs whose arrival gap outlasted the deepest cushion the link may hold
+    /// (dead air): counted in `audioUnderrunTotal` too, but they teach the cushion nothing.
+    let audioUnderrunDeadairTotal = Counter()
     /// Audio output buffer OVER-RUNs this session: a decoded buffer was dropped
     /// because the scheduled-ahead backlog already exceeded the safety CEILING
     /// (the worst-case-link backstop). CEILING-BACKSTOP ONLY - the designed

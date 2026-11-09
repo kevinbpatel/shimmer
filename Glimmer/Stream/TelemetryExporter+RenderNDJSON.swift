@@ -122,6 +122,8 @@ extension TelemetryRenderer {
         builder.addCount("audio_receive_failed_total", extras.audioReceiveFailedTotal)
         // Packets that failed to decode and were concealed: under-runs at zero loss.
         builder.addCount("audio_decode_failed_total", extras.audioDecodeFailedTotal)
+        // Under-runs after a gap no cushion could bridge: counted, but they teach the cushion nothing.
+        builder.addCount("audio_underrun_deadair_total", extras.audioUnderrunDeadairTotal)
         builder.add("audio_pkts_per_s", audio.packetsPerSecond)
         builder.add("audio_loss_rate", audio.lossRate)
         builder.add("audio_fec_recovery_rate", audio.fecRecoveryRate)
