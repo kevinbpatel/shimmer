@@ -38,6 +38,9 @@ public final class AudioDecoder: @unchecked Sendable {
     var isShutdown = false
 
     var decoder: OpaquePointer?                    // OpusMSDecoder*
+    /// Interleaved PCM the decoder writes before the demux, reused for every 5 ms packet.
+    /// Guarded by `stateLock`, which already serializes decoding.
+    var decodeScratch: [Float] = []
     let engine = AVAudioEngine()
     let playerNode = AVAudioPlayerNode()
     /// Drift-tracking resampler, inserted between `playerNode` and the mixer. A

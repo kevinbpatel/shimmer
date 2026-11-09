@@ -14,7 +14,7 @@ struct RtpAudioReceiverTests {
 
     final class NullAudioSink: NativeAudioSink {
         func initialize(audioConfig: Int32, opus: OpusConfig) -> Int32 { 0 }
-        func decodeAndPlay(_ opus: [UInt8]) {}
+        func decodeAndPlay(_ opus: UnsafeRawBufferPointer) {}
         func decodeAndPlayPLC() {}
         func cleanup() {}
     }
@@ -25,7 +25,7 @@ struct RtpAudioReceiverTests {
         private var packets: [[UInt8]] = []
 
         func initialize(audioConfig: Int32, opus: OpusConfig) -> Int32 { 0 }
-        func decodeAndPlay(_ opus: [UInt8]) { lock.lock(); packets.append(opus); lock.unlock() }
+        func decodeAndPlay(_ opus: UnsafeRawBufferPointer) { lock.lock(); packets.append(Array(opus)); lock.unlock() }
         func decodeAndPlayPLC() {}
         func cleanup() {}
         func recordedPackets() -> [[UInt8]] { lock.lock(); defer { lock.unlock() }; return packets }
@@ -37,7 +37,7 @@ struct RtpAudioReceiverTests {
         private var cleanups = 0
 
         func initialize(audioConfig: Int32, opus: OpusConfig) -> Int32 { 0 }
-        func decodeAndPlay(_ opus: [UInt8]) {}
+        func decodeAndPlay(_ opus: UnsafeRawBufferPointer) {}
         func decodeAndPlayPLC() {}
         func cleanup() { lock.lock(); cleanups += 1; lock.unlock() }
         func cleanupCount() -> Int { lock.lock(); defer { lock.unlock() }; return cleanups }
@@ -123,6 +123,15 @@ struct RtpAudioReceiverTests {
             Self.feed(receiver, dataSequences: [UInt16(block * RtpAudioQueue.dataShards + 1)])
             #expect(receiver.queue.blocks.count <= RtpAudioQueue.maxQueuedBlocks)
         }
+    }
+
+    /// The hand-off reads the payload in place, after the 12-byte RTP header, instead of copying it.
+    @Test func decodeHandOffPassesTheOpusBytesAfterTheHeader() {
+        let sink = RecordingAudioSink()
+        let receiver = Self.audioReceiver(sink: sink)
+        receiver.decodePacket(Self.audioDatagram(type: RtpAudioQueue.payloadTypeAudio, sequence: 0x0123,
+                                                 timestamp: 0, payload: [1, 2, 3]))
+        #expect(sink.recordedPackets() == [[1, 2, 3]])
     }
 
     /// Stop leaves the socket open for deinit, so a loop still in recvfrom or sendto can never

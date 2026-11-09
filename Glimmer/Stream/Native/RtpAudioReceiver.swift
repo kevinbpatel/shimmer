@@ -64,8 +64,8 @@ public protocol NativeAudioSink: AnyObject, Sendable {
     /// `opus` is the negotiated multistream config; `audioConfig` is the
     /// GFE/Sunshine channel-layout code.
     func initialize(audioConfig: Int32, opus: OpusConfig) -> Int32
-    /// Decode + play one opus packet (raw bytes, after FEC + any decrypt).
-    func decodeAndPlay(_ opus: [UInt8])
+    /// Decode + play one opus packet (raw bytes, after FEC + any decrypt), valid only for the call.
+    func decodeAndPlay(_ opus: UnsafeRawBufferPointer)
     /// Packet-loss concealment for one unrecovered/missing frame: invoke the opus
     /// decoder with no input so libopus conceals the gap (AudioStream.c:166-169).
     func decodeAndPlayPLC()

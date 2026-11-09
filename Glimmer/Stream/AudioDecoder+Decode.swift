@@ -101,40 +101,34 @@ extension AudioDecoder {
                                 input: UnsafePointer<UInt8>?, length: Int32,
                                 decodeFec: Int32) -> Bool {
         let frameCount = AVAudioFrameCount(samplesPerFrame)
-        guard let pcm = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frameCount) else { return false }
+        guard let pcm = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: frameCount),
+              let channelData = pcm.floatChannelData else { return false }
 
-        // opus_multistream_decode_float writes interleaved float; we declared
-        // a non-interleaved format. Use a small interleaved scratch and then
-        // demux into channelData[i]. A NULL input + frameSize triggers PLC; a
-        // real input with decode_fec=1 reconstructs the prior lost frame.
-        var interleaved = [Float](repeating: 0, count: samplesPerFrame * channelCount)
-        let (decoded, rejected) = interleaved.withUnsafeMutableBufferPointer { scratch in
-            Self.decodeOrConceal(decoder, input: input, length: length, into: scratch.baseAddress!,
-                                 frameSize: Int32(samplesPerFrame), decodeFec: decodeFec)
+        // opus_multistream_decode_float writes interleaved float; we declared a
+        // non-interleaved format, so decode into the reused scratch and demux into
+        // channelData[i]. 7.1's reorder swaps surround pairs into AVAudio's layout.
+        // A NULL input + frameSize triggers PLC; a real input with decode_fec=1
+        // reconstructs the prior lost frame.
+        let channels = channelCount
+        let reorder = outputReorder
+        if decodeScratch.count != samplesPerFrame * channels {
+            decodeScratch = [Float](repeating: 0, count: samplesPerFrame * channels)
+        }
+        let (decoded, rejected) = decodeScratch.withUnsafeMutableBufferPointer { scratch -> (Int32, Int32?) in
+            guard let interleaved = scratch.baseAddress else { return (0, nil) }
+            let result = Self.decodeOrConceal(decoder, input: input, length: length, into: interleaved,
+                                              frameSize: Int32(samplesPerFrame), decodeFec: decodeFec)
+            let frames = Int(max(result.frames, 0))
+            for source in 0..<channels {
+                let dst = channelData[reorder?[source] ?? source]
+                for i in 0..<frames { dst[i] = interleaved[i * channels + source] }
+            }
+            return result
         }
         // A pending gap's FEC decode reads the same packet, so count each packet once.
         if let rejected, decodeFec == 0 { noteDecodeFailure(opusError: rejected, bytes: Int(length)) }
         guard decoded > 0 else { return false }
         pcm.frameLength = AVAudioFrameCount(decoded)
-
-        guard let channelData = pcm.floatChannelData else { return false }
-        if let reorder = outputReorder {
-            // 7.1 path - swap surround pairs into AVAudio's expected layout.
-            for srcChannel in 0..<channelCount {
-                let dstChannel = reorder[srcChannel]
-                let dst = channelData[dstChannel]
-                for i in 0..<Int(decoded) {
-                    dst[i] = interleaved[i * channelCount + srcChannel]
-                }
-            }
-        } else {
-            for channel in 0..<channelCount {
-                let dst = channelData[channel]
-                for i in 0..<Int(decoded) {
-                    dst[i] = interleaved[i * channelCount + channel]
-                }
-            }
-        }
 
         // P1 AUDIO meter: account this buffer for the buffer-fill / under-run /
         // over-run / A/V-drift signals. Two backlog guards run first, both dropping
@@ -217,7 +211,7 @@ extension AudioDecoder {
 // MARK: - NativeAudioSink conformance (Swift-native engine)
 //
 // Lets RtpAudioReceiver feed the AudioDecoder. `initialize` reuses the shared
-// opus/engine setup; `decodeAndPlay([UInt8])` runs the shared decodeCore (with
+// opus/engine setup; `decodeAndPlay(_:)` runs the shared decodeCore (with
 // opus in-band FEC recovery ahead of the packet when a gap is pending, ★6), and
 // `decodeAndPlayPLC()` arms the pending-gap latch (`concealGap`) so the gap's
 // concealment frame is minted by FEC or, failing that, by NULL-input PLC.
@@ -277,11 +271,9 @@ extension AudioDecoder: NativeAudioSink {
         }
     }
 
-    public func decodeAndPlay(_ opus: [UInt8]) {
-        guard !opus.isEmpty else { decodeAndPlayPLC(); return }
-        opus.withUnsafeBufferPointer { buf in
-            decodeCore(input: buf.baseAddress, length: Int32(buf.count))
-        }
+    public func decodeAndPlay(_ opus: UnsafeRawBufferPointer) {
+        guard !opus.isEmpty, let base = opus.baseAddress else { decodeAndPlayPLC(); return }
+        decodeCore(input: base.assumingMemoryBound(to: UInt8.self), length: Int32(opus.count))
     }
 
     public func decodeAndPlayPLC() {
