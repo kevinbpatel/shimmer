@@ -202,8 +202,8 @@ extension StreamSession {
         // RTSP / control-connect / launch handshake runs inside
         // startConnection; building the stream after startConnection would drop
         // those early stage events. The bridge is published first, so the
-        // native callback path resolves through
-        // `StreamBridgeContext.current?.eventContinuation` and yields directly
+        // pipeline's event adapter captures it and yields to
+        // `bridge.eventContinuation` directly
         // without an actor hop.
         let stream = makeEventStream(bridge: bridge)
 

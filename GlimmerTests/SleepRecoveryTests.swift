@@ -162,3 +162,37 @@ struct SleepRecoveryTests {
         #expect(model.nativeStreamError == nil)
     }
 }
+
+// MARK: - Session ownership (ported from upstream's SessionLaunchTests)
+
+struct SessionLaunchTests {
+
+    /// A pipeline's events go to the session it started for, whichever is current when they fire,
+    /// so a late callback from a timed-out pipeline can't land in the next session (3b8c219a).
+    @Test @MainActor func eventsGoToTheSessionTheirPipelineStartedFor() async {
+        let session = StreamSession()
+        let bridge = StreamBridgeContext(session: session, videoDecoder: VideoDecoder(),
+                                         audioDecoder: AudioDecoder(),
+                                         inputForwarder: InputForwarder(observeGamepads: false))
+        let (stream, continuation) = AsyncStream<StreamEvent>.makeStream()
+        bridge.eventContinuation = continuation
+        let other = StreamBridgeContext(session: StreamSession(), videoDecoder: VideoDecoder(),
+                                        audioDecoder: AudioDecoder(),
+                                        inputForwarder: InputForwarder(observeGamepads: false))
+        let (otherStream, otherContinuation) = AsyncStream<StreamEvent>.makeStream()
+        other.eventContinuation = otherContinuation
+        let previous = StreamBridgeContext.current
+        StreamBridgeContext.current = other
+        defer { StreamBridgeContext.current = previous }
+
+        NativeConnectionEvents(bridge: bridge).stageStarting("name resolution")
+        continuation.finish()
+        otherContinuation.finish()
+        var received = 0
+        for await _ in stream { received += 1 }
+        var strayed = 0
+        for await _ in otherStream { strayed += 1 }
+        #expect(received == 1)
+        #expect(strayed == 0)
+    }
+}

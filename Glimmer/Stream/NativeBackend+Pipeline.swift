@@ -63,7 +63,7 @@ extension NativeBackend {
             // (no audio sink), startAudioReceive() still opens the ping so the
             // combined A/V session stays alive (Sunshine withholds video RTP until
             // it has seen the audio ping too).
-            startAudioReceive(handshake: handshake, config: config, server: server, host: host)
+            startAudioReceive(handshake: handshake, config: config, server: server, host: host, events: events)
 
             // --- Connected. Bring up native video receive + keepalive loop. ---
             // Flip inputReady here (the InputStream.c `initialized` analogue): the
@@ -331,7 +331,7 @@ extension NativeBackend {
     /// if it somehow wasn't running. Best-effort - non-fatal.
     func startAudioReceive(
         handshake: RtspHandshakeResult, config: BackendStreamConfig,
-        server: BackendServerInfo, host: NWEndpoint.Host
+        server: BackendServerInfo, host: NWEndpoint.Host, events: NativeConnectionEvents
     ) {
         guard let receiver = withState({ audioReceiver }) else {
             // No early-ping receiver (e.g. no audio sink). Nothing to receive.
@@ -345,7 +345,7 @@ extension NativeBackend {
             // H7: surface the video-only state instead of swallowing it - a
             // queryable counter + a non-fatal event (the visual stream is fine).
             TelemetryCounters.shared.audioReceiveFailedTotal.increment()
-            StreamBridgeContext.current?.eventContinuation?.yield(
+            events.bridge?.eventContinuation?.yield(
                 .audioFailed("\(error)"))
         }
     }
