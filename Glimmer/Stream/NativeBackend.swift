@@ -175,7 +175,7 @@ public final class NativeBackend: StreamingBackend, @unchecked Sendable {
                 completion(StreamError.sessionFailed(-1))
                 return
             }
-            completion(resultBox.get().map { self?.mapToStreamError($0) ?? .sessionFailed(-1) })
+            completion(resultBox.get().map { Self.mapToStreamError($0) })
         }
         bridgeThread.qualityOfService = .userInitiated
         bridgeThread.name = "Glimmer.nativeConnect"
@@ -190,12 +190,14 @@ public final class NativeBackend: StreamingBackend, @unchecked Sendable {
         func get() -> Error? { lock.lock(); defer { lock.unlock() }; return value }
     }
 
-    private func mapToStreamError(_ error: Error) -> StreamError {
+    static func mapToStreamError(_ error: Error) -> StreamError {
         if let streamError = error as? StreamError { return streamError }
-        if let rtsp = error as? RtspError, case .nonOK(_, let code) = rtsp {
-            return StreamError.sessionFailed(Int32(code))
+        switch error as? RtspError {
+        case .nonOK(_, let code): return .sessionFailed(Int32(code))
+        // The PC took the connection and went quiet: the shared couldn't-reach copy, not a stream code.
+        case .responseTimeout(let seconds): return .hostUnreachable("no RTSP response in \(Int(seconds)) s")
+        default: return .sessionFailed(-1)
         }
-        return StreamError.sessionFailed(-1)
     }
 
     func checkInterrupted() -> Bool {

@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import Network
 import Testing
 @testable import Glimmer
 
@@ -217,5 +218,96 @@ struct SdpCodecTests {
         // serverSupportsRfi defaults false -> RFI inactive -> "1".
         let sdp = sdpString(builder(format: StreamProtocol.VIDEO_FORMAT_H265))
         #expect(sdp.contains("a=x-nv-video[0].maxNumReferenceFrames:1 \r\n"))
+    }
+}
+
+// MARK: - RtspClient response deadline
+
+/// The RTSP client against a real loopback socket. Ported from upstream's
+/// RtspClientTests (42e564ba).
+struct RtspClientTests {
+
+    private static let key: [UInt8] = Array(0..<16).map { UInt8($0) }
+
+    private static func makeClient(port: UInt16) -> RtspClient {
+        let config = BackendStreamConfig(
+            width: 1920, height: 1080, fps: 60, bitrate: 20_000, packetSize: 1392,
+            streamingRemotely: 0, audioConfiguration: 0, supportedVideoFormats: 0,
+            clientRefreshRateX100: 6000, colorSpace: 0, colorRange: 0, encryptionFlags: 0,
+            remoteInputAesKey: key, remoteInputAesIv: key)
+        return RtspClient(
+            host: "127.0.0.1", rtspPort: port, rtspTargetUrl: "rtsp://127.0.0.1:\(port)",
+            urlAddr: "127.0.0.1", urlSafeAddr: "127.0.0.1", addrFamilyToken: "IPv4",
+            rtspClientVersion: 14, config: config, serverCodecModeRaw: 0, appVersionQuad: [7, 1, 450, 0])
+    }
+
+    /// Keeps the loopback server's accepted connections alive for the test.
+    private final class Accepted: @unchecked Sendable {
+        private let lock = NSLock()
+        private var conns: [NWConnection] = []
+        func keep(_ conn: NWConnection) { lock.lock(); conns.append(conn); lock.unlock() }
+        func cancelAll() { lock.lock(); conns.forEach { $0.cancel() }; lock.unlock() }
+    }
+
+    /// A loopback TCP server that accepts and never answers; returns once it is listening.
+    private static func silentListener() async throws -> (listener: NWListener, accepted: Accepted, port: UInt16) {
+        let listener = try NWListener(using: .tcp, on: .any)
+        let accepted = Accepted()
+        let queue = DispatchQueue(label: "RtspClientTests.listener")
+        listener.newConnectionHandler = { conn in
+            accepted.keep(conn)
+            conn.start(queue: queue)
+        }
+        let port: UInt16 = try await withCheckedThrowingContinuation { cont in
+            let resumed = ManagedAtomicFlag()
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if resumed.testAndSet() { cont.resume(returning: listener.port?.rawValue ?? 0) }
+                case .failed(let error):
+                    if resumed.testAndSet() { cont.resume(throwing: error) }
+                default: break
+                }
+            }
+            listener.start(queue: queue)
+        }
+        return (listener, accepted, port)
+    }
+
+    /// A PC that takes the connection and never answers fails at the response deadline, and that
+    /// failure reaches the launcher as the shared couldn't-reach copy rather than a hang.
+    @MainActor @Test func silentPeerFailsAtTheResponseDeadline() async throws {
+        let server = try await Self.silentListener()
+        defer { server.accepted.cancelAll(); server.listener.cancel() }
+        let started = DispatchTime.now()
+        do {
+            _ = try await Self.makeClient(port: server.port).oneShot(Data("OPTIONS".utf8), responseTimeout: 0.3)
+            Issue.record("a silent peer was waited on past the deadline")
+        } catch let error as RtspError {
+            guard case .responseTimeout = error else {
+                Issue.record("expected RtspError.responseTimeout, got \(error)")
+                return
+            }
+            let waitedMs = (DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds) / 1_000_000
+            #expect(waitedMs < 3_000)
+            let streamError = NativeBackend.mapToStreamError(error)
+            guard case .hostUnreachable = streamError else {
+                Issue.record("expected hostUnreachable, got \(streamError)")
+                return
+            }
+            #expect(AppModel.isTransientConnectionFailure(streamError))
+            #expect(AppModel.connectFailureBanner(for: streamError, hostName: "Tower")
+                == "Couldn't reach Tower. Make sure it's awake and on the same network.")
+        }
+    }
+
+    /// An RTSP status error still reaches the launcher as that status, not as a reach failure.
+    @Test func nonOkStatusKeepsItsCode() {
+        guard case .sessionFailed(let code) = NativeBackend.mapToStreamError(RtspError.nonOK(step: "PLAY", code: 503))
+        else {
+            Issue.record("a non-OK RTSP status must map to sessionFailed")
+            return
+        }
+        #expect(code == 503)
     }
 }

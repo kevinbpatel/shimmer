@@ -79,6 +79,8 @@ enum RtspError: Error, CustomStringConvertible {
     case nonOK(step: String, code: Int)
     case encryptedRtspUnsupported
     case noSdp
+    /// The PC took the connection but never answered within the response deadline.
+    case responseTimeout(TimeInterval)
 
     var description: String {
         switch self {
@@ -90,6 +92,7 @@ enum RtspError: Error, CustomStringConvertible {
         case .encryptedRtspUnsupported:
             return "rtspenc:// (encrypted RTSP) not yet supported by the native backend"
         case .noSdp: return "RTSP DESCRIBE returned no SDP payload"
+        case .responseTimeout(let seconds): return "no RTSP response within \(Int(seconds)) s"
         }
     }
 }
@@ -142,6 +145,9 @@ final class RtspClient: @unchecked Sendable {
     }
 
     static let controlStreamId = "streamid=control/13/0"
+    /// Sunshine answers each message in milliseconds; moonlight waits 10 s. Without this a PC that
+    /// accepts the connection and never replies holds the connect until the backend's 30 s cap.
+    static let responseTimeoutSeconds: TimeInterval = 10
 
     init(
         host: NWEndpoint.Host,
@@ -292,8 +298,8 @@ final class RtspClient: @unchecked Sendable {
         }
     }
 
-    /// A single connect → send → recv-until-EOF → close cycle.
-    func oneShot(_ bytes: Data) async throws -> Data {
+    /// A single connect → send → recv-until-EOF → close cycle, the reply bounded by `responseTimeout`.
+    func oneShot(_ bytes: Data, responseTimeout: TimeInterval = RtspClient.responseTimeoutSeconds) async throws -> Data {
         let tcpOptions = NWProtocolTCP.Options()
         tcpOptions.noDelay = true
         let params = NWParameters(tls: nil, tcp: tcpOptions)
@@ -330,26 +336,42 @@ final class RtspClient: @unchecked Sendable {
             connection.start(queue: queue)
         }
 
-        // 2) Send the request.
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            connection.send(content: bytes, completion: .contentProcessed { err in
-                if let err {
-                    cont.resume(throwing: RtspError.transportFailure("send: \(err)"))
-                } else {
-                    cont.resume()
-                }
-            })
+        // 2-3) Send, then read to EOF. The deadline cancels the connection, which ends the pending
+        // receive (an error or a bare EOF); the flag tells that apart from a transport failure, which
+        // sendAndReceive would otherwise retry.
+        let timedOut = ManagedAtomicFlag()
+        let deadline = DispatchWorkItem { timedOut.set(); connection.cancel() }
+        queue.asyncAfter(deadline: .now() + responseTimeout, execute: deadline)
+        defer { deadline.cancel() }
+        let response: Data
+        do {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                connection.send(content: bytes, completion: .contentProcessed { err in
+                    if let err {
+                        cont.resume(throwing: RtspError.transportFailure("send: \(err)"))
+                    } else {
+                        cont.resume()
+                    }
+                })
+            }
+            response = try await receiveToEnd(connection)
+        } catch {
+            guard timedOut.isSet, !interrupted.isSet else { throw error }
+            throw RtspError.responseTimeout(responseTimeout)
         }
+        if timedOut.isSet { throw RtspError.responseTimeout(responseTimeout) }
+        connection.cancel()
+        return response
+    }
 
-        // 3) Receive until the server closes (isComplete) - EOF delimits.
+    /// Receive until the server closes (isComplete): EOF delimits the response.
+    private func receiveToEnd(_ connection: NWConnection) async throws -> Data {
         var accumulated = Data()
         while true {
             let (chunk, isComplete) = try await receiveChunk(connection)
             if let chunk { accumulated.append(chunk) }
-            if isComplete { break }
+            if isComplete { return accumulated }
         }
-        connection.cancel()
-        return accumulated
     }
 
     func receiveChunk(_ connection: NWConnection) async throws -> (Data?, Bool) {
