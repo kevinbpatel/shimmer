@@ -121,7 +121,29 @@ struct ControllerArrivalOrderTests {
         #expect(backend.events == (arrivalAccepted ? [.arrival(slot), .removal(slot)] : []))
         #expect(forwarder.announcedControllerSlots.isEmpty)
     }
+
+    /// Upstream 2026.11.0 crashed starting a stream with a PlayStation controller: GameController ran
+    /// the handler on a dedicated capture queue, and the touchpad-sampling closures inherited
+    /// MainActor isolation from where the handler was installed (fixed in 1693c84e). Shimmer leaves
+    /// GameController on its main-queue default, so the handler runs on main. This pins that, and
+    /// drives synthetic DualSense and DualShock profiles, touchpad read included, through it.
+    @Test(arguments: [false, true])
+    func playStationProfilesRunThroughTheInstalledHandlerOnMain(dualSense: Bool) throws {
+        let (forwarder, backend) = rig()
+        defer { forwarder.detach() }
+        let controller = GCController.withExtendedGamepad()
+        forwarder.attach(gamepad: controller)
+        #expect(controller.handlerQueue === DispatchQueue.main)
+        let slot = try slot(of: controller, in: forwarder)
+        forwarder.setReady(true)
+        let handler = try #require(controller.extendedGamepad?.valueChangedHandler)
+        let pad: GCExtendedGamepad = dualSense ? GCDualSenseGamepad() : GCDualShockGamepad()
+        #expect(forwarder.touchpadElements(of: pad) != nil)
+        handler(pad, pad.buttonA)
+        #expect(backend.events.filter { $0.slot == slot }.contains(.state(slot)))
+    }
 }
+
 
 /// Records the controller packets the backend ACCEPTED, in order. Everything else is inert.
 final class ArrivalRecordingBackend: StreamingBackend {
