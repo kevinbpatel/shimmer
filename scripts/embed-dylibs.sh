@@ -41,9 +41,11 @@ SIGN_IDENTITY="${2:-${SIGN_IDENTITY:--}}"
 SIGN_KEYCHAIN="${3:-}"
 KC_FLAG=""
 [ -n "$SIGN_KEYCHAIN" ] && [ "$SIGN_IDENTITY" != "-" ] && KC_FLAG="--keychain $SIGN_KEYCHAIN"
-if [[ "$SIGN_IDENTITY" == "-" ]]; then
+if [[ "$SIGN_IDENTITY" != "Developer ID Application:"* ]]; then
+  # Ad hoc or the local self-signed identity: never notarized, so no
+  # secure-timestamp round-trip.
   TS_FLAG="--timestamp=none"
-  echo "Signing identity: adhoc (local dev - NOT notarizable)"
+  echo "Signing identity: $SIGN_IDENTITY (local dev - NOT notarizable)"
 else
   TS_FLAG="--timestamp"
   echo "Signing identity: $SIGN_IDENTITY (secure timestamp + hardened runtime)"

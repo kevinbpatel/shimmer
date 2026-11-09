@@ -126,7 +126,10 @@ make
 
 `make` builds and installs `/Applications/Shimmer.app` the same way a release
 ships. `make app` compile-checks, `make test` runs the unit tests,
-`make uninstall` removes it. The engine is under `Glimmer/Stream/` (the source
+`make uninstall` removes it. Without an Apple Developer ID, run
+`make local-signing-setup` once first: builds are then signed with a stable
+self-signed identity instead of ad hoc, so macOS keeps Input Monitoring and
+the Wi-Fi helper's approval across rebuilds. The engine is under `Glimmer/Stream/` (the source
 tree and Swift module keep glimmer's name; the app, bundle id
 `com.kevinbpatel.shimmer`, and data folders are Shimmer's). Upgrading from a
 glimmer install is automatic: on first launch Shimmer copies your pairings,

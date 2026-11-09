@@ -30,7 +30,9 @@ ENT="${4:?app entitlements file required}"
 HELPER_ENT="LoginHelper/LoginHelper.entitlements"
 
 KCF=""; [ -n "$KC" ] && [ "$ID" != "-" ] && KCF="--keychain $KC"
-if [ "$ID" = "-" ]; then TS="--timestamp=none"; else TS="--timestamp"; fi
+# Only a Developer ID signature is notarized, so only it needs Apple's secure
+# timestamp; ad hoc and the local self-signed identity skip the round-trip.
+case "$ID" in "Developer ID Application:"*) TS="--timestamp" ;; *) TS="--timestamp=none" ;; esac
 
 # Re-sign preserving the target's OWN entitlements + identifier (for Sparkle's
 # nested code). Hardened runtime is set explicitly.

@@ -80,6 +80,19 @@ CREDS           := scripts/signing-creds.sh
 # can't retrofit that onto an already-imported login-keychain key). This is the
 # standard CI/CD pattern. Created by `make codesign-setup`.
 SIGN_KEYCHAIN   := $(HOME)/Library/Keychains/glimmer-signing.keychain-db
+# Without a Developer ID, local builds sign with a stable self-signed identity
+# when `make local-signing-setup` has created one, instead of ad hoc. An ad hoc
+# signature's identity is its cdhash, new on every build, so every reinstall
+# lost Input Monitoring and the background-item approval; this one is the same
+# every build, so those grants survive. See scripts/setup-local-signing.sh.
+LOCAL_SIGN_ID       := Shimmer Local Signing
+LOCAL_SIGN_KEYCHAIN := $(HOME)/Library/Keychains/shimmer-local-signing.keychain-db
+LOCAL_SIGN_PASS     := $(HOME)/.config/shimmer/local-signing.pass
+ifeq ($(strip $(DEVELOPER_ID)),)
+  ifneq ($(wildcard $(LOCAL_SIGN_KEYCHAIN)),)
+    LOCAL_SIGNING := 1
+  endif
+endif
 # Version single source of truth: Glimmer/Version.xcconfig (NOT pbxproj).
 MARKETING_VERSION := $(shell sed -n 's/^MARKETING_VERSION = \(.*\)/\1/p' Glimmer/Version.xcconfig | tr -d ' ')
 DMG_NAME        := Shimmer-$(MARKETING_VERSION).dmg
@@ -115,7 +128,7 @@ HELPER_BIN    := $(DERIVED)/$(HELPER_LABEL)
 HELPER_SDK    := $(shell xcrun --sdk macosx --show-sdk-path)
 HELPER_TARGET := arm64-apple-macos26.0
 
-.PHONY: all release install reinstall uninstall clean app sign embed open \
+.PHONY: all release install reinstall uninstall clean app sign embed open local-signing-setup \
         helper-build embed-helper reset-stale-tcc \
         profile profile-signposts setup-notary notarize dmg dmg-background dist preflight \
         codesign-setup codesign-teardown ensure-signing dev test \
@@ -134,13 +147,14 @@ HELPER_TARGET := arm64-apple-macos26.0
 all: install
 
 # Build the notarized Release app (everything but publish) WITHOUT installing.
-# Falls back to adhoc Release (un-notarized; TCC re-prompts) without a Dev ID cert.
+# Without a Dev ID cert: an un-notarized Release, signed with the local identity
+# (`make local-signing-setup`, grants survive reinstalls) or else ad hoc.
 release:
 	@if [ -n "$(strip $(DEVELOPER_ID))" ]; then \
 		echo "  ▶ everything-but-publish: Developer ID + notarized (matches release)"; \
 		$(MAKE) CONFIG=Release notarize; \
 	else \
-		echo "  ▶ everything-but-publish: adhoc Release - no Developer ID cert (un-notarized; TCC re-prompts)"; \
+		echo "  ▶ everything-but-publish: un-notarized Release (no Developer ID cert)"; \
 		$(MAKE) CONFIG=Release app embed; \
 	fi
 
@@ -243,8 +257,12 @@ embed-helper: app $(HELPER_BIN)
 # (embed-dylibs). Debug and any adhoc build link the Homebrew copies as-is, so
 # they get Glimmer-Debug.entitlements (disable-library-validation). See SECURITY.md.
 sign: app embed-helper ensure-signing
-ifeq ($(strip $(DEVELOPER_ID)),)
-	@echo "▶ Adhoc-signing bundle inside-out (no Developer ID cert found)..."
+ifeq ($(LOCAL_SIGNING),1)
+	@echo "▶ Signing bundle inside-out with the local identity ($(LOCAL_SIGN_ID))..."
+	@security unlock-keychain -p "$$(cat "$(LOCAL_SIGN_PASS)")" "$(LOCAL_SIGN_KEYCHAIN)"
+	scripts/sign-bundle.sh "$(GLIMMER_APP_SRC)" "$(LOCAL_SIGN_ID)" "$(LOCAL_SIGN_KEYCHAIN)" Glimmer/Glimmer-Debug.entitlements
+else ifeq ($(strip $(DEVELOPER_ID)),)
+	@echo "▶ Adhoc-signing bundle inside-out (no Developer ID; 'make local-signing-setup' gives a stable identity)..."
 	scripts/sign-bundle.sh "$(GLIMMER_APP_SRC)" "-" "" Glimmer/Glimmer-Debug.entitlements
 else
 	@echo "▶ Signing bundle inside-out with: $(DEVELOPER_ID)"
@@ -255,7 +273,15 @@ endif
 # rewrites the bundle (the app must be signed last); embed-dylibs re-signs the
 # whole bundle itself with the same identity. Use this for distribution builds.
 embed: sign
+ifeq ($(LOCAL_SIGNING),1)
+	scripts/embed-dylibs.sh "$(GLIMMER_APP_SRC)" "$(LOCAL_SIGN_ID)" "$(LOCAL_SIGN_KEYCHAIN)"
+else
 	scripts/embed-dylibs.sh "$(GLIMMER_APP_SRC)" "$(if $(strip $(DEVELOPER_ID)),$(DEVELOPER_ID),-)" "$(if $(strip $(DEVELOPER_ID)),$(SIGN_KEYCHAIN),)"
+endif
+
+# One-time: create the stable self-signed identity local builds sign with.
+local-signing-setup:
+	@scripts/setup-local-signing.sh
 
 # Install the everything-but-publish build (see `release`) to /Applications.
 # `reinstall`/`open`/`dev` build on this.
@@ -318,10 +344,10 @@ unregister-build-products:
 # exactly how this was found. Clearing OUR OWN entry on each adhoc install keeps
 # the list honest: the app re-registers with its current requirement the next
 # time it asks. Narrow on purpose - one service, one bundle id, never anyone
-# else's grants. A Developer ID build skips it entirely and keeps its grant.
+# else's grants. A Developer ID or locally signed build skips it and keeps its grant.
 reset-stale-tcc:
 	@if [ -d "$(GLIMMER_APP_DST)" ] && \
-	   ! codesign -dvv "$(GLIMMER_APP_DST)" 2>&1 | grep -q "Authority=Developer ID"; then \
+	   codesign -dvv "$(GLIMMER_APP_DST)" 2>&1 | grep -q "Signature=adhoc"; then \
 		BID=$$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$(GLIMMER_APP_DST)/Contents/Info.plist" 2>/dev/null); \
 		if [ -n "$$BID" ] && tccutil reset ListenEvent "$$BID" >/dev/null 2>&1; then \
 			echo "  ✓ cleared this adhoc build's stale Input Monitoring grant (re-grant on next launch)"; \

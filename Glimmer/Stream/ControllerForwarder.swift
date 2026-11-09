@@ -178,11 +178,15 @@ extension InputForwarder {
         // reached us through GameController AND asked macOS to start a screen
         // recording. A streaming client has exactly one consumer for that button,
         // the host, so disable the gesture: the press is delivered immediately and
-        // macOS stays out of it. Home (PS) stays bound on purpose - the Game
-        // Overlay is a feature users expect from it and no chord depends on it.
-        if let create = gamepad.extendedGamepad?.buttonOptions, create.isBoundToSystemGesture {
-            create.preferredSystemGestureState = .disabled
-            Diag.info("controller \(slot): Create/Share was bound to a macOS system gesture - "
+        // macOS stays out of it. Home (PS / Xbox / Guide) gets the same
+        // treatment: by default it opens macOS's Game Overlay, which is never
+        // what a press means while the PC's game is on screen - Steam's own
+        // overlay is what the player is reaching for.
+        for (name, button) in [("Create/Share", gamepad.extendedGamepad?.buttonOptions),
+                               ("Home", gamepad.extendedGamepad?.buttonHome)] {
+            guard let button, button.isBoundToSystemGesture else { continue }
+            button.preferredSystemGestureState = .disabled
+            Diag.info("controller \(slot): \(name) was bound to a macOS system gesture - "
                 + "disabled so the press reaches the stream", "Controller")
         }
 
