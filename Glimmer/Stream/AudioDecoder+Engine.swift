@@ -37,6 +37,7 @@ extension AudioDecoder {
         streams = Int(strms)
         coupledStreams = Int(coupled)
         mapping = map
+        loggedDecodeFailure = false
 
         // P1 AUDIO meter: capture the output sample rate (frames↔ms conversion) and
         // reset the playout accounting for this session. Under the small meter lock,

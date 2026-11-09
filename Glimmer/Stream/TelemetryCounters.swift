@@ -392,6 +392,9 @@ final class TelemetryCounters: @unchecked Sendable {
     /// counter and no user signal - a silent audio-dead session. Bumped from the
     /// pipeline catch alongside the `.audioFailed` event. Always-live integer add.
     let audioReceiveFailedTotal = Counter()
+    /// Received Opus packets that failed to decode and were concealed instead; tells a
+    /// decode fault apart from playout starvation when under-runs climb at zero loss.
+    let audioDecodeFailedTotal = Counter()
 
     // ---- Input-activity gauge (last-input instant + idle-edge detection) ----
     //

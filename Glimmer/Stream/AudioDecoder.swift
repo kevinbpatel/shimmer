@@ -518,6 +518,9 @@ public final class AudioDecoder: @unchecked Sendable {
     /// by the next real packet (via opus FEC) or the next PLC. Guarded by
     /// `stateLock` (only ever touched on the decode path, which holds it).
     var pendingFecGap = false
+    /// The session's first undecodable packet has been logged (later ones only count).
+    /// Guarded by `stateLock`; reset at each decoder init.
+    var loggedDecodeFailure = false
 
     public init() {}
 }

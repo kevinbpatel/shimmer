@@ -108,14 +108,13 @@ extension AudioDecoder {
         // demux into channelData[i]. A NULL input + frameSize triggers PLC; a
         // real input with decode_fec=1 reconstructs the prior lost frame.
         var interleaved = [Float](repeating: 0, count: samplesPerFrame * channelCount)
-        let decoded = opus_multistream_decode_float(
-            decoder, input, length,
-            &interleaved, Int32(samplesPerFrame), decodeFec
-        )
-        guard decoded > 0 else {
-            // -1..-7 are recoverable; just drop the packet.
-            return false
+        let (decoded, rejected) = interleaved.withUnsafeMutableBufferPointer { scratch in
+            Self.decodeOrConceal(decoder, input: input, length: length, into: scratch.baseAddress!,
+                                 frameSize: Int32(samplesPerFrame), decodeFec: decodeFec)
         }
+        // A pending gap's FEC decode reads the same packet, so count each packet once.
+        if let rejected, decodeFec == 0 { noteDecodeFailure(opusError: rejected, bytes: Int(length)) }
+        guard decoded > 0 else { return false }
         pcm.frameLength = AVAudioFrameCount(decoded)
 
         guard let channelData = pcm.floatChannelData else { return false }
@@ -170,6 +169,29 @@ extension AudioDecoder {
         // 1Hz audio-state gauge. The resampler replaced the decode-path micro-stretch.
         publishAudioState()
         return true
+    }
+
+    /// One opus decode into `pcm`. A real packet libopus rejects (a malformed or
+    /// truncated frame) is concealed like a lost one, so its 5 ms plays instead of
+    /// opening a hole the meter reads as an under-run. Returns the frames written
+    /// and, when it concealed, the opus error the packet drew.
+    static func decodeOrConceal(_ decoder: OpaquePointer, input: UnsafePointer<UInt8>?, length: Int32,
+                                into pcm: UnsafeMutablePointer<Float>, frameSize: Int32,
+                                decodeFec: Int32) -> (frames: Int32, rejected: Int32?) {
+        let frames = opus_multistream_decode_float(decoder, input, length, pcm, frameSize, decodeFec)
+        guard frames <= 0, input != nil, length > 0 else { return (frames, nil) }
+        return (opus_multistream_decode_float(decoder, nil, 0, pcm, frameSize, 0), frames)
+    }
+
+    /// Count a packet that failed to decode (concealed instead) and log the session's
+    /// first. Caller holds `stateLock`, which guards the once-per-session latch.
+    private func noteDecodeFailure(opusError: Int32, bytes: Int) {
+        TelemetryCounters.shared.audioDecodeFailedTotal.increment()
+        guard !loggedDecodeFailure else { return }
+        loggedDecodeFailure = true
+        let reason = String(cString: opus_strerror(opusError))
+        Diag.notice("Opus packet of \(bytes) bytes didn't decode (\(reason), \(opusError)); concealing it. "
+            + "Later failures count in audio_decode_failed_total", "Stream.Audio")
     }
 
     /// ★6: a wire gap occurred (the queue emitted a `.lostPlaceholder`). Arm the
