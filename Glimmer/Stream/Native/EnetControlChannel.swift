@@ -222,26 +222,17 @@ final class EnetControlChannel: @unchecked Sendable {
     /// ring if a game re-arms the trigger effect at frame rate.
     var loggedFirstAdaptiveTriggers = false
 
-    /// Per-channel HIGHEST-DISPATCHED inbound reliable sequence number - the
-    /// receive-side half of ENet's per-channel reliable bookkeeping this subset
-    /// was missing. The host sends ALL control messages (rumble, triggers, LED,
-    /// motion, HDR, termination) as SEND_RELIABLE on channel 0 and relies on
-    /// real enet's ordered, exactly-once delivery; without this map a host
-    /// retransmission (lost client ACK) or UDP reordering dispatched stale
-    /// state AFTER its supersessor - e.g. a retransmitted rumble(x,y) landing
-    /// after the burst-ending motors-off and latching the pad buzzing until
-    /// the next host event. Every current consumer is latest-wins, so "ACK
-    /// everything, dispatch only strictly-newer" (drop stale/duplicate) is the
-    /// correct subset - we delay no message and never give up, we only refuse
-    /// to resurrect superseded state. Confined to `queue` (the receive
-    /// callback chain, the sole inbound-dispatch context), so no lock.
-    var lastDispatchedInboundRelSeq: [UInt8: UInt16] = [:]
+    /// The PC sends every control message (rumble, triggers, LED, motion, HDR,
+    /// termination) as SEND_RELIABLE on channel 0 and relies on ENet's ordered,
+    /// exactly-once delivery: a lost message's retransmit must land before its
+    /// successors, and a duplicate must not dispatch twice. Confined to `queue`,
+    /// the receive chain, so no lock.
+    var inboundOrder: [UInt8: EnetInboundOrder] = [:]
 
-    /// First stale/duplicate inbound-reliable drop breadcrumb latch (the
-    /// loggedFirstRumble discipline): one INFO sighting per session proves the
-    /// dedup gate fired on a real retransmit/reorder; per-event logging could
-    /// flood under sustained loss. Confined to `queue`, so no lock.
-    var loggedFirstStaleReliableDrop = false
+    /// Duplicate and gap-skip breadcrumbs fire once per session to avoid floods.
+    /// Confined to `queue`, so no lock.
+    var loggedFirstDuplicateReliable = false
+    var loggedFirstInboundGapSkip = false
 
     /// First "reliable received in a datagram WITHOUT the SENT_TIME header flag"
     /// breadcrumb latch. We now ACK these (we used to silently skip the ACK,

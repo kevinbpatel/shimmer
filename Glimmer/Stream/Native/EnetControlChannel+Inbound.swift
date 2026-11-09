@@ -116,25 +116,7 @@ extension EnetControlChannel {
             // retransmitting until its peer timeout.
             ackIfRequested(commandByte, channelID: channelID, relSeq: relSeq,
                            flags: flags, sentTime: sentTime)
-            // Per-channel staleness gate (see lastDispatchedInboundRelSeq):
-            // dispatch only a STRICTLY-NEWER reliable seq. A host retransmit
-            // (lost client ACK) or UDP reorder of an already-superseded
-            // command - the rumble(x,y) that would land after motors-off and
-            // latch the pad buzzing - is dropped here instead of dispatched.
-            guard Self.reliableSeqIsNewer(relSeq,
-                                          than: lastDispatchedInboundRelSeq[channelID] ?? 0) else {
-                if !loggedFirstStaleReliableDrop {
-                    loggedFirstStaleReliableDrop = true
-                    Diag.info("ENet dropped stale/duplicate inbound reliable "
-                        + "(ch \(channelID) relSeq \(relSeq), last dispatched "
-                        + "\(lastDispatchedInboundRelSeq[channelID] ?? 0)); "
-                        + "ACKed, not re-dispatched - first sighting this session",
-                        Self.logCategory)
-                }
-                return true
-            }
-            lastDispatchedInboundRelSeq[channelID] = relSeq
-            handleInboundControl(inner)
+            acceptInboundReliable(inner, channelID: channelID, relSeq: relSeq)
         default:
             // Remaining commands carry a body we don't act on but MUST consume
             // exactly so multi-command datagrams stay in sync - a RELIABLE
@@ -147,6 +129,31 @@ extension EnetControlChannel {
                            flags: flags, sentTime: sentTime)
         }
         return true
+    }
+
+    /// Drop duplicates (already ACKed), and authenticate everything else before
+    /// it can be held or move the channel cursor: a forged sequence number must
+    /// not make the PC's genuine messages look stale. Delivery is in order, held
+    /// behind a missing reliable until the PC resends it.
+    private func acceptInboundReliable(_ bytes: [UInt8], channelID: UInt8, relSeq: UInt16) {
+        let order = inboundOrder[channelID] ?? EnetInboundOrder()
+        if order.isDuplicate(relSeq) {
+            if !loggedFirstDuplicateReliable {
+                loggedFirstDuplicateReliable = true
+                Diag.info("ENet dropped duplicate inbound reliable (ch \(channelID) "
+                    + "relSeq \(relSeq), next \(order.next)); ACKed, first sighting this session", Self.logCategory)
+            }
+            return
+        }
+        guard let inner = openInboundControl(bytes) else { return }
+        let result = inboundOrder[channelID, default: EnetInboundOrder()]
+            .accept(relSeq, payload: inner)
+        if result.skipped > 0, !loggedFirstInboundGapSkip {
+            loggedFirstInboundGapSkip = true
+            Diag.notice("ENet inbound reliable gap skipped (ch \(channelID), \(result.skipped) seqs, "
+                + "hold full); first sighting this session", Self.logCategory)
+        }
+        for message in result.due { handleInboundControl(message) }
     }
 
     /// Advance `reader` past the body of a known fixed/variable-length ENet
@@ -222,30 +229,32 @@ extension EnetControlChannel {
     // EnetControlChannel+ControlMessages.swift, split out to keep this file
     // under the length limit.
 
-    /// Decrypt + dispatch one inbound host control payload (the inner bytes of a
+    /// Decrypt one inbound host control payload (the inner bytes of a
     /// SEND_RELIABLE). Every host control message on the encrypted stream is the
     /// envelope type 0x0001 → crypto.open() yields [type LE][len LE][payload].
-    /// Dispatch on the inner type: TERMINATION → onTerminated; HDR → onHdrMode
-    /// (transition-gated); RUMBLE → onRumble; TRIGGER RUMBLE → onRumbleTriggers;
-    /// RGB LED → onSetRgbLed; MOTION ENABLE → onSetMotionEvent; unknown →
-    /// count + once-per-type log + continue (NOT bail). Mirrors
-    /// controlReceiveThreadFunc.
-    func handleInboundControl(_ bytes: [UInt8]) {
-        guard bytes.count >= 2 else { return }
+    /// Nil for anything that doesn't authenticate.
+    func openInboundControl(_ bytes: [UInt8]) -> [UInt8]? {
+        guard bytes.count >= 2 else { return nil }
         let envelopeType = UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)
         guard envelopeType == 0x0001 else {
             Diag.info("ENet inbound non-encrypted control type 0x\(String(envelopeType, radix: 16)); ignoring",
                       Self.logCategory)
-            return
+            return nil
         }
-
-        let inner: [UInt8]
         do {
-            inner = try crypto.open(bytes)
+            return try crypto.open(bytes)
         } catch {
             Diag.error("ENet failed to decrypt inbound control: \(error, privacy: .private)", Self.logCategory)
-            return
+            return nil
         }
+    }
+
+    /// Dispatch one decrypted host control message on its inner type:
+    /// TERMINATION → onTerminated; HDR → onHdrMode (transition-gated); RUMBLE →
+    /// onRumble; TRIGGER RUMBLE → onRumbleTriggers; RGB LED → onSetRgbLed;
+    /// MOTION ENABLE → onSetMotionEvent; unknown → count + once-per-type log +
+    /// continue (NOT bail). Mirrors controlReceiveThreadFunc.
+    func handleInboundControl(_ inner: [UInt8]) {
         // inner = [type LE][payloadLength LE][payload]
         guard inner.count >= 4 else { return }
         let innerType = UInt16(inner[0]) | (UInt16(inner[1]) << 8)
