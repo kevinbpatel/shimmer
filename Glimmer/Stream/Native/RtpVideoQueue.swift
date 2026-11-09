@@ -108,6 +108,9 @@ final class RtpVideoQueue {
     var bufferFirstRecvTimeUs: UInt64 = 0
 
     var loggedFirstFecRecovery = false
+    /// The open run of FEC-recovered frames; summarized from maybeLogMetrics once
+    /// idle, so a lossy link logs one line per episode rather than one per frame.
+    var fecEpisode = FecRecoveryEpisode()
 
     /// Cauchy-decoder cache keyed by shape: the matrix is a pure function of (ds,ps)
     /// that repeats across a loss burst, so memoize instead of rebuilding per frame.
@@ -440,6 +443,9 @@ final class RtpVideoQueue {
         // keep it for live debugging; the file sink takes INFO+ by default.
         Diag.debug("NativeVideo METRIC recv-jitter=\(jitterMs)ms fec-recovery-rate=\(fecPct)% "
             + "(\(fecRecoveredFramesInWindow)/\(framesInWindow) frames) pkts/s=\(ppsStr)", Self.cat)
+        if let summary = fecEpisode.summaryIfIdle(nowUs: nowUs, idleUs: Self.metricsWindowUs) {
+            Diag.info("NativeVideo FEC recovery episode: \(summary)", Self.cat)
+        }
 
         // Feed the opt-in telemetry exporter. Monotonic window deltas (so the
         // exporter derives pkts/s + fec-recovery-rate from total-deltas) plus the
