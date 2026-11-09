@@ -56,16 +56,20 @@ extension RtpVideoQueue {
             return -1
         }
 
-        if bufferDataPackets != receivedDataPackets {
-            logFecRecovery()
-        }
-
-        // Re-queue recovered DATA shards (i < bufferDataPackets) (c:348-446).
+        // Rebuild and validate every recovered DATA shard (i < bufferDataPackets)
+        // before committing any of them or the recovery metric (c:348-446): one
+        // shard that fails its flag checks means the decode produced garbage, and
+        // staging the rest would submit a frame with a hole in it.
         let headEntry = pending.first
-        for i in 0..<totalPackets where marks[i] && i < bufferDataPackets {
-            requeueRecoveredShard(shards[i], index: i, headEntry: headEntry)
+        var recovered: [Entry] = []
+        for i in 0..<bufferDataPackets where marks[i] {
+            guard let entry = rebuildRecoveredShard(shards[i], index: i, headEntry: headEntry) else {
+                return -1
+            }
+            recovered.append(entry)
         }
-
+        logFecRecovery()
+        for entry in recovered { _ = queuePacket(entry) }
         return 0
     }
 
@@ -135,10 +139,10 @@ extension RtpVideoQueue {
     }
 
     /// Rebuild the RTP+NV header on one recovered DATA shard (slot `index`) and
-    /// re-feed it through queuePacket, dropping it if its sanity-checked flags are
-    /// corrupt (RtpVideoQueue.c:348-446). `headEntry` is the block's first received
+    /// return it as a queue entry, or nil if its sanity-checked flags are corrupt
+    /// (RtpVideoQueue.c:348-446). `headEntry` is the block's first received
     /// packet, used to source the header/timestamp/ssrc the FEC math can't recover.
-    private func requeueRecoveredShard(_ shard: [UInt8], index: Int, headEntry: Entry?) {
+    private func rebuildRecoveredShard(_ shard: [UInt8], index: Int, headEntry: Entry?) -> Entry? {
         var recovered = shard
         // Rebuild RTP header on the recovered shard.
         let recoveredSeq = Self.u16(index + Int(bufferLowestSequenceNumber))
@@ -166,25 +170,24 @@ extension RtpVideoQueue {
         let recFlags = (nv + 8 < recovered.count) ? recovered[nv + 8] : 0
         if index == 0 && (recFlags & Self.FLAG_SOF) == 0 {
             Diag.warn("NativeVideo FEC corrupt recovered packet \(recoveredSeq) (no SOF) frame \(currentFrameNumber)", Self.cat)
-            return
+            return nil
         }
         if index == bufferDataPackets - 1 && (recFlags & Self.FLAG_EOF) == 0 {
             Diag.warn("NativeVideo FEC corrupt recovered packet \(recoveredSeq) (no EOF) frame \(currentFrameNumber)", Self.cat)
-            return
+            return nil
         }
         if index > 0 && index < bufferDataPackets - 1 && (recFlags & Self.FLAG_CONTAINS_PIC_DATA) == 0 {
             Diag.warn("NativeVideo FEC corrupt recovered packet \(recoveredSeq) (no PIC) frame \(currentFrameNumber)", Self.cat)
-            return
+            return nil
         }
         if recFlags & ~(Self.FLAG_SOF | Self.FLAG_EOF | Self.FLAG_CONTAINS_PIC_DATA) != 0 {
             Diag.warn("NativeVideo FEC corrupt recovered packet \(recoveredSeq) (stray flags) frame \(currentFrameNumber)", Self.cat)
-            return
+            return nil
         }
 
-        let recoveredEntry = Entry(
+        return Entry(
             bytes: recovered, length: packetSize + dataOffset, seq: recoveredSeq,
             ts: ts, ssrc: ssrc, header: header, isParity: false)
-        _ = queuePacket(recoveredEntry)
     }
 
     // MARK: - stageCompleteFecBlock (c:465-524)

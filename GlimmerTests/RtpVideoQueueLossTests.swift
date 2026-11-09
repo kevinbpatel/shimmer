@@ -81,6 +81,34 @@ struct RtpVideoQueueLossTests {
         #expect(delegate.units.map(\.frameNumber) == [1, 3])
     }
 
+    // MARK: - FEC rebuild
+
+    /// Frame 2 as three data shards with three parity shards (fecPercentage 67).
+    private func wideShard(_ fecIndex: Int, flags: UInt8, payload: [UInt8]) -> [UInt8] {
+        VideoWire.shard(seq: UInt16(1 + fecIndex), frame: 2, fecIndex: fecIndex, dataCount: 3, fecPercent: 67,
+                        flags: flags, payload: payload)
+    }
+
+    /// Garbage parity makes every rebuild fail its shard checks. A failed rebuild commits
+    /// nothing, so the block is not submitted with a hole in it, and the data shards that
+    /// complete the frame on their own still deliver it whole.
+    @Test func failedRebuildCommitsNothing() {
+        let queue = makeQueue()
+        queue.addRawDatagram(VideoWire.singlePacketFrame(1, seq: 0, type: 2), receiveTimeUs: 1_000)
+        let garbage = [UInt8](repeating: 0xAB, count: 8), body = [UInt8](repeating: 2, count: 8)
+        let header = VideoWire.frameHeader(type: 1, lastPayloadLength: body.count)
+        queue.addRawDatagram(wideShard(0, flags: RtpVideoQueue.FLAG_SOF, payload: header), receiveTimeUs: 2_000)
+        queue.addRawDatagram(wideShard(3, flags: 0, payload: garbage), receiveTimeUs: 2_001)
+        queue.addRawDatagram(wideShard(4, flags: 0, payload: garbage), receiveTimeUs: 2_002)
+        queue.addRawDatagram(wideShard(5, flags: 0, payload: garbage), receiveTimeUs: 2_003)
+        #expect(delegate.units.map(\.frameNumber) == [1])
+        queue.addRawDatagram(wideShard(1, flags: 0, payload: body), receiveTimeUs: 2_004)
+        queue.addRawDatagram(wideShard(2, flags: RtpVideoQueue.FLAG_EOF, payload: body), receiveTimeUs: 2_005)
+        #expect(delegate.units.map(\.frameNumber) == [1, 2])
+        #expect(delegate.units.last?.buffers.first?.data == Data(body + body))
+        #expect(queue.fecRecoveredFramesInWindow == 0)
+    }
+
     /// Dropping a frame for a lost FEC block must not silence the report for the frame after it.
     @Test func lossAfterADroppedBlockIsStillReported() {
         let queue = makeQueue()
