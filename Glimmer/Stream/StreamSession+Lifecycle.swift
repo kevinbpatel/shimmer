@@ -150,10 +150,10 @@ extension StreamSession {
         //    which terminates the app Sunshine launched (a detached app,
         //    like a Steam Big Picture entry, is not Sunshine's to kill).
         //    Best-effort; the host can be unreachable if the network dropped.
+        let provider = quitAppOnStopProvider
+        let settingSaysQuit = await MainActor.run { provider() }
+        let quitApp = quitAppRequested || settingSaysQuit
         if let net = network {
-            let provider = quitAppOnStopProvider
-            let settingSaysQuit = await MainActor.run { provider() }
-            let quitApp = quitAppRequested || settingSaysQuit
             if quitApp {
                 log.info("Stop: /cancel - ending the host's app")
                 try? await net.cancel()
@@ -163,6 +163,16 @@ extension StreamSession {
             // shutdown() is a no-op now (the control channel is per-request) -
             // kept for symmetry with the rest of the teardown.
             await net.shutdown()
+        } else if quitApp, let net = cleanupNetwork {
+            // A failed reconnect attempt cleared `network`, but the game still
+            // runs on the PC the session launched on: quitting mid-reconnect
+            // must still end it. The PC may be the reason we're reconnecting,
+            // so the window doesn't wait on it past the quit bound.
+            log.info("Stop: /cancel mid-reconnect - ending the host's app")
+            _ = await TerminationGate.runBounded(seconds: TerminationGate.stopBoundSeconds) {
+                try? await net.cancel()
+                await net.shutdown()
+            }
         }
         quitAppRequested = false
         network = nil
@@ -218,6 +228,12 @@ extension StreamSession {
         window = nil
         videoDecoder = nil
         stopInProgress = false
+    }
+
+    /// The client stop cancels with. A failed reconnect attempt clears `network`, but the session
+    /// may still have a game running on `reconnectServer`, and a quit must not leave it there.
+    var cleanupNetwork: NetworkClient? {
+        network ?? reconnectServer.map { NetworkClient(server: $0) }
     }
 
     public func interrupt() async {
