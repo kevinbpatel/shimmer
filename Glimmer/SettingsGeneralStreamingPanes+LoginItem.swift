@@ -27,6 +27,9 @@ enum LoginItemManager {
         SMAppService.loginItem(identifier: helperBundleID)
     }
 
+    /// The launch-at-login helper's registration, for AgentControl's state file.
+    static var currentStatus: SMAppService.Status { activeService.status }
+
     /// Apply the desired state, returning the resulting status so the caller can
     /// prompt for approval. Surfaces failures to the in-app log (the old code
     /// swallowed them into os_log, which is why a broken registration looked

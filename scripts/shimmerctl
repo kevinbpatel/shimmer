@@ -38,6 +38,127 @@ def app_status(app):
             "signature_valid": signature is not None and signature.returncode == 0}
 
 
+STATE_FILE = Path.home() / "Library/Application Support/Shimmer/agent-state.json"
+COMMANDS_DIR = STATE_FILE.parent / "agent-commands"
+
+# What `fix` can do, mapped to the app's allowlisted agent commands.
+# `auto` marks fixes safe to apply without asking; the others open a System
+# Settings pane where a person has to flip a switch.
+FIXES = {
+    "refresh": ("refresh", True, "Re-check the PC, the helpers and permissions"),
+    "wifi-helper": ("repair-wifi-helper", True, "Re-register the Wi-Fi helper so launchd can start it"),
+    "login-item": ("repair-login-item", True, "Re-register the launch-at-login helper"),
+    "cancel-connect": ("cancel-connect", True, "Cancel a stream that is stuck connecting"),
+    "approve-background": ("open-login-items", False, "Open Login Items; switch Shimmer on"),
+    "input-monitoring": ("open-input-monitoring", False, "Open Input Monitoring; switch Shimmer on, then relaunch"),
+    "open-settings": ("open-settings", False, "Show Shimmer's window (optionally --tab)"),
+}
+ISSUE_FIX = {"host_status_loading": "refresh", "wifi_helper_not_running": "wifi-helper",
+             "wifi_helper_unavailable": "wifi-helper", "login_item_broken": "login-item",
+             "wifi_helper_needs_approval": "approve-background",
+             "login_item_needs_approval": "approve-background",
+             "input_monitoring_off": "input-monitoring"}
+
+
+def read_state(app):
+    """The running app's own account of itself (see Glimmer/AgentControl.swift)."""
+    if not STATE_FILE.exists():
+        return None
+    try:
+        state = json.loads(STATE_FILE.read_text())
+    except ValueError:
+        return None
+    pids = app_status(app)["running_pids"]
+    state["stale"] = state.get("app", {}).get("pid") not in pids
+    return state
+
+
+def send(app, command, timeout=15, **params):
+    """Ask the running app to do one allowlisted thing; wait for it to say it did."""
+    if not app_status(app)["running_pids"]:
+        raise RuntimeError("Shimmer isn't running. Start it with: open -a Shimmer (or `shimmerctl fix relaunch`).")
+    nonce = "%d-%d" % (time.time() * 1000, id(params))
+    # The app watches this owner-only folder (see Glimmer/AgentControl.swift);
+    # write-then-rename so it never reads half a file.
+    COMMANDS_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    request = {"command": command, "id": nonce,
+               "params": {key: value for key, value in params.items() if value}}
+    temporary = COMMANDS_DIR / (".%s.tmp" % nonce)
+    temporary.write_text(json.dumps(request))
+    temporary.rename(COMMANDS_DIR / ("%s.json" % nonce))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = read_state(app)
+        if state and state.get("last_command", {}).get("id") == nonce:
+            return state
+        time.sleep(0.25)
+    raise RuntimeError("The app didn't answer `%s` within %ds. It may be an older build without "
+                       "agent commands, or hung: try `shimmerctl fix relaunch`." % (command, timeout))
+
+
+def relaunch(app):
+    run(["osascript", "-e", 'tell application id "com.kevinbpatel.shimmer" to quit'], timeout=15)
+    for _ in range(40):
+        if not app_status(app)["running_pids"]:
+            break
+        time.sleep(0.25)
+    else:
+        for pid in app_status(app)["running_pids"]:
+            run(["kill", str(pid)])
+        time.sleep(1)
+    run(["open", "-g", app])
+    for _ in range(60):
+        state = read_state(app)
+        if state and not state["stale"]:
+            return state
+        time.sleep(0.25)
+    raise RuntimeError("Shimmer didn't come back after relaunching.")
+
+
+def launchd_job(label, domain="system"):
+    """launchd's view of a background helper: catches a job it can't spawn."""
+    out = run(["launchctl", "print", "%s/%s" % (domain, label)]).stdout
+    if not out:
+        return {"loaded": False}
+    job = {"loaded": True}
+    for key in ("state", "job state", "last exit code", "runs"):
+        for line in out.splitlines():
+            if line.strip().startswith(key + " = "):
+                job[key.replace(" ", "_")] = line.split("=", 1)[1].strip()
+                break
+    job["spawn_failing"] = "spawn failed" in out or "EX_CONFIG" in out
+    return job
+
+
+def fix(args):
+    if args.what == "relaunch":
+        return {"fixed": "relaunch", "state": relaunch(args.app)}, 0
+    if args.what == "auto":
+        state = send(args.app, "refresh")
+        applied, manual = [], []
+        # launchd can hold a helper job it can't spawn while the app only sees
+        # "waiting for approval"; re-registering gives it a fresh job either way.
+        if launchd_job("io.ugfugl.glimmer.helper").get("spawn_failing"):
+            send(args.app, FIXES["wifi-helper"][0], timeout=25)
+            applied.append("wifi-helper")
+        for item in state.get("issues", []):
+            name = ISSUE_FIX.get(item["id"])
+            if name and FIXES[name][1] and name not in applied:
+                send(args.app, FIXES[name][0], timeout=25)
+                applied.append(name)
+            elif name and name not in manual and name not in applied:
+                manual.append({"issue": item["summary"], "run": "shimmerctl fix " + name})
+        state = send(args.app, "refresh")
+        return {"applied": applied, "needs_a_person": manual,
+                "remaining_issues": state.get("issues", []), "loading": state.get("loading", [])}, \
+            0 if not state.get("issues") else 1
+    command, _, description = FIXES[args.what]
+    state = send(args.app, command, timeout=25, tab=getattr(args, "tab", None))
+    return {"fixed": args.what, "what_it_does": description,
+            "result": state.get("last_command", {}).get("result"),
+            "issues": state.get("issues", []), "loading": state.get("loading", [])}, 0
+
+
 def tcp_probe(host, port, timeout=3):
     started = time.monotonic()
     try:
@@ -89,7 +210,30 @@ def log_entries(last="10m", start=None):
 
 
 def doctor(args):
-    result = {"client": app_status(args.app), "host": args.host}
+    result = {"client": app_status(args.app)}
+    state = None
+    if result["client"]["running_pids"]:
+        try:
+            state = send(args.app, "refresh")
+        except RuntimeError as error:
+            result["app_state_error"] = str(error)
+            state = read_state(args.app)
+    if state:
+        result["app"] = {key: state.get(key) for key in
+                         ("ui", "selected_host", "stream", "controller", "permissions",
+                          "wifi_helper", "login_item", "loading", "issues")}
+        result["app"]["stale"] = state.get("stale")
+    result["launchd"] = {"wifi_helper": launchd_job("io.ugfugl.glimmer.helper"),
+                         "login_helper": launchd_job("com.kevinbpatel.shimmer.LoginHelper",
+                                                     "gui/%d" % __import__("os").getuid())}
+    if not args.host and state:
+        selected = state.get("selected_host") or {}
+        args.host = selected.get("local_address") or selected.get("manual_address")
+    if not args.host:
+        result["diagnosis"] = "no_host"
+        result["guidance"] = "No PC is selected in Shimmer; pass --host."
+        return result, 1
+    result["host"] = args.host
     result["ports"] = {"http": tcp_probe(args.host, args.http_port),
                        "https": tcp_probe(args.host, args.https_port)}
     try:
@@ -105,6 +249,11 @@ def doctor(args):
         result["logs_error"] = str(error)
         permission_denied = False
     result["diagnosis"] = diagnosis(result["ports"]["http"], result["ports"]["https"], permission_denied)
+    issues = (result.get("app") or {}).get("issues") or []
+    result["fixes"] = sorted({"shimmerctl fix " + ISSUE_FIX[item["id"]]
+                              for item in issues if item["id"] in ISSUE_FIX})
+    if result["launchd"]["wifi_helper"].get("spawn_failing"):
+        result["fixes"] = sorted(set(result["fixes"]) | {"shimmerctl fix wifi-helper"})
     result["guidance"] = {
         "macos_local_network_denied": "Allow Shimmer in macOS Privacy & Security > Local Network.",
         "secure_port_unreachable": "The PC answers on HTTP but not HTTPS. Check Sunshine's HTTPS listener and firewall. An exhausted accept queue requires restarting Sunshine; re-pairing does not repair that listener.",
@@ -112,7 +261,7 @@ def doctor(args):
         "http_port_unreachable": "Check Sunshine's HTTP listener and firewall.",
         "ports_reachable": "TCP ports answer. This alone does not prove pairing, TLS, or video works; use test-stream for an app-level test."
     }[result["diagnosis"]]
-    return result, 0 if result["diagnosis"] == "ports_reachable" else 1
+    return result, 0 if result["diagnosis"] == "ports_reachable" and not result["fixes"] else 1
 
 
 def test_stream(args):
@@ -159,14 +308,21 @@ def main():
                                 input=Path(__file__).read_bytes())
         return remote.returncode
     parser = argparse.ArgumentParser(description=__doc__,
-        epilog="Remote: shimmerctl --on user@tailscale-address doctor --host PC-address")
+        epilog="Start with `shimmerctl doctor`, then `shimmerctl fix auto`. "
+               "Remote: shimmerctl --on user@tailscale-address doctor")
     parser.add_argument("--app", default=default_app_path())
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="Installed app, signature, and running process IDs")
+    commands.add_parser("state", help="What the running app is showing and doing, its permissions, "
+                        "helpers, anything still loading, and known issues with their fixes")
+    repair = commands.add_parser("fix", help="Repair a known issue (auto applies every safe fix)")
+    repair.add_argument("what", choices=["auto", "relaunch"] + sorted(FIXES))
+    repair.add_argument("--tab", choices=["computers", "stream", "general", "about"],
+                        help="For open-settings")
     logs = commands.add_parser("logs", help="Structured Shimmer unified logs")
     logs.add_argument("--last", default="10m")
     check = commands.add_parser("doctor", help="Check client installation, host ports, and recent failures")
-    check.add_argument("--host", required=True)
+    check.add_argument("--host", help="PC address (default: the PC selected in Shimmer)")
     check.add_argument("--http-port", type=int, default=47989)
     check.add_argument("--https-port", type=int, default=47984)
     check.add_argument("--last", default="10m")
@@ -178,6 +334,14 @@ def main():
         result, code = doctor(args)
     elif args.command == "test-stream":
         result, code = test_stream(args)
+    elif args.command == "state":
+        if app_status(args.app)["running_pids"]:
+            result = send(args.app, "state")
+        else:
+            result = read_state(args.app) or {"error": "Shimmer isn't running and has no saved state."}
+        code = 0 if not result.get("issues") else 1
+    elif args.command == "fix":
+        result, code = fix(args)
     elif args.command == "logs":
         result, code = {"entries": log_entries(args.last)}, 0
     else:

@@ -297,6 +297,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             guard let model = Self.boundManager else { return }
             Self.menuBar = MenuBarController(model: model)
+            // shimmerctl's view into, and handle on, the running app.
+            AgentControl.shared.start(model: model)
         }
     }
 

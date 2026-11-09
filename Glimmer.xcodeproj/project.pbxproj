@@ -46,6 +46,7 @@
 		A100018A /* SettingsPCsShortcutsPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100018B /* SettingsPCsShortcutsPanes.swift */; };
 		A100019A /* AboutPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100019B /* AboutPane.swift */; };
 		04E4D673A3624136A035F8F2 /* CLIIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */; };
+		A6E7C0A1B2C3D4E5F6A7B8C9 /* AgentControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E7C0A1B2C3D4E5F6A7B8CA /* AgentControl.swift */; };
 		A100020A /* DiagnosticsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100020B /* DiagnosticsPane.swift */; };
 		A1009001 /* UpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1009002 /* UpdaterController.swift */; };
 		A1009012 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A1009011 /* Sparkle */; };
@@ -389,6 +390,7 @@
 		A100018B /* SettingsPCsShortcutsPanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPCsShortcutsPanes.swift; sourceTree = "<group>"; };
 		A100019B /* AboutPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutPane.swift; sourceTree = "<group>"; };
 		DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIIntegration.swift; sourceTree = "<group>"; };
+		A6E7C0A1B2C3D4E5F6A7B8CA /* AgentControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentControl.swift; sourceTree = "<group>"; };
 		A100020B /* DiagnosticsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsPane.swift; sourceTree = "<group>"; };
 		A1009002 /* UpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterController.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000100000C01 /* HostCodecPreference.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostCodecPreference.swift; sourceTree = "<group>"; };
@@ -759,6 +761,7 @@
 				A100018B /* SettingsPCsShortcutsPanes.swift */,
 				A100019B /* AboutPane.swift */,
 				DD1C85EA296D44EE95EC3607 /* CLIIntegration.swift */,
+				A6E7C0A1B2C3D4E5F6A7B8CA /* AgentControl.swift */,
 				A100011B /* DualSenseHID.swift */,
 				D20000A2 /* DualSenseHID+Decode.swift */,
 				A10000013 /* AppModel.swift */,
@@ -1206,6 +1209,7 @@
 				A100018A /* SettingsPCsShortcutsPanes.swift in Sources */,
 				A100019A /* AboutPane.swift in Sources */,
 				04E4D673A3624136A035F8F2 /* CLIIntegration.swift in Sources */,
+				A6E7C0A1B2C3D4E5F6A7B8C9 /* AgentControl.swift in Sources */,
 				A100011A /* DualSenseHID.swift in Sources */,
 				D20000A3 /* DualSenseHID+Decode.swift in Sources */,
 				A10000003 /* AppModel.swift in Sources */,

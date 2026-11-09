@@ -75,5 +75,39 @@ class DoctorTests(unittest.TestCase):
         self.assertFalse(cli.tcp_probe("127.0.0.1", port, timeout=1)["reachable"])
 
 
+class AgentContractTests(unittest.TestCase):
+    """The CLI and the app (Glimmer/AgentControl.swift) must agree on names."""
+    swift = (Path(__file__).resolve().parents[2] / "Glimmer/AgentControl.swift").read_text()
+
+    def app_commands(self):
+        import re
+        block = self.swift[self.swift.index("enum Command"):self.swift.index("private weak var model")]
+        names = set(re.findall(r'= "([a-z-]+)"', block))
+        for line in re.findall(r"^\s*case ([a-z, ]+)$", block, re.M):   # plain cases: name == raw value
+            names |= {n.strip() for n in line.split(",")}
+        return names
+
+    def test_every_fix_sends_a_command_the_app_knows(self):
+        for name, (command, _, _) in cli.FIXES.items():
+            self.assertIn(command, self.app_commands(), name)
+
+    def test_every_issue_the_app_reports_has_a_fix(self):
+        import re
+        issue_ids = set(re.findall(r'issue\("([a-z_]+)"', self.swift))
+        self.assertTrue(issue_ids)
+        for issue_id in issue_ids - {"stream_error"}:
+            self.assertIn(issue_id, cli.ISSUE_FIX, issue_id)
+            self.assertIn(cli.ISSUE_FIX[issue_id], cli.FIXES)
+
+    def test_a_stale_state_file_is_flagged(self):
+        import json, tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "agent-state.json"
+            path.write_text(json.dumps({"app": {"pid": 999999}, "issues": []}))
+            with patch.object(cli, "STATE_FILE", path), \
+                 patch.object(cli, "app_status", return_value={"running_pids": [1234]}):
+                self.assertTrue(cli.read_state("/Applications/Shimmer.app")["stale"])
+
+
 if __name__ == "__main__":
     unittest.main()
