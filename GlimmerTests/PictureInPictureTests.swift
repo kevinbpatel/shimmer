@@ -4,9 +4,11 @@
 //  Hardware-free coverage for the Picture in Picture decision logic: the
 //  present-suppression truth table StreamWindow feeds the decoder, the
 //  mirror-source sizing that keeps the 1:1 PiP mirror free of hairline gaps,
-//  and the default chord's non-collision with the other client-side chords.
+//  the default chord's non-collision with the other client-side chords, and
+//  the keep-alive that redraws the PiP panel (see `PiPKeepAlive`).
 //
 
+import AppKit
 import CoreGraphics
 import Testing
 @testable import Glimmer
@@ -104,6 +106,39 @@ struct PictureInPictureTests {
                 #expect(a != b)
             }
         }
+    }
+
+    // MARK: - Recording keep-alive
+
+    /// What matters is that every nudge is a real change in the panel's own
+    /// layer tree - a no-op assignment commits nothing, and nothing committed
+    /// leaves the picture frozen.
+    @MainActor @Test func keepAliveNudgesALayerInsideThePanelAndCleansUp() throws {
+        let panelContent = NSView(frame: NSRect(x: 0, y: 0, width: 584, height: 329))
+        let keepAlive = PiPKeepAlive(in: panelContent)
+        let host = try #require(panelContent.subviews.first)
+        #expect(panelContent.subviews.count == 1)
+        let dot = try #require(host.layer?.sublayers?.first)
+        #expect(dot.bounds.size == CGSize(width: 1, height: 1))
+
+        let start = dot.position
+        keepAlive.nudge()
+        let moved = dot.position
+        #expect(moved != start)
+        keepAlive.nudge()
+        #expect(dot.position != moved)
+
+        // It sits over the picture's corner: clicks there must still reach PiP.
+        #expect(panelContent.hitTest(NSPoint(x: 0.5, y: 0.5)) === panelContent)
+
+        keepAlive.stop()
+        #expect(panelContent.subviews.isEmpty)
+    }
+
+    @MainActor @Test func keepAliveBoundsTheFreezeToAFrameOrThree() {
+        // 60 fps frames are 16.7 ms apart; staying stuck for more than a few
+        // of them after the animation is a visible hitch.
+        #expect(PiPKeepAlive.interval <= 0.05)
     }
 
     @Test func defaultPiPChordCarriesNoCommandModifier() {

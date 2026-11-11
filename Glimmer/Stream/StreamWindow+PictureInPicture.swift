@@ -474,6 +474,8 @@ extension StreamWindow {
                 }
                 apply()
                 self.onPictureInPicturePanelChanged?(panel)
+                self.pipKeepAlive?.stop()
+                self.pipKeepAlive = PiPKeepAlive(in: content)
                 content.postsFrameChangedNotifications = true
                 self.pipPanelFrameObserver = NotificationCenter.default.addObserver(
                     forName: NSView.frameDidChangeNotification, object: content, queue: .main
@@ -520,6 +522,8 @@ extension StreamWindow {
             NotificationCenter.default.removeObserver(obs)
             pipPanelFrameObserver = nil
         }
+        pipKeepAlive?.stop()
+        pipKeepAlive = nil
         window.ignoresMouseEvents = false
         if restoreShape { restorePiPSourceShape() }
         if let chrome = savedChromeBeforePiP {
@@ -603,5 +607,81 @@ extension StreamWindow {
         guard let saved = savedControllerBackgroundFlag else { return }
         GCController.shouldMonitorBackgroundEvents = saved
         savedControllerBackgroundFlag = nil
+    }
+}
+
+// MARK: - Recording keep-alive
+
+/// Redraws the system PiP panel a few times a second so the picture cannot
+/// stay frozen after a Stage Manager switch or Mission Control.
+///
+/// macOS 27.2, measured 2026-11-10: while the screen is being recorded
+/// (Cmd-Shift-5, or any other display capture), a Stage Manager switch or a
+/// Mission Control animation stops the window server sampling a video
+/// layer's image queue - and it does not start again when the animation
+/// ends. Frames keep arriving and keep being enqueued on time; the picture
+/// just sits on its last one until something redraws the window showing it.
+/// Hovering the pointer over the PiP was enough, which is how this was
+/// found. A bare `AVSampleBufferDisplayLayer` in an ordinary window does the
+/// same, so it is neither this app nor PiP. macOS 27.0 does not do it.
+///
+/// A Core Animation commit anywhere in the PANEL's layer tree restarts the
+/// sampling. Commits in the source window's tree do not: AVKit moves the
+/// video layer into the panel for as long as PiP is up. Moving, reordering,
+/// flushing and re-levelling either window do not either.
+///
+/// So: one 1pt, 1%-opaque layer in the panel's corner (under its rounded
+/// mask), nudged on a timer. The stall DURING the animation - about half a
+/// second, and it holds every window on screen, video or not - is the
+/// system's and cannot be shortened from here; this only bounds how long
+/// AFTER it the picture stays stuck. A commit on every display refresh lost
+/// the same frames as 60 Hz, so the rate buys nothing beyond that bound:
+/// 20 Hz is at most 50 ms, costs nothing measurable in this process, and
+/// stays inside the window server's noise.
+@MainActor
+final class PiPKeepAlive {
+    static let interval: TimeInterval = 1.0 / 20.0
+
+    /// Layer-HOSTING (layer assigned before `wantsLayer`), so the tree under
+    /// it is ours to mutate; AppKit owns the panel's own backing layers.
+    private let host = PassThroughView(frame: NSRect(x: 0, y: 0, width: 2, height: 1))
+    private let dot = CALayer()
+    private var timer: Timer?
+    private var flip = false
+
+    init(in panelContent: NSView) {
+        host.layer = CALayer()
+        host.wantsLayer = true
+        dot.frame = CGRect(x: 0, y: 0, width: 1, height: 1)
+        dot.backgroundColor = CGColor(gray: 0, alpha: 0.01)
+        host.layer?.addSublayer(dot)
+        panelContent.addSubview(host)
+        let timer = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.nudge() }
+        }
+        timer.tolerance = Self.interval / 4
+        // .common: keep going while the user drags or resizes the PiP.
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    /// One commit in the panel's tree. The dot moves between two positions a
+    /// point apart; the change has to be real, or nothing is committed.
+    func nudge() {
+        flip.toggle()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        dot.position = CGPoint(x: flip ? 1.5 : 0.5, y: 0.5)
+        CATransaction.commit()
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        host.removeFromSuperview()
+    }
+
+    private final class PassThroughView: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }

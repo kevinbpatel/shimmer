@@ -15,6 +15,12 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - The stream can be screen-recorded and screen-shared from the Mac, and
   Picture in Picture keeps playing while you record. glimmer hid the stream
   from screen capture, which stopped the PiP picture when a recording began.
+- While you record, the PiP picture no longer stays frozen after a Stage
+  Manager switch or Mission Control. macOS 27.2 stops drawing a video layer
+  during those animations when the screen is being captured, and never
+  resumes on its own; Shimmer now redraws the PiP panel 20 times a second,
+  which restarts it. The half-second pause during the animation itself is
+  the system's - it holds every window on screen - and remains.
 
 ### One window
 - Servers, Stream, General and About tabs replace the launcher and the

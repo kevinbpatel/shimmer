@@ -264,6 +264,9 @@ public final class StreamWindow {
     /// Observer on the PiP panel's content view frame, so the mirror source
     /// window tracks PiP window resizes and keeps filling it 1:1.
     var pipPanelFrameObserver: NSObjectProtocol?
+    /// Keeps the PiP picture from staying frozen after a Stage Manager or
+    /// Mission Control animation during a screen recording (`PiPKeepAlive`).
+    var pipKeepAlive: PiPKeepAlive?
     /// Read at the confirmed switch-away edge: should the stream pop out to
     /// Picture in Picture instead of just hiding? Wired to the user's
     /// Settings toggle by the session owner.
