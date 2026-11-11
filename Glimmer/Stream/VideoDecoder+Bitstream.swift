@@ -237,22 +237,33 @@ extension VideoDecoder {
             let count = raw.count
 
             // First pass: collect NAL spans and the exact output length.
+            //
+            // Every start code ends in 0x01, so the scan jumps from one 0x01
+            // byte to the next with `memchr` (vectorised) and only then looks
+            // back for the two or three zero bytes. Entropy-coded video has a
+            // 0x01 about once in 256 bytes, so this touches a small fraction
+            // of what a byte-at-a-time walk did - that walk was the largest
+            // user-space cost of a high-bitrate stream (13% of a core at
+            // ~190 Mbps). The spans it finds are identical: a code is the
+            // 4-byte form when a third zero precedes the 0x01 and that zero
+            // wasn't already consumed, the 3-byte form otherwise.
             var nals: [(start: Int, length: Int)] = []
             var outSize = 0
             var nalStart = -1
-            var i = 0
-            while i < count {
-                let scLen = startCodeLength(at: i, base: base, count: count)
-                if scLen > 0 {
-                    if nalStart >= 0, i > nalStart {
-                        nals.append((nalStart, i - nalStart))
-                        outSize += 4 + (i - nalStart)
-                    }
-                    i += scLen
-                    nalStart = i
-                } else {
-                    i += 1
+            var consumed = 0 // first byte not part of an earlier start code
+            var search = 0
+            while search < count,
+                  let hit = memchr(base + search, 0x01, count - search) {
+                let one = UnsafeRawPointer(hit) - UnsafeRawPointer(base)
+                search = one + 1
+                guard one >= consumed + 2, base[one - 1] == 0, base[one - 2] == 0 else { continue }
+                let codeStart = (one >= consumed + 3 && base[one - 3] == 0) ? one - 3 : one - 2
+                if nalStart >= 0, codeStart > nalStart {
+                    nals.append((nalStart, codeStart - nalStart))
+                    outSize += 4 + (codeStart - nalStart)
                 }
+                nalStart = one + 1
+                consumed = one + 1
             }
             if nalStart >= 0, count > nalStart {
                 nals.append((nalStart, count - nalStart))
@@ -280,20 +291,6 @@ extension VideoDecoder {
             }
             return out
         }
-    }
-
-    /// Length of an Annex-B start code at `i` (4 for 00 00 00 01, 3 for
-    /// 00 00 01, 0 if none). Helper so the AVCC scan reads in one place.
-    private nonisolated func startCodeLength(
-        at i: Int, base: UnsafePointer<UInt8>, count: Int
-    ) -> Int {
-        if i + 3 < count, base[i] == 0, base[i + 1] == 0, base[i + 2] == 0, base[i + 3] == 1 {
-            return 4
-        }
-        if i + 2 < count, base[i] == 0, base[i + 1] == 0, base[i + 2] == 1 {
-            return 3
-        }
-        return 0
     }
 
     // MARK: - Sample buffer construction (for VT input)

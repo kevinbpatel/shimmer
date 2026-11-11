@@ -36,6 +36,9 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
   no longer leaves a stale error.
 - An opt-in 60 ms ceiling on the audio playout cushion. Codec caps remove
   whole codec families. Colour on SDR displays is no longer over-saturated.
+- Less CPU at high bitrates: finding the frame boundaries in the incoming
+  video was the largest cost in the app at ~190 Mbps, and now skips most of
+  the bytes it used to read.
 
 ### Tools
 - `shimmerctl`: check connectivity, read logs and run test streams, locally
