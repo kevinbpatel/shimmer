@@ -39,6 +39,8 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - Less CPU at high bitrates: finding the frame boundaries in the incoming
   video was the largest cost in the app at ~190 Mbps, and now skips most of
   the bytes it used to read.
+- The app no longer pauses its main thread for ~28 ms every two seconds to
+  ask macOS whether the login item is registered.
 
 ### Tools
 - `shimmerctl`: check connectivity, read logs and run test streams, locally

@@ -181,9 +181,31 @@ final class AgentControl: NSObject {
 
     // MARK: - State
 
+    /// The login helper's registration, as last asked. `SMAppService.status`
+    /// is a synchronous XPC round trip to the service-management daemon
+    /// (measured ~28 ms), and the 2 s timer below ran it on the main thread
+    /// for as long as the app was open - a stall longer than a 60 fps frame,
+    /// every other second, mid-stream. The timer now reuses an answer up to
+    /// `loginStatusMaxAge` old; a forced write (every agent command, including
+    /// the `state` that `shimmerctl state` / `doctor` send) always asks again,
+    /// so what an agent reads on request is current.
+    private var loginStatus: (value: SMAppService.Status, at: Date)?
+    private static let loginStatusMaxAge: TimeInterval = 30
+
+    private func currentLoginStatus(fresh: Bool) -> SMAppService.Status {
+        if !fresh, let cached = loginStatus,
+           Date().timeIntervalSince(cached.at) < Self.loginStatusMaxAge {
+            return cached.value
+        }
+        let value = LoginItemManager.currentStatus
+        loginStatus = (value, Date())
+        return value
+    }
+
     func writeState(force: Bool = false) {
         guard let model else { return }
-        var snapshot = Self.snapshot(model: model, launchedAt: launchedAt, lastCommand: lastCommand)
+        var snapshot = Self.snapshot(model: model, launchedAt: launchedAt, lastCommand: lastCommand,
+                                     loginStatus: currentLoginStatus(fresh: force))
         let options = NSApp.presentationOptions
         snapshot["menu_bar"] = menuBarEvents.merging([
             "hidden_by_shimmer": options.contains(.hideMenuBar) ? "yes (full-screen stream covering the notch)"
@@ -205,10 +227,10 @@ final class AgentControl: NSObject {
     }
 
     static func snapshot(model: AppModel, launchedAt: Date,
-                         lastCommand: [String: String]?) -> [String: Any] {
+                         lastCommand: [String: String]?,
+                         loginStatus: SMAppService.Status) -> [String: Any] {
         let bundle = Bundle.main
         let mainOpen = NSApp.windows.contains { $0.identifier?.rawValue == "main" && $0.isVisible }
-        let loginStatus = LoginItemManager.currentStatus
         let wantsLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
         let inputMonitoring = Self.inputMonitoringStatus()
 
