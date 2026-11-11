@@ -12,6 +12,9 @@ Everything below glimmer 2026.9.0 in this file is upstream glimmer's history.
 - Works around the AVKit sample-buffer PiP crop and black-overlay bugs
   (Apple FB22411168), leaves no ghost Stage Manager tile, and waits for the
   stream's first frame.
+- The stream can be screen-recorded and screen-shared from the Mac, and
+  Picture in Picture keeps playing while you record. glimmer hid the stream
+  from screen capture, which stopped the PiP picture when a recording began.
 
 ### One window
 - Servers, Stream, General and About tabs replace the launcher and the

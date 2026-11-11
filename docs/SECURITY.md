@@ -269,11 +269,15 @@ unsandboxed. The Debug/adhoc variant (`Glimmer/Glimmer-Debug.entitlements`) adds
 OpenSSL/Opus dylibs as-is can still load them; Release omits it (validation
 enforced).
 
-**NSWindow.sharingType** = `.none`. The stream window opts out of
-ScreenCaptureKit, `screencapture(1)`, and Cmd-Shift-5. Third-party recording /
-conferencing apps (QuickTime, OBS, Loom, Zoom, Teams) see a black surface where
-the stream is - same posture as Apple TV+ and Netflix. Users who want to record
-their session use the host PC's recording tools, not the Mac's.
+**NSWindow.sharingType** = `.readOnly`. The stream window is visible to
+ScreenCaptureKit, `screencapture(1)`, Cmd-Shift-5 and recording / conferencing
+apps (QuickTime, OBS, Loom, Zoom, Teams), like any other window. glimmer opted
+out with `.none`, the posture Apple TV+ and Netflix take for protected video.
+Shimmer doesn't: the stream is the user's own game, and Picture in Picture
+mirrors the stream window's layer, so the opt-out stopped the PiP picture
+whenever a screen recording started. Anything already allowed to record this
+Mac's screen (a macOS permission the user grants per app) can therefore record
+the stream too.
 
 ## Sensitive material - what we don't log
 

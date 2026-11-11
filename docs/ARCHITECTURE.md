@@ -406,10 +406,11 @@ bring it back. We deliberately do NOT auto-reorder-front on
 launcher, Dock-clicking) and yanked the user back into the stream whenever they
 tried to change a setting.
 
-**`NSWindow.sharingType`** = `.none`. The stream window opts out of
-ScreenCaptureKit and `screencapture(1)`; third-party recording / conferencing
-apps see a black surface where the stream is. Threat-model rationale is in
-`SECURITY.md` → Runtime hardening.
+**`NSWindow.sharingType`** = `.readOnly`. The stream window can be captured by
+ScreenCaptureKit, `screencapture(1)` and recording / conferencing apps. glimmer
+used `.none`; Shimmer allows capture because Picture in Picture mirrors this
+window's layer and stopped when a recording started. See `SECURITY.md` →
+Runtime hardening.
 
 ## Crossing isolation - receive threads ↔ Swift actors
 

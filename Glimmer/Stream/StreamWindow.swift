@@ -429,18 +429,16 @@ public final class StreamWindow {
         window.acceptsMouseMovedEvents = true
         window.hidesOnDeactivate = false
 
-        // SECURITY: refuse to be screen-captured. Prevents
-        // ScreenCaptureKit, the screencapture(1) tool, Cmd-Shift-5, Zoom /
-        // Teams / Discord screen-share, and the Quick-Time screen recording
-        // path from pulling the stream surface. Apps capturing the screen
-        // see a black region where the stream is drawn. Same posture as
-        // Apple TV+ and Netflix's macOS playback windows. If a user wants
-        // to record their stream they can use the host PC's own recording
-        // tools, where the underlying stream is unencrypted bytes the host
-        // owns - Glimmer is not the right place to expose that.
-        // (`--debug-pip-probe` launches make it read-only so the automated
-        // screen captures used to verify PiP placement can see the window.)
-        window.sharingType = PiPTrace.enabled ? .readOnly : .none
+        // Screen capture is ALLOWED (`.readOnly`). This used to be `.none`,
+        // which hides the window from ScreenCaptureKit, screencapture(1),
+        // Cmd-Shift-5 and screen sharing - the Netflix / Apple TV+ posture,
+        // inherited from glimmer. But the stream is the user's own game, not
+        // protected video, and the system Picture in Picture window mirrors
+        // THIS window's layer: with `.none`, the PiP picture stopped as soon
+        // as a screen recording started (reported on macOS 27.2). Recording
+        // your own stream on the Mac is a normal thing to want, and nothing
+        // here is secret from the person at the keyboard.
+        window.sharingType = .readOnly
 
         let view = DisplayContainerView(frame: screen.frame)
 
