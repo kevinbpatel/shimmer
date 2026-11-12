@@ -9,12 +9,8 @@
 Shimmer streams games from a PC running
 [Sunshine](https://github.com/LizardByte/Sunshine) to your Mac, and can pop the
 stream out into macOS **Picture in Picture**. The game floats over your other
-apps while your controller keeps playing.
-
-<p align="center">
-  <img src="docs/assets/servers.png" width="600" alt="Shimmer's Servers tab with a paired PC, its apps and a latency graph">
-</p>
-<p align="center"><em>Your PCs and their apps, in one window.</em></p>
+apps while your controller keeps playing, with no significant frame drops
+through Stage Manager, Mission Control or a locked screen.
 
 ### Picture in Picture
 
@@ -26,17 +22,23 @@ mouse over the PiP window moves the PC's pointer.
 ### One window
 
 Servers lists your PCs and the ones nearby, pairs them in place, shows each PC's
-apps, and can measure latency. Stream and General hold the settings.
+apps, and can measure latency. Stream and General hold the settings. The layout
+takes after Tailscale's Mac app.
 
 <p align="center">
-  <img src="docs/assets/stream-settings.png" width="600" alt="Shimmer's Stream settings tab">
+  <img src="docs/assets/servers.webp" width="400" alt="Shimmer's Servers tab with a paired PC, its apps and a latency graph">
+  <img src="docs/assets/stream-settings.webp" width="400" alt="Shimmer's Stream settings tab">
 </p>
-<p align="center"><em>Stream settings.</em></p>
 
 ### Made for the menu bar
 
-The menu bar icon shows the connected controller and its battery, or the app
-you're streaming. End Stream and Picture in Picture are in its menu.
+The menu bar icon shows the connected controller and its battery, drawn after
+Steam's controller icons, or the app you're streaming. End Stream and Picture in
+Picture are in its menu.
+
+<p align="center">
+  <img src="docs/assets/menu-bar-icons.webp" width="474" alt="Shimmer's menu bar icon for six controllers: DualSense, Xbox Wireless, Switch Pro, DualShock 4, Steam Controller charging and 8BitDo Ultimate">
+</p>
 
 ### What works today
 
